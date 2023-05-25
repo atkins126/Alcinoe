@@ -1,0 +1,97 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Form2'
+  ClientHeight = 705
+  ClientWidth = 519
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnResize = FormResize
+  DesignerMasterStyle = 0
+  object RemoteCameraLayout: TALLayout
+    HitTest = True
+    Position.X = 184.000000000000000000
+    Position.Y = 384.000000000000000000
+    Size.Width = 150.000000000000000000
+    Size.Height = 150.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    OnPaint = RemoteCameraLayoutPaint
+  end
+  object LocalCameraLayout: TALLayout
+    HitTest = True
+    Position.X = 15.000000000000000000
+    Position.Y = 385.000000000000000000
+    Size.Width = 150.000000000000000000
+    Size.Height = 150.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    OnPaint = LocalCameraLayoutPaint
+  end
+  object ButtonCall: TButton
+    Align = Top
+    Margins.Left = 15.000000000000000000
+    Margins.Top = 15.000000000000000000
+    Margins.Right = 15.000000000000000000
+    Position.X = 15.000000000000000000
+    Position.Y = 86.000000000000000000
+    Size.Width = 489.000000000000000000
+    Size.Height = 35.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Text = 'Connect'
+    OnClick = ButtonCallClick
+  end
+  object ButtonHangUp: TButton
+    Align = Top
+    Enabled = False
+    Margins.Left = 15.000000000000000000
+    Margins.Top = 15.000000000000000000
+    Margins.Right = 15.000000000000000000
+    Position.X = 15.000000000000000000
+    Position.Y = 136.000000000000000000
+    Size.Width = 489.000000000000000000
+    Size.Height = 35.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    Text = 'Hang-up'
+    OnClick = ButtonHangUpClick
+  end
+  object ServerUrlEdit: TEdit
+    Touch.InteractiveGestures = [LongTap, DoubleTap]
+    Align = Top
+    TabOrder = 4
+    Text = 'http://192.168.0.1:3030'
+    Position.X = 15.000000000000000000
+    Position.Y = 186.000000000000000000
+    Margins.Left = 15.000000000000000000
+    Margins.Top = 15.000000000000000000
+    Margins.Right = 15.000000000000000000
+    Size.Width = 489.000000000000000000
+    Size.Height = 33.000000000000000000
+    Size.PlatformDefault = False
+    TextPrompt = 'Server url'
+  end
+  object TextIntro: TALText
+    Align = Top
+    AutoSize = True
+    Margins.Left = 15.000000000000000000
+    Margins.Top = 15.000000000000000000
+    Margins.Right = 15.000000000000000000
+    Position.X = 15.000000000000000000
+    Position.Y = 15.000000000000000000
+    Size.Width = 489.000000000000000000
+    Size.Height = 56.000000000000000000
+    Size.PlatformDefault = False
+    Text = 
+      'You must also run '#13#10'Alcinoe\embarcadero\<yourDelphiVersion>\upda' +
+      'te.bat'#13#10' to retrieve and patch the original delphi source code'
+    TextSettings.Font.Size = 14.000000000000000000
+    TextSettings.Font.StyleExt = {00070000000000000004000000}
+    TextSettings.FontColor = claCrimson
+    TextSettings.WordWrap = True
+    TextSettings.HorzAlign = Center
+  end
+end

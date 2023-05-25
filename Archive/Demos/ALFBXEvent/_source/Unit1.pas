@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls, ALFBXclient, Shellapi;
+  Dialogs, StdCtrls, ExtCtrls, Alcinoe.FBX.Client, Shellapi;
 
 type
 
@@ -57,8 +57,8 @@ var
 
 implementation
 
-uses ALString,
-     ALFbxBase;
+uses Alcinoe.StringUtils,
+     Alcinoe.FBX.Base;
 
 {$R *.dfm}
 
@@ -82,7 +82,7 @@ begin
                                         AnsiString(ALEditFirebirdLogin.text),
                                         AnsiString(ALEditFirebirdPassword.text),
                                         AnsiString(ALEditFirebirdCharset.text),
-                                        ALStringReplace(ALTrim(AnsiString(ALMemoFireBirdEventName.lines.text)),#13#10,';',[RfReplaceALL]),
+                                        ALStringReplaceA(ALTrim(AnsiString(ALMemoFireBirdEventName.lines.text)),#13#10,';',[RfReplaceALL]),
                                         aFBAPiVersion,
                                         AnsiString(ALEditFirebirdLib.text),
                                         -1,

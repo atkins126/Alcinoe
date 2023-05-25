@@ -4,13 +4,17 @@ program DProjNormalizer;
 
 {$R *.res}
 
+{$I ..\..\..\Source\Alcinoe.inc}
+
 uses
+  system.IOUtils,
+  System.AnsiStrings,
   System.SysUtils,
-  ALXmlDoc,
-  ALCommon,
-  ALStringList,
-  ALFiles,
-  ALString;
+  Alcinoe.XMLDoc,
+  Alcinoe.Common,
+  Alcinoe.StringList,
+  Alcinoe.Files,
+  Alcinoe.StringUtils;
 
 {***********************************************************}
 Procedure _SortAttributesByNodeName(const aNode: TalXmlNode);
@@ -20,7 +24,7 @@ Begin
     ANode.AttributeNodes.CustomSort(
       function(List: TALXMLNodeList; Index1, Index2: Integer): Integer
       begin
-        result := ALCompareStr(List[index1].NodeName, List[index2].NodeName);
+        result := ALCompareStrA(List[index1].NodeName, List[index2].NodeName);
       end);
   //-----
   if aNode.ChildNodes <> nil then
@@ -36,13 +40,13 @@ Begin
     ANode.ChildNodes.CustomSort(
       function(List: TALXMLNodeList; Index1, Index2: Integer): Integer
       begin
-        result := ALCompareStr(List[index1].NodeName, List[index2].NodeName);
+        result := ALCompareStrA(List[index1].NodeName, List[index2].NodeName);
         if (result = 0) then begin
           var LXmlStr1: AnsiString;
           var LXmlStr2: AnsiString;
           List[index1].SaveToXML(LXmlStr1);  // << yes I know it's ugly
           List[index2].SaveToXML(LXmlStr2);  // << but I m lazzy
-          result := ALCompareStr(LXmlStr1, LXmlStr2);
+          result := ALCompareStrA(LXmlStr1, LXmlStr2);
         end;
       end);
   //-----
@@ -85,7 +89,7 @@ begin
 
   try
 
-    //Init project params 
+    //Init project params
     {$IFDEF DEBUG}
     ReportMemoryleaksOnSHutdown := True;
     {$ENDIF}
@@ -94,18 +98,18 @@ begin
     //init LDProjFilename / LCreateBackup
     var LDProjFilename: String;
     var LCreateBackup: Boolean;
-    var LParamLst := TALStringListU.Create;
+    var LParamLst := TALStringListW.Create;
     try
       for var I := 1 to ParamCount do
         LParamLst.Add(ParamStr(i));
-      LDProjFilename := ALTrimU(LParamLst.Values['-DProj']);
-      LCreateBackup := not ALSameTextU(ALTrimU(LParamLst.Values['-CreateBackup']), 'false');
+      LDProjFilename := ALTrim(LParamLst.Values['-DProj']);
+      LCreateBackup := not ALSameTextW(ALTrim(LParamLst.Values['-CreateBackup']), 'false');
     finally
       ALFreeAndNil(LParamLst);
     end;
     if LDProjFilename = '' then begin
-      LDProjFilename := ALTrimU(paramstr(1));
-      LCreateBackup := not ALSameTextU(ALTrimU(paramstr(2)), 'false');
+      LDProjFilename := ALTrim(paramstr(1));
+      LCreateBackup := not ALSameTextW(ALTrim(paramstr(2)), 'false');
     end;
     if LDProjFilename = '' then raise Exception.Create('Usage: DProjNormalizer.exe -DProj="<DprojFilename>" -CreateBackup=<true/false>');
 
@@ -128,11 +132,6 @@ begin
 
       //init LDeploymentNode
       var LDeploymentNode := LBorlandProjectNode.ChildNodes.FindNode('Deployment');
-      if LDeploymentNode = nil then raise Exception.Create('ProjectExtensions.BorlandProject.Deployment node not found!');
-
-      //check version attribute <Deployment Version="3">
-      //if LDeploymentNode.Attributes['Version'] <> '3' then
-      //  raise Exception.Create('ProjectExtensions.BorlandProject.Deployment.Version is not in the expected value (3)');
 
       //init LItemGroupNode
       var LItemGroupNode := LDProjXmlDoc.DocumentElement.ChildNodes.FindNode('ItemGroup');
@@ -171,42 +170,79 @@ begin
         LItemGroupNode.ChildNodes.add(LBuildConfigurationNodes[i]);
 
       //order LDeploymentNode
-      _SortAttributesByNodeName(LDeploymentNode);
-      _SortChildNodesByNodeNameAndAttributes(LDeploymentNode);
+      if LDeploymentNode <> nil then begin
+        _SortAttributesByNodeName(LDeploymentNode);
+        _SortChildNodesByNodeNameAndAttributes(LDeploymentNode);
+      end;
+
+      //remove <Disabled/> node from JavaReference node
+      //<JavaReference Include="android\Merged\libs\androidx.activity-activity-1.5.1.jar">
+      //  <ContainerId>ClassesdexFile64</ContainerId>
+      //  <Disabled/>
+      //</JavaReference>
+      // =>
+      //<JavaReference Include="android\Merged\libs\androidx.activity-activity-1.5.1.jar">
+      //  <ContainerId>ClassesdexFile64</ContainerId>
+      //</JavaReference>
+      {$IFNDEF ALCompilerVersionSupported}
+        {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-40709 is corrected and update the code below'}
+      {$IFEND}
+      for var I := LItemGroupNode.ChildNodes.Count - 1 downto 0 do begin
+        var LJavaReferenceNode := LItemGroupNode.ChildNodes[i];
+        if ALSameTextA(LJavaReferenceNode.NodeName, 'JavaReference') then begin
+          var LDisabledNode := LJavaReferenceNode.ChildNodes.FindNode('Disabled');
+          if (LDisabledNode <> nil) and (ALSameTextA(LDisabledNode.Text, 'false') or (LDisabledNode.Text='')) then
+            LJavaReferenceNode.ChildNodes.Remove(LDisabledNode);
+        end;
+      end;
+
+      //remove DCCReference nodes
+      //<DCCReference Include="Unit1.pas">
+      //  <Form>Form1</Form>
+      //</DCCReference>
+      for var I := LItemGroupNode.ChildNodes.Count - 1 downto 0 do begin
+        var LDCCReferenceNode := LItemGroupNode.ChildNodes[i];
+        if ALSameTextA(LDccReferenceNode.NodeName, 'DCCReference') then
+          LItemGroupNode.ChildNodes.Delete(i);
+      end;
 
       //remove from deployment unnecessary items
       //https://quality.embarcadero.com/browse/RSP-28003
-      for var I := LDeploymentNode.ChildNodes.Count - 1 downto 0 do begin
-        var LEnabledNode: TALXmlNode := nil;
-        var LDeployFileNode := LDeploymentNode.ChildNodes[i];
-        if (ALSameText(LDeployFileNode.NodeName, 'DeployFile')) then begin
-          for var j := LDeployFileNode.ChildNodes.Count - 1 downto 0 do begin
-            LEnabledNode := LDeployFileNode.ChildNodes[j].ChildNodes.FindNode('Enabled');
-            if (LEnabledNode <> nil) and (ALSameText(LEnabledNode.Text,'false')) then break;
-          end;
-          if (not ALSameText(LDeployFileNode.attributes['Class'], 'File')) and
-             ((LEnabledNode = nil) or                                           // normally we can also update other properties of a deploy file not only
-              (not ALSameText(LEnabledNode.Text,'false'))) then                 // enabled, but i consider we can only update enabled
-            LDeploymentNode.ChildNodes.Delete(i);
-        end
-        else if (ALSameText(LDeployFileNode.NodeName, 'DeployClass')) or    // this DeployClass seam not correctly updated
-                (ALSameText(LDeployFileNode.NodeName, 'ProjectRoot')) then  // so I prefer to delete them (don't know what could be the consequence)
-          LDeploymentNode.ChildNodes.Delete(i);                             // and ProjectRoot seam also to be useless
+      if LDeploymentNode <> nil then begin
+        for var I := LDeploymentNode.ChildNodes.Count - 1 downto 0 do begin
+          var LEnabledNode: TALXmlNode := nil;
+          var LDeployFileNode := LDeploymentNode.ChildNodes[i];
+          if (ALSameTextA(LDeployFileNode.NodeName, 'DeployFile')) then begin
+            for var j := LDeployFileNode.ChildNodes.Count - 1 downto 0 do begin
+              LEnabledNode := LDeployFileNode.ChildNodes[j].ChildNodes.FindNode('Enabled');
+              if (LEnabledNode <> nil) and (ALSameTextA(LEnabledNode.Text,'false')) then break;
+            end;
+            if (not ALSameTextA(LDeployFileNode.attributes['Class'], 'File')) and
+               ((LEnabledNode = nil) or                             // normally we can also update other properties of a deploy file not only
+                (not ALSameTextA(LEnabledNode.Text,'false'))) then  // enabled, but i consider we can only update enabled
+              LDeploymentNode.ChildNodes.Delete(i);
+          end
+          else if (ALSameTextA(LDeployFileNode.NodeName, 'DeployClass')) or    // this DeployClass seam not correctly updated
+                  (ALSameTextA(LDeployFileNode.NodeName, 'ProjectRoot')) then  // so I prefer to delete them (don't know what could be the consequence)
+            LDeploymentNode.ChildNodes.Delete(i);                              // and ProjectRoot seam also to be useless
+        end;
       end;
 
       //put ProjectRoot at the end (don't know if it's matter)
-      var LProjectRootNodes: Tarray<TalXmlNode>;
-      setlength(LProjectRootNodes, 0);
-      while True do begin
-        var LProjectRootNode := LDeploymentNode.ChildNodes.FindNode('ProjectRoot');
-        if LProjectRootNode <> nil then begin
-          Setlength(LProjectRootNodes, length(LProjectRootNodes)+1);
-          LProjectRootNodes[length(LProjectRootNodes) - 1] := LDeploymentNode.ChildNodes.Extract(LProjectRootNode);
-        end
-        else break;
+      if LDeploymentNode <> nil then begin
+        var LProjectRootNodes: Tarray<TalXmlNode>;
+        setlength(LProjectRootNodes, 0);
+        while True do begin
+          var LProjectRootNode := LDeploymentNode.ChildNodes.FindNode('ProjectRoot');
+          if LProjectRootNode <> nil then begin
+            Setlength(LProjectRootNodes, length(LProjectRootNodes)+1);
+            LProjectRootNodes[length(LProjectRootNodes) - 1] := LDeploymentNode.ChildNodes.Extract(LProjectRootNode);
+          end
+          else break;
+        end;
+        for var I := Low(LProjectRootNodes) to High(LProjectRootNodes) do
+          LDeploymentNode.ChildNodes.add(LProjectRootNodes[i]);
       end;
-      for var I := Low(LProjectRootNodes) to High(LProjectRootNodes) do
-        LDeploymentNode.ChildNodes.add(LProjectRootNodes[i]);
 
       //Remove Empty ProjectExtensions Node
       _RemoveEmptyProjectExtensionsNode(LDProjXmlDoc.DocumentElement);
@@ -225,8 +261,8 @@ begin
 
       //save the dproj
       if LCreateBackup then begin
-        if ALFileExistsU(LDProjFilename + '.bak') then raise Exception.CreateFmt('The backup file (%s) already exists!', [LDProjFilename + '.bak']);
-        if not ALrenameFileU(LDProjFilename, LDProjFilename+ '.bak') then raiseLastOsError;
+        if Tfile.Exists(LDProjFilename + '.bak') then raise Exception.CreateFmt('The backup file (%s) already exists!', [LDProjFilename + '.bak']);
+        Tfile.Move(LDProjFilename, LDProjFilename+ '.bak');
       end;
       ALSaveStringToFile(cAlUTF8Bom + LXmlStr, LDProjFilename);
 

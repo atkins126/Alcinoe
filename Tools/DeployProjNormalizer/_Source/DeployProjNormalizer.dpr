@@ -8,12 +8,13 @@ uses
   System.AnsiStrings,
   System.SysUtils,
   System.Classes,
+  System.IOUtils,
   system.Math,
-  ALXmlDoc,
-  ALCommon,
-  ALStringList,
-  ALFiles,
-  ALString;
+  Alcinoe.XMLDoc,
+  Alcinoe.Common,
+  Alcinoe.StringList,
+  Alcinoe.Files,
+  Alcinoe.StringUtils;
 
 {***********************************************************}
 Procedure _SortAttributesByNodeName(const aNode: TalXmlNode);
@@ -23,7 +24,7 @@ Begin
     ANode.AttributeNodes.CustomSort(
       function(List: TALXMLNodeList; Index1, Index2: Integer): Integer
       begin
-        result := ALCompareStr(List[index1].NodeName, List[index2].NodeName);
+        result := ALCompareStrA(List[index1].NodeName, List[index2].NodeName);
       end);
   //-----
   if aNode.ChildNodes <> nil then
@@ -39,13 +40,13 @@ Begin
     ANode.ChildNodes.CustomSort(
       function(List: TALXMLNodeList; Index1, Index2: Integer): Integer
       begin
-        result := ALCompareStr(List[index1].NodeName, List[index2].NodeName);
+        result := ALCompareStrA(List[index1].NodeName, List[index2].NodeName);
         if (result = 0) then begin
           var LXmlStr1: AnsiString;
           var LXmlStr2: AnsiString;
           List[index1].SaveToXML(LXmlStr1);  // << yes I know it's ugly
           List[index2].SaveToXML(LXmlStr2);  // << but I m lazzy
-          result := ALCompareStr(LXmlStr1, LXmlStr2);
+          result := ALCompareStrA(LXmlStr1, LXmlStr2);
         end;
       end);
   //-----
@@ -73,12 +74,13 @@ begin
 
 end;
 
-{******************************************************}
-function _getProjectRoot(const aProjectName: ansiString;
-                         const aPlatFormName: AnsiString): ansiString;
+{***********************}
+function _getProjectRoot(
+           const aProjectName: ansiString;
+           const aPlatFormName: AnsiString): ansiString;
 begin
   result := aProjectName +
-            ALifThen(
+            ALifThenA(
               //----
               (aPlatformName = 'iOSDevice64') or
               (aPlatformName = 'iOSSimulator') or
@@ -89,12 +91,13 @@ begin
               '.app');
 end;
 
-{*****************************************************}
-function _getProperty(const aProperties: TALStringList; // contain items like Cfg_1_iOSDevice64#xxxx=yyyyy
-                      const aConfigs: TALStringList; // contain items like Cfg_1=Debug
-                      const aPlatFormName: ansiString;
-                      const aConfigName: AnsiString;
-                      const aPropertyName: ansiString): ansiString;
+{********************}
+function _getProperty(
+           const aProperties: TALStringListA; // contain items like Cfg_1_iOSDevice64#xxxx=yyyyy
+           const aConfigs: TALStringListA; // contain items like Cfg_1=Debug
+           const aPlatFormName: ansiString;
+           const aConfigName: AnsiString;
+           const aPropertyName: ansiString): ansiString;
 begin
   var LConfigKey := aConfigs.Values[aConfigName]; // Cfg_1
                     result := aProperties.Values[LConfigKey+'_'+aPlatFormName+'#'+aPropertyName]; // Cfg_1_iOSDevice64#xxxx
@@ -103,38 +106,40 @@ begin
   if result='' then result := aProperties.Values['Base#'+aPropertyName];                          // Base#xxxx
 end;
 
-{*********************************************************}
-function _getExeOutputDir(const aProperties: TALStringList; // contain items like Cfg_1_iOSDevice64=..\..\$(Platform)\$(Config)
-                          const aConfigs: TALStringList; // contain items like Cfg_1=Debug
-                          const aPlatFormName: ansiString;
-                          const aConfigName: AnsiString): ansiString;
+{************************}
+function _getExeOutputDir(
+           const aProperties: TALStringListA; // contain items like Cfg_1_iOSDevice64=..\..\$(Platform)\$(Config)
+           const aConfigs: TALStringListA; // contain items like Cfg_1=Debug
+           const aPlatFormName: ansiString;
+           const aConfigName: AnsiString): ansiString;
 begin
   result := _getProperty(
-              aProperties, // const aProperties: TALStringList; // contain items like Cfg_1_iOSDevice64=..\..\$(Platform)\$(Config)
-              aConfigs, // const aConfigs: TALStringList; // contain items like Cfg_1=Debug
+              aProperties, // const aProperties: TALStringListA; // contain items like Cfg_1_iOSDevice64=..\..\$(Platform)\$(Config)
+              aConfigs, // const aConfigs: TALStringListA; // contain items like Cfg_1=Debug
               aPlatFormName, // const aPlatFormName: ansiString;
               aConfigName, // const aConfigName: AnsiString
               'DCC_ExeOutput'); // const aPropertyName: String;
-  result := ALStringReplace(result, '$(Platform)', aPlatFormName, [rfIgnoreCase, RfReplaceALL]);
-  result := ALStringReplace(result, '$(Config)', aConfigName, [rfIgnoreCase, RfReplaceALL]);
+  result := ALStringReplaceA(result, '$(Platform)', aPlatFormName, [rfIgnoreCase, RfReplaceALL]);
+  result := ALStringReplaceA(result, '$(Config)', aConfigName, [rfIgnoreCase, RfReplaceALL]);
   if (result <> '') and (result[high(result)] <> '\') then result := result + '\';
-  if alpos('.\', result) = 1 then delete(Result, 1, 2);
+  if ALPosA('.\', result) = 1 then delete(Result, 1, 2);
 end;
 
-{******************************************************************}
-Procedure _addDeployFile(const aAlreadyDeployedFiles: TalStringList;
-                         const aItemGroupNode: TalXmlNode;
-                         const aCondition: AnsiString; // ConfigName
-                         const aInclude: AnsiString;
-                         const aDeployClass: AnsiString;
-                         const aLocalCommand: AnsiString;
-                         const aOperation: AnsiString;
-                         aOverwrite: AnsiString;
-                         const aRemoteCommand: AnsiString;
-                         const aRemoteDir: AnsiString;
-                         const aRemoteName: AnsiString;
-                         aRequired: AnsiString;
-                         const aEnabled: Boolean = True); overload;
+{***********************}
+Procedure _addDeployFile(
+            const aAlreadyDeployedFiles: TALStringListA;
+            const aItemGroupNode: TalXmlNode;
+            const aCondition: AnsiString; // ConfigName
+            const aInclude: AnsiString;
+            const aDeployClass: AnsiString;
+            const aLocalCommand: AnsiString;
+            const aOperation: AnsiString;
+            aOverwrite: AnsiString;
+            const aRemoteCommand: AnsiString;
+            const aRemoteDir: AnsiString;
+            const aRemoteName: AnsiString;
+            aRequired: AnsiString;
+            const aEnabled: Boolean = True); overload;
 Begin
   var LPlatFormName := aItemGroupNode.Attributes['Condition']; // '$(Platform)'=='Android'
   //-----
@@ -187,27 +192,28 @@ Begin
   end;
 End;
 
-{******************************************************************}
-Procedure _addDeployFile(const aAlreadyDeployedFiles: TalStringList;
-                         const aProperties: TALStringList;
-                         const aConfigs: TALStringList;
-                         const aPlatFormName: ansiString;
-                         const aConfigName: AnsiString;
-                         const aPropertyName: ansiString;
-                         const aItemGroupNode: TalXmlNode;
-                         const aDeployClass: AnsiString;
-                         const aLocalCommand: AnsiString;
-                         const aOperation: AnsiString;
-                         aOverwrite: AnsiString;
-                         const aRemoteCommand: AnsiString;
-                         const aRemoteDir: AnsiString;
-                         const aRemoteName: AnsiString;
-                         aRequired: AnsiString;
-                         const aEnabled: Boolean = True); overload;
+{***********************}
+Procedure _addDeployFile(
+            const aAlreadyDeployedFiles: TALStringListA;
+            const aProperties: TALStringListA;
+            const aConfigs: TALStringListA;
+            const aPlatFormName: ansiString;
+            const aConfigName: AnsiString;
+            const aPropertyName: ansiString;
+            const aItemGroupNode: TalXmlNode;
+            const aDeployClass: AnsiString;
+            const aLocalCommand: AnsiString;
+            const aOperation: AnsiString;
+            aOverwrite: AnsiString;
+            const aRemoteCommand: AnsiString;
+            const aRemoteDir: AnsiString;
+            const aRemoteName: AnsiString;
+            aRequired: AnsiString;
+            const aEnabled: Boolean = True); overload;
 Begin
   var LInclude := _getProperty(
-                    aProperties, // const aProperties: TALStringList;
-                    aconfigs, //const aConfigs: TALStringList;
+                    aProperties, // const aProperties: TALStringListA;
+                    aconfigs, //const aConfigs: TALStringListA;
                     aPlatFormName, // const aPlatFormName: ansiString;
                     aConfigName, // const aConfigName: AnsiString;
                     aPropertyName); // const aPropertyName: ansiString
@@ -215,7 +221,7 @@ Begin
     var LRemoteName := aRemoteName;
     if LRemoteName = '' then LRemoteName := ALExtractFileName(Linclude);
     _addDeployFile(
-      aAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+      aAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
       aItemGroupNode, // const aItemGroupNode: TalXmlNode;
       aConfigName, // const aCondition: AnsiString;
       LInclude, // const aInclude: AnsiString;
@@ -244,30 +250,30 @@ begin
     //init LDProjFilename / LDeployProjFilename / LProjectName / LOnlySort
     var LDProjFilename: String;
     var LCreateBackup: Boolean;
-    var LParamLst := TALStringListU.Create;
+    var LParamLst := TALStringListW.Create;
     try
       for var I := 1 to ParamCount do
         LParamLst.Add(ParamStr(i));
-      LDProjFilename := ALTrimU(LParamLst.Values['-DProj']);
-      LCreateBackup := not ALSameTextU(ALTrimU(LParamLst.Values['-CreateBackup']), 'false');
+      LDProjFilename := ALTrim(LParamLst.Values['-DProj']);
+      LCreateBackup := not ALSameTextW(ALTrim(LParamLst.Values['-CreateBackup']), 'false');
     finally
       ALFreeAndNil(LParamLst);
     end;
     if LDProjFilename = '' then begin
-      LDProjFilename := ALTrimU(paramstr(1));
-      LCreateBackup := not ALSameTextU(ALTrimU(paramstr(2)), 'false');
+      LDProjFilename := ALTrim(paramstr(1));
+      LCreateBackup := not ALSameTextW(ALTrim(paramstr(2)), 'false');
     end;
     if LDProjFilename = '' then raise Exception.Create('Usage: DeployProjNormalizer.exe -DProj="<DprojFilename>" -CreateBackup=<true/false>');
     var LProjectName := ALExtractFileName(AnsiString(LDProjFilename), true{RemoveFileExt});
-    var LDeployProjFilename := ALExtractFilePathU(LDProjFilename) + String(LProjectName) + '.deployproj';
+    var LDeployProjFilename := ALExtractFilePath(LDProjFilename) + String(LProjectName) + '.deployproj';
 
     //create the LDProjXmlDoc / LDeployProjXmlDoc
     var LDProjXmlDoc := TALXmlDocument.Create('Project');
     var LDeployProjXmlDoc := TALXmlDocument.Create('Project');
-    var LPlatforms := TALStringList.Create;
-    var LConfigs := TALStringList.Create;
-    var LProperties := TALStringList.Create;
-    var LAlreadyDeployedFiles := TALStringList.Create;
+    var LPlatforms := TALStringListA.Create;
+    var LConfigs := TALStringListA.Create;
+    var LProperties := TALStringListA.Create;
+    var LAlreadyDeployedFiles := TALStringListA.Create;
     Try
 
       //init LAlreadyDeployedFiles
@@ -319,7 +325,7 @@ begin
       if LPlatformsNode = nil then raise Exception.Create('Platforms node not found!');
       for var I := 0 to LPlatformsNode.ChildNodes.Count - 1 do begin
         var LPlatformNode := LPlatformsNode.ChildNodes[i];
-        if not ALSameText(LPlatformNode.Text, 'True') then continue;
+        if not ALSameTextA(LPlatformNode.Text, 'True') then continue;
         Var LplatformName := LPlatformNode.Attributes['value'];
         if LplatformName = '' then raise Exception.Create('Error D76FB179-4F0D-4CBF-93CA-E3D41E58C273');
         var LDeployProjItemGroupNode := LDeployProjXmlDoc.DocumentElement.AddChild('ItemGroup');
@@ -330,10 +336,10 @@ begin
       //init Lconfigs
       for var I := 0 to LItemGroupNode.ChildNodes.Count - 1 do begin
         var LBuildConfigurationNode := LItemGroupNode.ChildNodes[i];
-        if not ALSameText(LBuildConfigurationNode.NodeName, 'BuildConfiguration') then continue;
+        if not ALSameTextA(LBuildConfigurationNode.NodeName, 'BuildConfiguration') then continue;
         var LConfigName := LBuildConfigurationNode.Attributes['Include'];
         if LConfigName = '' then raise Exception.Create('Error 316E8622-C0D6-482A-AC18-3166F461A9CA');
-        if AlSameText(LConfigName, 'Base') then continue;
+        if ALSameTextA(LConfigName, 'Base') then continue;
         var LKeyNode := LBuildConfigurationNode.ChildNodes.FindNode('Key');
         if LKeyNode = nil then raise Exception.Create('Error 12A4543B-527B-45B4-B87D-D9CD04D66568');
         Lconfigs.AddNameValue(LConfigName,LKeyNode.Text); // Debug=Cfg_1
@@ -346,8 +352,8 @@ begin
         if (LPropertyGroupNode.NodeName = 'PropertyGroup') and
            (LPropertyGroupNode.attributes['Condition'] <> '') then begin
           var Lcondition := LPropertyGroupNode.attributes['Condition']; // '$(Base_iOSDevice64)'!=''
-          Lcondition := ALStringReplace(Lcondition,'''$(','',[]); // // Base_iOSDevice64)'!=''
-          Lcondition := ALStringReplace(Lcondition,')''!=''''','',[]); // // Base_iOSDevice64
+          Lcondition := ALStringReplaceA(Lcondition,'''$(','',[]); // // Base_iOSDevice64)'!=''
+          Lcondition := ALStringReplaceA(Lcondition,')''!=''''','',[]); // // Base_iOSDevice64
           for var J := 0 to LPropertyGroupNode.ChildNodes.Count - 1 do begin
             var LPropertyNode := LPropertyGroupNode.ChildNodes[J]; // <Icns_MainIcns>icons\ico_round_16_32_48_128_256_512.icns</Icns_MainIcns>
             if LPropertyNode.Text <> '' then LProperties.AddNameValue(Lcondition+'#'+LPropertyNode.NodeName, LPropertyNode.Text); // Cfg_1_iOSDevice64#Icns_MainIcns=icons\ico_round_16_32_48_128_256_512.icns
@@ -360,7 +366,7 @@ begin
              ((LProjectVersionNode.Text <> '19.2' {Sydney}) and
               (LProjectVersionNode.Text <> '19.5' {Alexandria})) then
             raise Exception.Create('Unsupported Delphi compiler. Please consult Readme.txt');
-          LProjectVersion := ALStrToFloat(LProjectVersionNode.Text, ALDefaultFormatSettings);
+          LProjectVersion := ALStrToFloat(LProjectVersionNode.Text, ALDefaultFormatSettingsA);
         end;
       end;
       if SameValue(LProjectVersion, 0) then
@@ -374,7 +380,7 @@ begin
           for var J := 0 to LDeploymentNode.ChildNodes.Count - 1 do begin
             var LDeployFileNode := LDeploymentNode.ChildNodes[J];
             if (LDeployFileNode.NodeName = 'DeployFile') and
-               (ALSameText(LDeployFileNode.attributes['Class'], LName)) then begin
+               (ALSameTextA(LDeployFileNode.attributes['Class'], LName)) then begin
               for var k := 0 to LDeployClassNode.ChildNodes.Count - 1 do begin
                 var LDeployClassPlatformNode := LDeployClassNode.ChildNodes[K];
                 if LDeployClassPlatformNode.NodeName <> 'Platform' then
@@ -387,7 +393,7 @@ begin
                     raise Exception.Create('Error D6497915-23CC-4D0D-9855-774741D74886');
                   var LDeployFilePlatformName := LDeployFilePlatformNode.Attributes['Name'];
                   if LDeployFilePlatformName = '' then raise Exception.Create('Error CC0A9209-4B03-4E9A-A543-B0B92371880E');
-                  if ALSameText(LDeployFilePlatformName, LDeployClassPlatformName) then begin
+                  if ALSameTextA(LDeployFilePlatformName, LDeployClassPlatformName) then begin
                     for var M := 0 to LDeployClassPlatformNode.ChildNodes.Count - 1 do begin
                       var LNodeName := LDeployClassPlatformNode.ChildNodes[m].NodeName;
                       if LDeployFilePlatformNode.ChildNodes.FindNode(LNodeName) = nil then
@@ -478,7 +484,7 @@ begin
           Var LRemoteDir: AnsiString := '';
           var LPlatformRemoteDirNode := LPlatformNode.ChildNodes.FindNode('RemoteDir');
           if LPlatformRemoteDirNode <> nil then LRemoteDir := LPlatformRemoteDirNode.Text;
-          if alpos('.\', LRemoteDir) = 1 then delete(LRemoteDir, 1, 1);
+          if ALPosA('.\', LRemoteDir) = 1 then delete(LRemoteDir, 1, 1);
           if (LRemoteDir <> '') and (LRemoteDir[low(LRemoteDir)] <> '\') then LRemoteDir := '\' + LRemoteDir;
           if (LRemoteDir <> '') and (LRemoteDir[high(LRemoteDir)] <> '\') then LRemoteDir := LRemoteDir + '\';
           if (LRemoteDir = '') then LRemoteDir := '\';
@@ -491,11 +497,11 @@ begin
 
           //<Enabled>false</Enabled>
           var LPlatformEnabledNode := LPlatformNode.ChildNodes.FindNode('Enabled');
-          var LEnabled := (LPlatformEnabledNode = nil) or (not ALSameText(LPlatformEnabledNode.Text, 'false'));
+          var LEnabled := (LPlatformEnabledNode = nil) or (not ALSameTextA(LPlatformEnabledNode.Text, 'false'));
 
           //create LDeployProjDeployFileNode
           _addDeployFile(
-            LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+            LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
             LDeployProjItemGroupNode, // const aItemGroupNode: TalXmlNode;
             LDeployFileNode.Attributes['Configuration'], // const aCondition: String;
             LDeployFileNode.Attributes['LocalName'], // const aInclude: String;
@@ -546,16 +552,16 @@ begin
           for var K := 0 to LConfigs.Count - 1 do begin
             var LPlatformName := LplatForms[J];
             var LRemoteDir: AnsiString;
-            if ALsametext(LPlatformName, 'iOSDevice64') or
-               ALsametext(LPlatformName, 'iOSSimulator') or
-               ALSameText(LplatFormName, 'iOSSimARM64') then LRemoteDir := _getProjectRoot(LProjectName, LPlatformName) + '\StartUp\Documents\'
-            else if ALsametext(LPlatformName, 'OSX64') or
-                    ALsametext(LPlatformName, 'OSXARM64') then LRemoteDir := _getProjectRoot(LProjectName, LPlatformName) + '\Contents\Resources\StartUp\'
-            else if ALsametext(LPlatformName, 'Android') or
-                    ALsametext(LPlatformName, 'Android64') then LRemoteDir := _getProjectRoot(LProjectName, LPlatformName) + '\assets\internal\'
+            if ALSameTextA(LPlatformName, 'iOSDevice64') or
+               ALSameTextA(LPlatformName, 'iOSSimulator') or
+               ALSameTextA(LplatFormName, 'iOSSimARM64') then LRemoteDir := _getProjectRoot(LProjectName, LPlatformName) + '\StartUp\Documents\'
+            else if ALSameTextA(LPlatformName, 'OSX64') or
+                    ALSameTextA(LPlatformName, 'OSXARM64') then LRemoteDir := _getProjectRoot(LProjectName, LPlatformName) + '\Contents\Resources\StartUp\'
+            else if ALSameTextA(LPlatformName, 'Android') or
+                    ALSameTextA(LPlatformName, 'Android64') then LRemoteDir := _getProjectRoot(LProjectName, LPlatformName) + '\assets\internal\'
             else continue;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[J]), // const aItemGroupNode: TalXmlNode;
               LConfigs.Names[k], // const aCondition: String;
               LRcItemNode.Attributes['Include'], // const aInclude: String;
@@ -576,7 +582,7 @@ begin
         for var J := 0 to LConfigs.Count - 1 do begin
           var LConfigName := LConfigs.Names[j];
 
-          if (ALSameText(LplatFormName, 'Android') or ALSameText(LplatFormName, 'Android64')) then begin
+          if (ALSameTextA(LplatFormName, 'Android') or ALSameTextA(LplatFormName, 'Android64')) then begin
 
             //-----
             //<Android_LauncherIcon36>$(BDS)\bin\Artwork\Android\FM_LauncherIcon_36x36.png</Android_LauncherIcon36>
@@ -586,9 +592,9 @@ begin
             //<Android_LauncherIcon144>$(BDS)\bin\Artwork\Android\FM_LauncherIcon_144x144.png</Android_LauncherIcon144>
             //<Android_LauncherIcon192>$(BDS)\bin\Artwork\Android\FM_LauncherIcon_192x192.png</Android_LauncherIcon192>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_LauncherIcon36', // const aPropertyName: ansiString;
@@ -603,9 +609,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_LauncherIcon48', // const aPropertyName: ansiString;
@@ -620,9 +626,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_LauncherIcon72', // const aPropertyName: ansiString;
@@ -637,9 +643,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_LauncherIcon96', // const aPropertyName: ansiString;
@@ -654,9 +660,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_LauncherIcon144', // const aPropertyName: ansiString;
@@ -671,9 +677,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_LauncherIcon192', // const aPropertyName: ansiString;
@@ -693,9 +699,9 @@ begin
             //<Android_SplashImage640>$(BDS)\bin\Artwork\Android\FM_SplashImage_640x480.png</Android_SplashImage640>
             //<Android_SplashImage960>$(BDS)\bin\Artwork\Android\FM_SplashImage_960x720.png</Android_SplashImage960>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_SplashImage426', // const aPropertyName: ansiString;
@@ -710,9 +716,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_SplashImage470', // const aPropertyName: ansiString;
@@ -727,9 +733,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_SplashImage640', // const aPropertyName: ansiString;
@@ -744,9 +750,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_SplashImage960', // const aPropertyName: ansiString;
@@ -767,9 +773,9 @@ begin
             //<Android_NotificationIcon72>$(BDS)\bin\Artwork\Android\FM_NotificationIcon_72x72.png</Android_NotificationIcon72>
             //<Android_NotificationIcon96>$(BDS)\bin\Artwork\Android\FM_NotificationIcon_96x96.png</Android_NotificationIcon96>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_NotificationIcon24', // const aPropertyName: ansiString;
@@ -784,9 +790,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_NotificationIcon36', // const aPropertyName: ansiString;
@@ -801,9 +807,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_NotificationIcon48', // const aPropertyName: ansiString;
@@ -818,9 +824,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_NotificationIcon72', // const aPropertyName: ansiString;
@@ -835,9 +841,9 @@ begin
               ''); // aRequired: AnsiString;
             //-----
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Android_NotificationIcon96', // const aPropertyName: ansiString;
@@ -853,15 +859,15 @@ begin
 
           end;
 
-          if ALSameText(LplatFormName, 'iOSDevice64') or
-             ALSameText(LplatFormName, 'iOSSimulator') or
-             ALSameText(LplatFormName, 'iOSSimARM64') then begin
+          if ALSameTextA(LplatFormName, 'iOSDevice64') or
+             ALSameTextA(LplatFormName, 'iOSSimulator') or
+             ALSameTextA(LplatFormName, 'iOSSimARM64') then begin
 
             //<iOS_AppStore1024>$(BDS)\bin\Artwork\iOS\iPhone\FM_ApplicationIcon_1024x1024.png</iOS_AppStore1024>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iOS_AppStore1024', // const aPropertyName: ansiString;
@@ -880,9 +886,9 @@ begin
             //<iPad_AppIcon152>$(BDS)\bin\Artwork\iOS\iPad\FM_ApplicationIcon_152x152.png</iPad_AppIcon152>
             //<iPad_AppIcon167>$(BDS)\bin\Artwork\iOS\iPad\FM_ApplicationIcon_167x167.png</iPad_AppIcon167>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_AppIcon120', // const aPropertyName: ansiString;
@@ -896,9 +902,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_AppIcon180', // const aPropertyName: ansiString;
@@ -912,9 +918,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_AppIcon152', // const aPropertyName: ansiString;
@@ -928,9 +934,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_AppIcon167', // const aPropertyName: ansiString;
@@ -948,9 +954,9 @@ begin
             //<iPhone_Spotlight120>$(BDS)\bin\Artwork\iOS\iPhone\FM_SpotlightSearchIcon_120x120.png</iPhone_Spotlight120>
             //<iPad_SpotLight80>$(BDS)\bin\Artwork\iOS\iPad\FM_SpotlightSearchIcon_80x80.png</iPad_SpotLight80>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Spotlight80', // const aPropertyName: ansiString;
@@ -964,9 +970,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Spotlight120', // const aPropertyName: ansiString;
@@ -980,9 +986,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_SpotLight80', // const aPropertyName: ansiString;
@@ -1000,9 +1006,9 @@ begin
             //<iPhone_Setting87>$(BDS)\bin\Artwork\iOS\iPhone\FM_SettingIcon_87x87.png</iPhone_Setting87>
             //<iPad_Setting58>$(BDS)\bin\Artwork\iOS\iPad\FM_SettingIcon_58x58.png</iPad_Setting58>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Setting58', // const aPropertyName: ansiString;
@@ -1016,9 +1022,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Setting87', // const aPropertyName: ansiString;
@@ -1032,9 +1038,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_Setting58', // const aPropertyName: ansiString;
@@ -1052,9 +1058,9 @@ begin
             //<iPhone_Notification60>$(BDS)\bin\Artwork\iOS\iPhone\FM_NotificationIcon_60x60.png</iPhone_Notification60>
             //<iPad_Notification40>$(BDS)\bin\Artwork\iOS\iPad\FM_NotificationIcon_40x40.png</iPad_Notification40>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Notification40', // const aPropertyName: ansiString;
@@ -1068,9 +1074,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Notification60', // const aPropertyName: ansiString;
@@ -1084,9 +1090,9 @@ begin
               '', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_Notification40', // const aPropertyName: ansiString;
@@ -1108,9 +1114,9 @@ begin
             //<iPad_Launch2x>$(BDS)\bin\Artwork\iOS\iPad\FM_LaunchImage_2x.png</iPad_Launch2x>
             //<iPad_LaunchDark2x>$(BDS)\bin\Artwork\iOS\iPad\FM_LaunchImageDark_2x.png</iPad_LaunchDark2x>
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Launch2x', // const aPropertyName: ansiString;
@@ -1124,9 +1130,9 @@ begin
               'FM_LaunchScreenImage_iPhone@2x.png', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_LaunchDark2x', // const aPropertyName: ansiString;
@@ -1140,9 +1146,9 @@ begin
               'FM_LaunchScreenImage_iPhoneDark@2x.png', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_Launch3x', // const aPropertyName: ansiString;
@@ -1156,9 +1162,9 @@ begin
               'FM_LaunchScreenImage_iPhone@3x.png', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPhone_LaunchDark3x', // const aPropertyName: ansiString;
@@ -1172,9 +1178,9 @@ begin
               'FM_LaunchScreenImage_iPhoneDark@3x.png', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_Launch2x', // const aPropertyName: ansiString;
@@ -1188,9 +1194,9 @@ begin
               'FM_LaunchScreenImage_iPad@2x.png', // const aRemoteName: String;
               ''); // aRequired: AnsiString;
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'iPad_LaunchDark2x', // const aPropertyName: ansiString;
@@ -1211,10 +1217,10 @@ begin
           //GDB is Android debugger. Specifically, Delphi uses GDB for debugging 32bit Android applications. For debugging 64bit
           //Android applications it uses different debugger LLDB. GDB is deprecated and will be removed soon
           //https://source.android.com/devices/tech/debug/gdb
-          //if (ALSameText(LplatFormName, 'Android')) and
-          //   (ALSameText(LConfigName, 'Debug')) then
+          //if (ALSameTextA(LplatFormName, 'Android')) and
+          //   (ALSameTextA(LConfigName, 'Debug')) then
           //  _addDeployFile(
-          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
           //    TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
           //    LConfigName, // const aCondition: String;
           //    '$(NDKBasePath)\prebuilt\android-arm\gdbserver\gdbserver', // const aInclude: String;
@@ -1239,46 +1245,46 @@ begin
           //Android/Android64
           //mips: code compiled for the MIPS32r1 and later architecture (32 bits, MIPS support has been removed from the Android NDK in r17).
           //this file is simply to show the message "Application does not support this device" at startup
-          if (ALSameText(LplatFormName, 'Android') or ALSameText(LplatFormName, 'Android64')) then
-            _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
-              LConfigName, // const aCondition: String;
-              '$(BDS)\lib\android\'+ALLowerCase(LConfigName)+'\mips\libnative-activity.so', // const aInclude: String;
-              'AndroidLibnativeMipsFile', // const aDeployClass: String;
-              '', // const aLocalCommand: String;
-              '1', // const aOperation: String;
-              'True', // aOverwrite: String;
-              '', // const aRemoteCommand: String;
-              _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\mips\', // const aRemoteDir: String;
-              'lib'+LProjectName+'.so', // const aRemoteName: String;
-              ''); // aRequired: AnsiString
+          //if (ALSameTextA(LplatFormName, 'Android') or ALSameTextA(LplatFormName, 'Android64')) then
+          //  _addDeployFile(
+          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+          //    TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
+          //    LConfigName, // const aCondition: String;
+          //    '$(BDS)\lib\android\'+ALLowerCase(LConfigName)+'\mips\libnative-activity.so', // const aInclude: String;
+          //    'AndroidLibnativeMipsFile', // const aDeployClass: String;
+          //    '', // const aLocalCommand: String;
+          //    '1', // const aOperation: String;
+          //    'True', // aOverwrite: String;
+          //    '', // const aRemoteCommand: String;
+          //    _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\mips\', // const aRemoteDir: String;
+          //    'lib'+LProjectName+'.so', // const aRemoteName: String;
+          //    ''); // aRequired: AnsiString
 
           //-----------------
           //Android/Android64
           //armeabi: code compiled for the old ARMv5 architecture (32 bits, ARMv5 support has been removed from Android NDK in r17)
           //this file is simply to show the message "Application does not support this device" at startup
-          if (ALSameText(LplatFormName, 'Android') or ALSameText(LplatFormName, 'Android64')) then
-            _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
-              LConfigName, // const aCondition: String;
-              '$(BDS)\lib\android\'+ALLowerCase(LConfigName)+'\armeabi\libnative-activity.so', // const aInclude: String;
-              'AndroidLibnativeArmeabiFile', // const aDeployClass: String;
-              '', // const aLocalCommand: String;
-              '1', // const aOperation: String;
-              'True', // aOverwrite: String;
-              '', // const aRemoteCommand: String;
-              _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\armeabi\', // const aRemoteDir: String;
-              'lib'+LProjectName+'.so', // const aRemoteName: String;
-              ''); // aRequired: AnsiString
+          //if (ALSameTextA(LplatFormName, 'Android') or ALSameTextA(LplatFormName, 'Android64')) then
+          //  _addDeployFile(
+          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+          //    TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
+          //    LConfigName, // const aCondition: String;
+          //    '$(BDS)\lib\android\'+ALLowerCase(LConfigName)+'\armeabi\libnative-activity.so', // const aInclude: String;
+          //    'AndroidLibnativeArmeabiFile', // const aDeployClass: String;
+          //    '', // const aLocalCommand: String;
+          //    '1', // const aOperation: String;
+          //    'True', // aOverwrite: String;
+          //    '', // const aRemoteCommand: String;
+          //    _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\armeabi\', // const aRemoteDir: String;
+          //    'lib'+LProjectName+'.so', // const aRemoteName: String;
+          //    ''); // aRequired: AnsiString
 
           //-----------------
           //Android/Android64
           //armeabi-v7a: compiled code for ARMv7 architecture (32 bits)
-          if (ALSameText(LplatFormName, 'Android')) then
+          if (ALSameTextA(LplatFormName, 'Android')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+'lib'+LProjectName+'.so', // const aInclude: String;
@@ -1291,17 +1297,17 @@ begin
               'lib'+LProjectName+'.so', // const aRemoteName: String;
               'True'); // aRequired: AnsiString
           //-----
-          if (ALSameText(LplatFormName, 'Android64')) then begin
-            if ALSametext(
+          if (ALSameTextA(LplatFormName, 'Android64')) then begin
+            if ALSameTextA(
                  _getProperty(
-                   LProperties, // const aProperties: TALStringList;
-                   Lconfigs, //const aConfigs: TALStringList;
+                   LProperties, // const aProperties: TALStringListA;
+                   Lconfigs, //const aConfigs: TALStringListA;
                    LPlatFormName, // const aPlatFormName: ansiString;
                    LConfigName, // const aConfigName: AnsiString;
                    'DCC_GenerateAndroidAppBundleFile'), // const aPropertyName: ansiString;
                  'True') then //const aConfigName: AnsiString)
               _addDeployFile(
-                LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+                LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
                 TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
                 LConfigName, // const aCondition: String;
                 _getExeOutputDir(LProperties,LConfigs,'Android',LConfigName)+'lib'+LProjectName+'.so', // const aInclude: String;
@@ -1312,29 +1318,32 @@ begin
                 '', // const aRemoteCommand: String;
                 _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\armeabi-v7a\', // const aRemoteDir: String;
                 'lib'+LProjectName+'.so', // const aRemoteName: String;
-                '') // aRequired: AnsiString
-            else
-              _addDeployFile(
-                LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-                TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
-                LConfigName, // const aCondition: String;
-                '$(BDS)\lib\android\'+ALLowerCase(LConfigName)+'\armeabi-v7a\libnative-activity.so', // const aInclude: String;
-                'AndroidLibnativeArmeabiv7aFile', // const aDeployClass: String;
-                '', // const aLocalCommand: String;
-                '1', // const aOperation: String;
-                'True', // aOverwrite: String;
-                '', // const aRemoteCommand: String;
-                _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\armeabi-v7a\', // const aRemoteDir: String;
-                'lib'+LProjectName+'.so', // const aRemoteName: String;
                 ''); // aRequired: AnsiString
+            //this file is simply to show the message "Application does not support this device" at startup
+            //but it's not present in the "release" directory (c:\Program Files (x86)\Embarcadero\Studio\22.0\lib\android\release\armeabi-v7a\)
+            //so I prefere to skip it - https://quality.embarcadero.com/browse/RSP-40256
+            //else
+            //  _addDeployFile(
+            //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+            //    TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
+            //    LConfigName, // const aCondition: String;
+            //    '$(BDS)\lib\android\'+ALLowerCase(LConfigName)+'\armeabi-v7a\libnative-activity.so', // const aInclude: String;
+            //    'AndroidLibnativeArmeabiv7aFile', // const aDeployClass: String;
+            //    '', // const aLocalCommand: String;
+            //    '1', // const aOperation: String;
+            //    'True', // aOverwrite: String;
+            //    '', // const aRemoteCommand: String;
+            //    _getProjectRoot(LProjectName, LPlatformName)+'\library\lib\armeabi-v7a\', // const aRemoteDir: String;
+            //    'lib'+LProjectName+'.so', // const aRemoteName: String;
+            //    ''); // aRequired: AnsiString
           end;
 
           //---------
           //Android64
           //arm64-v8a: compiled code for ARMv8 architecture (64 bits)
-          if (ALSameText(LplatFormName, 'Android64')) then
+          if (ALSameTextA(LplatFormName, 'Android64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+'lib'+LProjectName+'.so', // const aInclude: String;
@@ -1351,9 +1360,9 @@ begin
           //Android/Android64
           //The manifest file describes essential information about your app to the Android build tools, the Android
           //operating system, and Google Play
-          if (ALSameText(LplatFormName, 'Android') or ALSameText(LplatFormName, 'Android64')) then
+          if (ALSameTextA(LplatFormName, 'Android') or ALSameTextA(LplatFormName, 'Android64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+ 'AndroidManifest.xml', // const aInclude: String;
@@ -1370,10 +1379,10 @@ begin
           //Android/Android64
           //The classes.dex file is a Dalvik Executable file that all Android applications must have. This file contains
           //the Java libraries that the application uses.
-          if (ALSameText(LplatFormName, 'Android') or ALSameText(LplatFormName, 'Android64')) and
+          if (ALSameTextA(LplatFormName, 'Android') or ALSameTextA(LplatFormName, 'Android64')) and
              (compareValue(LProjectVersion, 19.5{Alexandria}) >= 0) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName) + _getProjectRoot(LProjectName, LPlatformName) + '.classes', // const aInclude: String;
@@ -1390,10 +1399,10 @@ begin
           //Android/Android64
           //The classes.dex file is a Dalvik Executable file that all Android applications must have. This file contains
           //the Java libraries that the application uses.
-          if (ALSameText(LplatFormName, 'Android') or ALSameText(LplatFormName, 'Android64')) and
+          if (ALSameTextA(LplatFormName, 'Android') or ALSameTextA(LplatFormName, 'Android64')) and
              (compareValue(LProjectVersion, 19.5{Alexandria}) < 0) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+ 'classes.dex', // const aInclude: String;
@@ -1409,10 +1418,10 @@ begin
           //-----
           //OSX64
           //The main binary
-          if (ALSameText(LplatFormName, 'OSX64')) or
-             (ALSameText(LplatFormName, 'OSXARM64')) then
+          if (ALSameTextA(LplatFormName, 'OSX64')) or
+             (ALSameTextA(LplatFormName, 'OSXARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName, // const aInclude: String;
@@ -1429,12 +1438,12 @@ begin
           //OSX64
           //Debugging Information
           //https://developer.apple.com/documentation/xcode/building-your-app-to-include-debugging-information
-          if ((ALSameText(LplatFormName, 'OSX64')) or
-              (ALSameText(LplatFormName, 'OSXARM64'))) and
+          if ((ALSameTextA(LplatFormName, 'OSX64')) or
+              (ALSameTextA(LplatFormName, 'OSXARM64'))) and
              ((compareValue(LProjectVersion, 19.5{Alexandria}) < 0) or
-              (ALSameText(LConfigName, 'Debug'))) then
+              (ALSameTextA(LConfigName, 'Debug'))) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.dSYM', // const aInclude: String;
@@ -1450,10 +1459,10 @@ begin
           //-----
           //OSX64
           //Key-value pairs that grant an executable permission to use a service or technology.
-          if (ALSameText(LplatFormName, 'OSX64')) or
-             (ALSameText(LplatFormName, 'OSXARM64')) then
+          if (ALSameTextA(LplatFormName, 'OSX64')) or
+             (ALSameTextA(LplatFormName, 'OSXARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.entitlements', // const aInclude: String;
@@ -1472,10 +1481,10 @@ begin
           //where the system can easily access it. macOS and iOS use Info.plist files to determine
           //what icon to display for a bundle, what document types an app supports, and many other
           //behaviors that have an impact outside the bundle itself.
-          if (ALSameText(LplatFormName, 'OSX64')) or
-             (ALSameText(LplatFormName, 'OSXARM64')) then
+          if (ALSameTextA(LplatFormName, 'OSX64')) or
+             (ALSameTextA(LplatFormName, 'OSXARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.info.plist', // const aInclude: String;
@@ -1490,12 +1499,12 @@ begin
 
           //-----
           //OSX64
-          if (ALSameText(LplatFormName, 'OSX64')) or
-             (ALSameText(LplatFormName, 'OSXARM64')) then
+          if (ALSameTextA(LplatFormName, 'OSX64')) or
+             (ALSameTextA(LplatFormName, 'OSXARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
-              LProperties, // const aProperties: TALStringList;
-              LConfigs, // const aConfigs: TALStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
+              LProperties, // const aProperties: TALStringListA;
+              LConfigs, // const aConfigs: TALStringListA;
               LPlatFormName, // const aPlatFormName: ansiString;
               LConfigName, // const aConfigName: AnsiString;
               'Icns_MainIcns', // const aPropertyName: ansiString;
@@ -1512,11 +1521,11 @@ begin
           //-----------
           //iOSDevice64
           //The main binary
-          if (ALSameText(LplatFormName, 'iOSDevice64')) or
-             (ALSameText(LplatFormName, 'iOSSimulator')) or
-             (ALSameText(LplatFormName, 'iOSSimARM64')) then
+          if (ALSameTextA(LplatFormName, 'iOSDevice64')) or
+             (ALSameTextA(LplatFormName, 'iOSSimulator')) or
+             (ALSameTextA(LplatFormName, 'iOSSimARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName, // const aInclude: String;
@@ -1533,12 +1542,12 @@ begin
           //iOSDevice64
           //Debugging Information
           //https://developer.apple.com/documentation/xcode/building-your-app-to-include-debugging-information
-          if ((ALSameText(LplatFormName, 'iOSDevice64')) or
-              (ALSameText(LplatFormName, 'iOSSimARM64'))) and
+          if ((ALSameTextA(LplatFormName, 'iOSDevice64')) or
+              (ALSameTextA(LplatFormName, 'iOSSimARM64'))) and
              ((compareValue(LProjectVersion, 19.5{Alexandria}) < 0) or
-              (ALSameText(LConfigName, 'Debug'))) then
+              (ALSameTextA(LConfigName, 'Debug'))) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.dSYM', // const aInclude: String;
@@ -1554,10 +1563,10 @@ begin
           //-----------
           //iOSDevice64
           //Key-value pairs that grant an executable permission to use a service or technology.
-          if (ALSameText(LplatFormName, 'iOSDevice64')) or
-             (ALSameText(LplatFormName, 'iOSSimARM64')) then
+          if (ALSameTextA(LplatFormName, 'iOSDevice64')) or
+             (ALSameTextA(LplatFormName, 'iOSSimARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.entitlements', // const aInclude: String;
@@ -1576,11 +1585,11 @@ begin
           //where the system can easily access it. macOS and iOS use Info.plist files to determine
           //what icon to display for a bundle, what document types an app supports, and many other
           //behaviors that have an impact outside the bundle itself.
-          if (ALSameText(LplatFormName, 'iOSDevice64')) or
-             (ALSameText(LplatFormName, 'iOSSimulator')) or
-             (ALSameText(LplatFormName, 'iOSSimARM64')) then
+          if (ALSameTextA(LplatFormName, 'iOSDevice64')) or
+             (ALSameTextA(LplatFormName, 'iOSSimulator')) or
+             (ALSameTextA(LplatFormName, 'iOSSimARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.info.plist', // const aInclude: String;
@@ -1600,11 +1609,11 @@ begin
           //launch screen isn’t an opportunity for artistic expression. It’s solely intended to
           //enhance the perception of your app as quick to launch and immediately ready for use.
           //Every app must supply a launch screen.
-          if (ALSameText(LplatFormName, 'iOSDevice64')) or
-             (ALSameText(LplatFormName, 'iOSSimulator')) or
-             (ALSameText(LplatFormName, 'iOSSimARM64')) then
+          if (ALSameTextA(LplatFormName, 'iOSDevice64')) or
+             (ALSameTextA(LplatFormName, 'iOSSimulator')) or
+             (ALSameTextA(LplatFormName, 'iOSSimARM64')) then
             _addDeployFile(
-              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+              LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
               TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
               LConfigName, // const aCondition: String;
               _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.launchscreen', // const aInclude: String;
@@ -1620,9 +1629,9 @@ begin
           //-----
           //Win32
           //The main binary
-          //if (ALSameText(LplatFormName, 'Win32')) then
+          //if (ALSameTextA(LplatFormName, 'Win32')) then
           //  _addDeployFile(
-          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
           //    TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
           //    LConfigName, // const aCondition: String;
           //    _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.exe', // const aInclude: String;
@@ -1638,9 +1647,9 @@ begin
           //-----
           //Win64
           //The main binary
-          //if (ALSameText(LplatFormName, 'Win64')) then
+          //if (ALSameTextA(LplatFormName, 'Win64')) then
           //  _addDeployFile(
-          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TalStringList;
+          //    LAlreadyDeployedFiles, // const aAlreadyDeployedFiles: TALStringListA;
           //    TalXmlNode(LplatForms.Objects[I]), // const aItemGroupNode: TalXmlNode;
           //    LConfigName, // const aCondition: String;
           //    _getExeOutputDir(LProperties,LConfigs,LPlatFormName,LConfigName)+LProjectName+'.exe', // const aInclude: String;
@@ -1659,8 +1668,8 @@ begin
 
       //save the backup of DeployProj
       if (LCreateBackup) and
-         (ALFileExistsU(LDeployProjFilename)) and
-         (not ALFileExistsU(LDeployProjFilename + '.bak')) then begin
+         (Tfile.exists(LDeployProjFilename)) and
+         (not Tfile.exists(LDeployProjFilename + '.bak')) then begin
         var LBackupDeployProjXmlDoc := TALXmlDocument.Create('Project');
         try
           LBackupDeployProjXmlDoc.Options := [];
