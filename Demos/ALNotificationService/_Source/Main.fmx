@@ -1,0 +1,111 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 718
+  ClientWidth = 360
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnShow = FormShow
+  DesignerMasterStyle = 0
+  object MemoLog: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    TextSettings.WordWrap = True
+    Align = Client
+    Size.Width = 360.000000000000000000
+    Size.Height = 267.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 5
+    Viewport.Width = 356.000000000000000000
+    Viewport.Height = 263.000000000000000000
+  end
+  object ButtonGetToken: TButton
+    Align = Top
+    Position.Y = 217.000000000000000000
+    Size.Width = 360.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 4
+    Text = 'Get Token'
+    OnClick = ButtonGetTokenClick
+  end
+  object TextIntro: TALText
+    Align = Top
+    AutoSize = True
+    Margins.Left = 15.000000000000000000
+    Margins.Top = 15.000000000000000000
+    Margins.Right = 15.000000000000000000
+    Margins.Bottom = 15.000000000000000000
+    Position.X = 15.000000000000000000
+    Position.Y = 15.000000000000000000
+    Size.Width = 330.000000000000000000
+    Size.Height = 187.000000000000000000
+    Size.PlatformDefault = False
+    Text = 
+      'The instructions how to setup Firebase Cloud Messaging are writt' +
+      'en in ALFmxFirebaseMessaging.pas. Regarding this demo you will n' +
+      'eed to replace android\GoogleServices\google-services.json and i' +
+      'os\GoogleServices\GoogleService-Info.plist by your own and then ' +
+      'execute android\MergeLibraries.bat. You will also need to update' +
+      ' the const FirebaseMessaging** declared in Main.pas'
+    TextSettings.Font.Size = 14.000000000000000000
+    TextSettings.Font.StyleExt = {00070000000000000004000000}
+    TextSettings.FontColor = claCrimson
+    TextSettings.WordWrap = True
+    TextSettings.HorzAlign = Center
+  end
+  object EditToken: TEdit
+    Touch.InteractiveGestures = [LongTap, DoubleTap]
+    Align = Top
+    TabOrder = 6
+    Position.Y = 417.000000000000000000
+    Size.Width = 360.000000000000000000
+    Size.Height = 34.000000000000000000
+    Size.PlatformDefault = False
+    TextPrompt = 'Device Token'
+  end
+  object ButtonSendAlertNotificationViaHttpV1: TButton
+    Align = Top
+    Position.Y = 297.000000000000000000
+    Size.Width = 360.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    Text = 'Send Alert Notification (Http V1)'
+    OnClick = ButtonSendAlertNotificationViaHttpV1Click
+  end
+  object ButtonSendDataNotificationViaHttpV1: TButton
+    Align = Top
+    Position.Y = 257.000000000000000000
+    Size.Width = 360.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Text = 'Send Data Notification (Http V1)'
+    OnClick = ButtonSendDataNotificationViaHttpV1Click
+  end
+  object ButtonSendAlertDataNotificationViaHttpV1: TButton
+    Align = Top
+    Position.Y = 337.000000000000000000
+    Size.Width = 360.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Text = 'Send Alert + Data Notification (Http V1)'
+    OnClick = ButtonSendAlertDataNotificationViaHttpV1Click
+  end
+  object ButtonShowNotification: TButton
+    Align = Top
+    Position.Y = 377.000000000000000000
+    Size.Width = 360.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    Text = 'Show Alert Notification'
+    OnClick = ButtonShowNotificationClick
+  end
+end
