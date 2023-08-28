@@ -1,14 +1,15 @@
-﻿unit Unit1;
+unit ALTestRtti;
 
 interface
 
-{.$define ALRTTIAnsiString}
-
 uses
-  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ExtCtrls, StdCtrls, ComCtrls, Shellapi,
-  System.Generics.Defaults, diagnostics, System.Generics.Collections, dateutils,
-  Alcinoe.RTTI;
+  System.Classes,
+  System.Diagnostics,
+  System.Types,
+  Alcinoe.Common,
+  Alcinoe.RTTI,
+  Alcinoe.StringUtils,
+  DUnitX.TestFramework;
 
 {$RTTI EXPLICIT METHODS([vcPublic, vcPublished])
                 FIELDS([vcPublic, vcPublished])
@@ -16,36 +17,29 @@ uses
 
 type
 
-  {~~~~~~~~~~~~~~~~~~~}
-  TForm1 = class(TForm)
-    ButtonCreateObjectWithAutoInit: TButton;
-    ButtonCreateObjectClassicalWay: TButton;
-    Panel1: TPanel;
-    Label1: TLabel;
-    ButtonBenchTALRttiTypeGetFields: TButton;
-    ButtonBenchTRttiTypeGetFields: TButton;
-    ButtonBenchTALRttiTypeGetField: TButton;
-    ButtonBenchTRttiTypeGetField: TButton;
-    Memo1: TMemo;
-    Panel2: TPanel;
-    Label2: TLabel;
-    procedure ButtonCreateObjectWithAutoInitClick(Sender: TObject);
-    procedure ButtonCreateObjectClassicalWayClick(Sender: TObject);
-    procedure ButtonBenchTALRttiTypeGetFieldsClick(Sender: TObject);
-    procedure ButtonBenchTRttiTypeGetFieldsClick(Sender: TObject);
-    procedure ButtonBenchTALRttiTypeGetFieldClick(Sender: TObject);
-    procedure ButtonBenchTRttiTypeGetFieldClick(Sender: TObject);
-    procedure FormClick(Sender: TObject);
-  protected
-  private
+  [TestFixture]
+  TALTestRtti = class
+  strict private
+    fStopWatchAlcinoe: TStopwatch;
+    fStopWatchDELPHI: TStopwatch;
+    procedure CheckExecutionTime(const ARatio: single = 1.2);
   public
+    [Setup]
+    procedure Setup;
+    //[TearDown]
+    //procedure TearDown;
+    [Test]
+    procedure TestALRttiAutoInit;
+    procedure onClick(Sender: TObject);
   end;
 
-  {~~~~~~~~~~~~~~~~~~~}
-  TChildObject = class;
+  TAlign = (alNone, alTop, alBottom, alLeft, alRight, alClient, alCustom);
 
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  TAutoInitObject = class(TObject)
+  TAlignSet = set of TAlign;
+
+  TALAutoInitChildObject = class;
+
+  TALAutoInitObject = class(TObject)
   private
     FDateTimeValue2: TDateTime;
     FAlignValues2: TAlignSet;
@@ -58,12 +52,12 @@ type
     FOnclick2: TnotifyEvent;
     FDoubleValue2: Double;
     FCharValue2: Char;
-    FChildObject2: TChildObject;
+    FChildObject2: TALAutoInitChildObject;
     FBooleanValue2: Boolean;
     FInt32Value2: Int32;
     FAnsiCharValue2: ansiChar;
-    fOwner2: Tform1;
-    fOwner3: TForm1;
+    fOwner2: TALTestRtti;
+    fOwner3: TALTestRtti;
     FDateTimeValue3: TDateTime;
     FAlignValues3: TAlignSet;
     FInt64Value3: Int64;
@@ -71,7 +65,7 @@ type
     FStringValue3: String;
     FAlignValue3: TAlign;
     FStringList3: TStringList;
-    FChildObject3: TChildObject;
+    FChildObject3: TALAutoInitChildObject;
     FAnsiStringValue3: ansiString;
     FOnclick3: TnotifyEvent;
     FDoubleValue3: Double;
@@ -85,7 +79,7 @@ type
     procedure SetAnsiStringValue2(const Value: ansiString);
     procedure SetBooleanValue2(const Value: Boolean);
     procedure SetCharValue2(const Value: Char);
-    procedure SetChildObject2(const Value: TChildObject);
+    procedure SeTALAutoInitChildObject2(const Value: TALAutoInitChildObject);
     procedure SetDateTimeValue2(const Value: TDateTime);
     procedure SetDoubleValue2(const Value: Double);
     procedure SetInt32Value2(const Value: Int32);
@@ -94,12 +88,12 @@ type
     procedure SetSingleValue2(const Value: Single);
     procedure SetStringList2(const Value: TStringList);
     procedure SetStringValue2(const Value: String);
-    function GetOwner2: TForm1;
+    function GetOwner2: TALTestRtti;
   public
     AutoInit: Boolean;
-    Owner: TForm1;
-    property Owner2: TForm1 read GetOwner2;
-    property Owner3: TForm1 read fOwner3;
+    Owner: TALTestRtti;
+    property Owner2: TALTestRtti read GetOwner2;
+    property Owner3: TALTestRtti read fOwner3;
   public
     //----
     //auto init of member fields
@@ -130,12 +124,12 @@ type
     AlignValues: TAlignSet;
     [TALInit('QuoteChar:A;NameValueSeparator:B;Options:[soStrictDelimiter, soWriteBOM]')]
     StringList: TStringList;
-    [TALInit('Owner.FormClick')]
+    [TALInit('Owner.OnClick')]
     Onclick: TnotifyEvent;
     [TALInit('left:50;right:75')]
     Rect: TRect;
     [TALInit('')]
-    ChildObject: TChildObject;
+    ChildObject: TALAutoInitChildObject;
  public
     //----
     //auto init of property fields with setter
@@ -166,10 +160,10 @@ type
     property AlignValues2: TAlignSet read FAlignValues2 write SetAlignValues2;
     [TALInit('QuoteChar:A;NameValueSeparator:B;Options:[soStrictDelimiter, soWriteBOM]')]
     property StringList2: TStringList read FStringList2 write SetStringList2;
-    [TALInit('Owner2.FormClick')]
+    [TALInit('Owner2.OnClick')]
     property Onclick2: TnotifyEvent read FOnclick2 write SetOnclick2;
     [TALInit('')]
-    property ChildObject2: TChildObject read FChildObject2 write SetChildObject2;
+    property ChildObject2: TALAutoInitChildObject read FChildObject2 write SeTALAutoInitChildObject2;
   public
     //----
     //auto init of property fields without setter
@@ -200,155 +194,111 @@ type
     property AlignValues3: TAlignSet read FAlignValues3 write fAlignValues3;
     [TALInit('QuoteChar:A;NameValueSeparator:B;Options:[soStrictDelimiter, soWriteBOM]')]
     property StringList3: TStringList read FStringList3 write fStringList3;
-    [TALInit('Owner2.FormClick')]
+    [TALInit('Owner2.OnClick')]
     property Onclick3: TnotifyEvent read FOnclick3 write FOnclick3;
     [TALInit('')]
-    property ChildObject3: TChildObject read FChildObject3 write fChildObject3;
+    property ChildObject3: TALAutoInitChildObject read FChildObject3 write fChildObject3;
   public
-    constructor Create(const aOwner: Tform1; const AAutoInit: Boolean); virtual;
+    constructor Create(const aOwner: TALTestRtti; const AAutoInit: Boolean); virtual;
     destructor Destroy; override;
   End;
 
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   [TALInit('BooleanValue3:false;Int32Value:52')]
-  TAutoInitObject2 = class(TAutoInitObject)
+  TALAutoInitObject2 = class(TALAutoInitObject)
   private
   public
     [TALInit('alLeft')]
     property AlignValue2;
    public
-    constructor Create(const aOwner: Tform1; const AAutoInit: Boolean); override;
+    constructor Create(const aOwner: TALTestRtti; const AAutoInit: Boolean); override;
   End;
 
-  {~~~~~~~~~~~~~~~~~~~~~~~~}
   [TALInit('Int32Value:75')]
-  TAutoInitObject3 = class(TAutoInitObject2)
+  TALAutoInitObject3 = class(TALAutoInitObject2)
   private
   public
     [TALInit('altop')]
     property AlignValue2;
    public
-    constructor Create(const aOwner: Tform1; const AAutoInit: Boolean); override;
+    constructor Create(const aOwner: TALTestRtti; const AAutoInit: Boolean); override;
   End;
 
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  TChildObject = class(TObject)
+  TALAutoInitChildObject = class(TObject)
   private
-    fOwner: TAutoInitObject;
+    fOwner: TALAutoInitObject;
   public
-    constructor Create(const aOwner: TAutoInitObject); virtual;
+    constructor Create(const aOwner: TALAutoInitObject); virtual;
   End;
-
-var
-  Form1: TForm1;
 
 implementation
 
 uses
-  System.Math,
-  System.TypInfo,
-  system.rtti,
-  Alcinoe.Common,
-  Alcinoe.StringUtils;
+  system.SysUtils,
+  system.DateUtils,
+  System.Math;
 
-{$R *.dfm}
-
-{********************************************************************}
-procedure TForm1.ButtonCreateObjectWithAutoInitClick(Sender: TObject);
+{**************************}
+procedure TALTestRtti.Setup;
 begin
-  var LStopWatch := TstopWatch.StartNew;
-  for var I := 0 to 1000000 do begin
-    var LAutoInitObject := TAutoInitObject.create(self, True);
-    LAutoInitObject.Free;
-  end;
-  var LAutoInitObject2 := TAutoInitObject2.create(self, True);
-  LAutoInitObject2.Free;
-  var LAutoInitObject3 := TAutoInitObject3.create(self, True);
-  LAutoInitObject3.Free;
-  LStopWatch.stop;
-  Showmessage('1 000 000 TAutoInitObject created in '+AlformatFloatW('0.##', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms');
-end;
-
-{********************************************************************}
-procedure TForm1.ButtonCreateObjectClassicalWayClick(Sender: TObject);
-begin
-  var LStopWatch := TstopWatch.StartNew;
-  for var I := 0 to 1000000 do begin
-    var LAutoInitObject := TAutoInitObject.create(self, false);
-    LAutoInitObject.Free;
-  end;
-  var LAutoInitObject2 := TAutoInitObject2.create(self, false);
-  LAutoInitObject2.Free;
-  var LAutoInitObject3 := TAutoInitObject3.create(self, false);
-  LAutoInitObject3.Free;
-  LStopWatch.stop;
-  Showmessage('1 000 000 TAutoInitObject created in '+AlformatFloatW('0.##', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms');
-end;
-
-{*********************************************************************}
-procedure TForm1.ButtonBenchTALRttiTypeGetFieldsClick(Sender: TObject);
-begin
-  var LQualifiedClassName := {$IF defined(ALRTTIAnsiString)}AnsiString{$ENDIF}(Self.QualifiedClassName);
-  var LStopWatch := TstopWatch.StartNew;
-  var LRTTIType := ALGetRTTIType(LQualifiedClassName);
-  for var I := 0 to 500000 do
-    LRTTIType.GetFields(mvPublished);
-  LStopWatch.stop;
-  Showmessage('500 000 GetFields in '+AlformatFloatW('0.##', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms');
+  fStopWatchAlcinoe := TStopwatch.Create;
+  fStopWatchDELPHI := TStopwatch.Create;
 end;
 
 {*******************************************************************}
-procedure TForm1.ButtonBenchTRttiTypeGetFieldsClick(Sender: TObject);
+procedure TALTestRtti.CheckExecutionTime(const ARatio: single = 1.2);
 begin
-  var LStopWatch := TstopWatch.StartNew;
-  var ctx := TRttiContext.Create;
-  try
-    var rt := ctx.GetType(TForm1);
-    for var I := 0 to 500000 do
-      rt.GetFields;
-  finally
-    ctx.Free;
+  {$IF defined(debug) or defined(Win32)}
+  //In debug we have overflow checking and range checking so that mean
+  //that the execution time will be much slower that the Delphi RTL so skip it
+  //In Win32 we remove all ASM (fastcode heritage) than the delphi RTL have
+  //so we will be othen much more slower than the Delphi RTL
+  Writeln(ALFormatW('CheckExecutionTime Skipped - %0.0f ms for Alcinoe vs %0.0f ms for Delphi (%0.1fx faster)', [fStopWatchAlcinoe.Elapsed.TotalMilliseconds, fStopWatchDELPHI.Elapsed.TotalMilliseconds, fStopWatchDELPHI.Elapsed.TotalMilliseconds / fStopWatchAlcinoe.Elapsed.TotalMilliseconds], ALDefaultFormatSettingsW));
+  {$ELSE}
+  if fStopWatchAlcinoe.Elapsed.TotalMilliseconds > fStopWatchDELPHI.Elapsed.TotalMilliseconds * ARatio then
+    Assert.Fail(ALFormatW('Time too long (%0.0f ms for Alcinoe vs %0.0f ms for Delphi)', [fStopWatchAlcinoe.Elapsed.TotalMilliseconds, fStopWatchDELPHI.Elapsed.TotalMilliseconds], ALDefaultFormatSettingsW))
+  else
+    //https://github.com/VSoftTechnologies/DUnitX/issues/319
+    Writeln(ALFormatW('%0.0f ms for Alcinoe vs %0.0f ms for Delphi (%0.1fx faster)', [fStopWatchAlcinoe.Elapsed.TotalMilliseconds, fStopWatchDELPHI.Elapsed.TotalMilliseconds, fStopWatchDELPHI.Elapsed.TotalMilliseconds / fStopWatchAlcinoe.Elapsed.TotalMilliseconds], ALDefaultFormatSettingsW));
+  {$ENDIF}
+end;
+
+{***************************************}
+procedure TALTestRtti.TestALRttiAutoInit;
+begin
+  //--
+  for var I := 0 to 100000 do begin
+    fStopWatchAlcinoe.Start; {-}
+      var LAutoInitObject := TALAutoInitObject.create(self, True);
+      LAutoInitObject.Free;
+      var LAutoInitObject2 := TALAutoInitObject2.create(self, True);
+      LAutoInitObject2.Free;
+      var LAutoInitObject3 := TALAutoInitObject3.create(self, True);
+      LAutoInitObject3.Free;
+      fStopWatchAlcinoe.Stop;
   end;
-  LStopWatch.stop;
-  Showmessage('500 000 GetFields in '+AlformatFloatW('0.##', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms');
-end;
-
-{********************************************************************}
-procedure TForm1.ButtonBenchTALRttiTypeGetFieldClick(Sender: TObject);
-begin
-  var LQualifiedClassName := {$IF defined(ALRTTIAnsiString)}AnsiString{$ENDIF}(Self.QualifiedClassName);
-  var LStopWatch := TstopWatch.StartNew;
-  var LRTTIType := ALGetRTTIType(LQualifiedClassName);
-  for var I := 0 to 500000 do
-    LRTTIType.GetField('Action', mvPublished);
-  LStopWatch.stop;
-  Showmessage('500 000 GetField in '+AlformatFloatW('0.##', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms');
-end;
-
-{******************************************************************}
-procedure TForm1.ButtonBenchTRttiTypeGetFieldClick(Sender: TObject);
-begin
-  var LStopWatch := TstopWatch.StartNew;
-  var ctx := TRttiContext.Create;
-  try
-    var rt := ctx.GetType(TForm1);
-    for var I := 0 to 500000 do
-      rt.GetField('Action');
-  finally
-    ctx.Free;
+  //--
+  for var I := 0 to 100000 do begin
+    fStopWatchDelphi.Start; {-}
+      var LAutoInitObject := TALAutoInitObject.create(self, false);
+      LAutoInitObject.Free;
+      var LAutoInitObject2 := TALAutoInitObject2.create(self, false);
+      LAutoInitObject2.Free;
+      var LAutoInitObject3 := TALAutoInitObject3.create(self, false);
+      LAutoInitObject3.Free;
+      fStopWatchDelphi.Stop;
   end;
-  LStopWatch.stop;
-  Showmessage('500 000 GetField in '+AlformatFloatW('0.##', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms');
+  //--
+  CheckExecutionTime(1.20{ARatio});
 end;
 
-{******************************************}
-procedure TForm1.FormClick(Sender: TObject);
+{*********************************************}
+procedure TALTestRtti.onClick(Sender: TObject);
 begin
  //nothing to do here
 end;
 
-{*********************************************************************************}
-constructor TAutoInitObject.create(const aOwner: Tform1; const AAutoInit: Boolean);
+{****************************************************************************************}
+constructor TALAutoInitObject.create(const aOwner: TALTestRtti; const AAutoInit: Boolean);
 begin
   Owner := aOwner;
   FOwner2 := aOwner;
@@ -372,10 +322,10 @@ begin
     StringList.QuoteChar:='A';
     StringList.NameValueSeparator := 'B';
     StringList.Options := [soStrictDelimiter, soWriteBOM];
-    Onclick := Owner.FormClick;
+    Onclick := Owner.OnClick;
     Rect.left := 50;
     Rect.right := 75;
-    ChildObject := TChildObject.create(self);
+    ChildObject := TALAutoInitChildObject.create(self);
     //----
     CharValue2 := 'B';
     AnsiCharValue2 := 'e';
@@ -393,8 +343,8 @@ begin
     StringList2.QuoteChar:='A';
     StringList2.NameValueSeparator := 'B';
     StringList2.Options := [soStrictDelimiter, soWriteBOM];
-    Onclick2 := Owner.FormClick;
-    ChildObject2 := TChildObject.create(self);
+    Onclick2 := Owner.OnClick;
+    ChildObject2 := TALAutoInitChildObject.create(self);
     //----
     CharValue3 := 'B';
     AnsiCharValue3 := 'e';
@@ -412,11 +362,11 @@ begin
     StringList3.QuoteChar:='A';
     StringList3.NameValueSeparator := 'B';
     StringList3.Options := [soStrictDelimiter, soWriteBOM];
-    Onclick3 := Owner.FormClick;
-    ChildObject3 := TChildObject.create(self);
+    Onclick3 := Owner.OnClick;
+    ChildObject3 := TALAutoInitChildObject.create(self);
   end;
   //--
-  if self.ClassType = TAutoInitObject  then begin
+  if self.ClassType = TALAutoInitObject  then begin
     if CharValue <> 'B' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if AnsiCharValue <> 'e' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if StringValue <> 'abcdefg' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
@@ -436,7 +386,7 @@ begin
     Onclick(self);
     if Rect.left <> 50 then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if Rect.right <> 75 then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
-    if ChildObject.classname <> 'TChildObject' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
+    if ChildObject.classname <> 'TALAutoInitChildObject' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     //----
     if CharValue2 <> 'B' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if AnsiCharValue2 <> 'e' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
@@ -455,7 +405,7 @@ begin
     if StringList2.NameValueSeparator <> 'B' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if StringList2.Options <> [soStrictDelimiter, soWriteBOM] then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     Onclick2(self);
-    if ChildObject2.classname <> 'TChildObject' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
+    if ChildObject2.classname <> 'TALAutoInitChildObject' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     //----
     if CharValue3 <> 'B' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if AnsiCharValue3 <> 'e' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
@@ -474,12 +424,12 @@ begin
     if StringList3.NameValueSeparator <> 'B' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     if StringList3.Options <> [soStrictDelimiter, soWriteBOM] then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
     Onclick3(self);
-    if ChildObject3.classname <> 'TChildObject' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
+    if ChildObject3.classname <> 'TALAutoInitChildObject' then raise Exception.create('Error 3AC91D01-134D-4092-BAEC-D22217157CDE');
   end;
 end;
 
-{*********************************}
-destructor TAutoInitObject.Destroy;
+{***********************************}
+destructor TALAutoInitObject.Destroy;
 begin
   if AutoInit then ALRttiFinalizeInstance(self)
   else begin
@@ -493,104 +443,104 @@ begin
   inherited;
 end;
 
-{*****************************************}
-function TAutoInitObject.GetOwner2: TForm1;
+{************************************************}
+function TALAutoInitObject.GetOwner2: TALTestRtti;
 begin
   result := FOwner2;
 end;
 
-{************************************************************}
-procedure TAutoInitObject.SetAlignValue2(const Value: TAlign);
+{**************************************************************}
+procedure TALAutoInitObject.SetAlignValue2(const Value: TAlign);
 begin
   FAlignValue2 := Value;
 end;
 
-{****************************************************************}
-procedure TAutoInitObject.SetAlignValues2(const Value: TAlignSet);
+{******************************************************************}
+procedure TALAutoInitObject.SetAlignValues2(const Value: TAlignSet);
 begin
   FAlignValues2 := Value;
 end;
 
-{*****************************************************************}
-procedure TAutoInitObject.SetAnsiCharValue2(const Value: ansiChar);
+{*******************************************************************}
+procedure TALAutoInitObject.SetAnsiCharValue2(const Value: ansiChar);
 begin
   FAnsiCharValue2 := Value;
 end;
 
-{*********************************************************************}
-procedure TAutoInitObject.SetAnsiStringValue2(const Value: ansiString);
+{***********************************************************************}
+procedure TALAutoInitObject.SetAnsiStringValue2(const Value: ansiString);
 begin
   FAnsiStringValue2 := Value;
 end;
 
-{***************************************************************}
-procedure TAutoInitObject.SetBooleanValue2(const Value: Boolean);
+{*****************************************************************}
+procedure TALAutoInitObject.SetBooleanValue2(const Value: Boolean);
 begin
   FBooleanValue2 := Value;
 end;
 
-{*********************************************************}
-procedure TAutoInitObject.SetCharValue2(const Value: Char);
+{***********************************************************}
+procedure TALAutoInitObject.SetCharValue2(const Value: Char);
 begin
   FCharValue2 := Value;
 end;
 
-{*******************************************************************}
-procedure TAutoInitObject.SetChildObject2(const Value: TChildObject);
+{*****************************************************************************************}
+procedure TALAutoInitObject.SeTALAutoInitChildObject2(const Value: TALAutoInitChildObject);
 begin
   FChildObject2 := Value;
 end;
 
-{******************************************************************}
-procedure TAutoInitObject.SetDateTimeValue2(const Value: TDateTime);
+{********************************************************************}
+procedure TALAutoInitObject.SetDateTimeValue2(const Value: TDateTime);
 begin
   FDateTimeValue2 := Value;
 end;
 
-{*************************************************************}
-procedure TAutoInitObject.SetDoubleValue2(const Value: Double);
+{***************************************************************}
+procedure TALAutoInitObject.SetDoubleValue2(const Value: Double);
 begin
   FDoubleValue2 := Value;
 end;
 
-{***********************************************************}
-procedure TAutoInitObject.SetInt32Value2(const Value: Int32);
+{*************************************************************}
+procedure TALAutoInitObject.SetInt32Value2(const Value: Int32);
 begin
   FInt32Value2 := Value;
 end;
 
-{***********************************************************}
-procedure TAutoInitObject.SetInt64Value2(const Value: Int64);
+{*************************************************************}
+procedure TALAutoInitObject.SetInt64Value2(const Value: Int64);
 begin
   FInt64Value2 := Value;
 end;
 
-{***************************************************************}
-procedure TAutoInitObject.SetOnclick2(const Value: TnotifyEvent);
+{*****************************************************************}
+procedure TALAutoInitObject.SetOnclick2(const Value: TnotifyEvent);
 begin
   FOnclick2 := Value;
 end;
 
-{*************************************************************}
-procedure TAutoInitObject.SetSingleValue2(const Value: Single);
+{***************************************************************}
+procedure TALAutoInitObject.SetSingleValue2(const Value: Single);
 begin
   FSingleValue2 := Value;
 end;
 
-{*****************************************************************}
-procedure TAutoInitObject.SetStringList2(const Value: TStringList);
+{*******************************************************************}
+procedure TALAutoInitObject.SetStringList2(const Value: TStringList);
 begin
   FStringList2 := Value;
 end;
 
-{*************************************************************}
-procedure TAutoInitObject.SetStringValue2(const Value: String);
+{***************************************************************}
+procedure TALAutoInitObject.SetStringValue2(const Value: String);
 begin
   FStringValue2 := Value;
 end;
 
-{**********************************************************************************}
-constructor TAutoInitObject2.Create(const aOwner: Tform1; const AAutoInit: Boolean);
+{*****************************************************************************************}
+constructor TALAutoInitObject2.Create(const aOwner: TALTestRtti; const AAutoInit: Boolean);
 begin
   inherited create(aOwner, AAutoInit);
   if not AAutoInit then begin
@@ -599,15 +549,15 @@ begin
     Int32Value := 52;
   end;
   //--
-  if self.ClassType = TAutoInitObject2 then begin
+  if self.ClassType = TALAutoInitObject2 then begin
     if AlignValue2 <> TAlign.alLeft then raise Exception.create('Error D09DA31D-11BF-4404-BF0A-92D38B82D23D');
     if BooleanValue3 <> false then raise Exception.create('Error D09DA31D-11BF-4404-BF0A-92D38B82D23D');
     if Int32Value <> 52 then raise Exception.create('Error D09DA31D-11BF-4404-BF0A-92D38B82D23D');
   end;
 end;
 
-{**********************************************************************************}
-constructor TAutoInitObject3.Create(const aOwner: Tform1; const AAutoInit: Boolean);
+{*****************************************************************************************}
+constructor TALAutoInitObject3.Create(const aOwner: TALTestRtti; const AAutoInit: Boolean);
 begin
   inherited create(aOwner, AAutoInit);
   if not AAutoInit then begin
@@ -615,14 +565,14 @@ begin
     Int32Value := 75;
   end;
   //--
-  if self.ClassType = TAutoInitObject3 then begin
+  if self.ClassType = TALAutoInitObject3 then begin
     if AlignValue2 <> altop then raise Exception.create('Error D09DA31D-11BF-4404-BF0A-92D38B82D23D');
     if Int32Value <> 75 then raise Exception.create('Error D09DA31D-11BF-4404-BF0A-92D38B82D23D');
   end;
 end;
 
-{*************************************************************}
-constructor TChildObject.Create(const aOwner: TAutoInitObject);
+{*************************************************************************}
+constructor TALAutoInitChildObject.Create(const aOwner: TALAutoInitObject);
 begin
   if aOwner = nil then
     raise Exception.Create('Error CCD0F741-D468-4CD1-A94F-9E5F8F680643');
@@ -630,11 +580,137 @@ begin
 end;
 
 initialization
-  {$IFDEF DEBUG}
-  ReportMemoryleaksOnSHutdown := True;
-  {$ENDIF}
-  SetMultiByteConversionCodePage(CP_UTF8);
-  ALRttiInitialization;
+  ALRttiInitialization(
+    ['ALTestRtti.*',
+     'DUnitX.TestFramework.TLogLevel',
+     'System.AnsiChar',
+     'System.AnsiString',
+     'System.Boolean',
+     'System.Byte',
+     'System.Cardinal',
+     'System.Char',
+     'System.Classes.IInterfaceList',
+     'System.Classes.IStringsAdapter',
+     'System.Classes.TAsyncConstArrayFunctionEvent',
+     'System.Classes.TAsyncConstArrayProc',
+     'System.Classes.TAsyncConstArrayProcedureEvent',
+     'System.Classes.TAsyncFunctionEvent',
+     'System.Classes.TAsyncProcedureEvent',
+     'System.Classes.TBasicAction',
+     'System.Classes.TBasicActionLink',
+     'System.Classes.TComponent',
+     'System.Classes.TComponentEnumerator',
+     'System.Classes.TComponentName',
+     'System.Classes.TComponentState',
+     'System.Classes.TComponentStyle',
+     'System.Classes.TGetDeltaStreamsEvent',
+     'System.Classes.TNotifyEvent',
+     'System.Classes.TObservers',
+     'System.Classes.TObservers.TCanObserveEvent',
+     'System.Classes.TObservers.TObserverAddedEvent',
+     'System.Classes.TOperation',
+     'System.Classes.TPersistent',
+     'System.Classes.TSeekOrigin',
+     'System.Classes.TStream',
+     'System.Classes.TStringItemList',
+     'System.Classes.TStringList',
+     'System.Classes.TStringList.TOverridden',
+     'System.Classes.TStringListSortCompare',
+     'System.Classes.TStrings',
+     'System.Classes.TStringsEnumerator',
+     'System.Classes.TStringsOptions',
+     'System.Double',
+     'System.Extended',
+     'System.Generics.Collections.TCollectionNotifyEvent<System.Classes.IInterfaceList>',
+     'System.Generics.Collections.TCollectionNotifyEvent<System.Classes.TBasicActionLink>',
+     'System.Generics.Collections.TCollectionNotifyEvent<System.Classes.TComponent>',
+     'System.Generics.Collections.TCollectionNotifyEvent<System.Integer>',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>.TItemArray',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>.TKeyCollection',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>.TKeyEnumerator',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>.TPairEnumerator',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>.TValueCollection',
+     'System.Generics.Collections.TDictionary<System.Integer,System.Classes.IInterfaceList>.TValueEnumerator',
+     'System.Generics.Collections.TEnumerable<System.Classes.IInterfaceList>',
+     'System.Generics.Collections.TEnumerable<System.Classes.TBasicActionLink>',
+     'System.Generics.Collections.TEnumerable<System.Classes.TComponent>',
+     'System.Generics.Collections.TEnumerable<System.Generics.Collections.TPair<System.Integer,System.Classes.IInterfaceList>>',
+     'System.Generics.Collections.TEnumerable<System.Integer>',
+     'System.Generics.Collections.TEnumerator<System.Classes.IInterfaceList>',
+     'System.Generics.Collections.TEnumerator<System.Classes.TBasicActionLink>',
+     'System.Generics.Collections.TEnumerator<System.Classes.TComponent>',
+     'System.Generics.Collections.TEnumerator<System.Generics.Collections.TPair<System.Integer,System.Classes.IInterfaceList>>',
+     'System.Generics.Collections.TEnumerator<System.Integer>',
+     'System.Generics.Collections.TList<System.Classes.TBasicActionLink>',
+     'System.Generics.Collections.TList<System.Classes.TBasicActionLink>.ParrayofT',
+     'System.Generics.Collections.TList<System.Classes.TBasicActionLink>.TEmptyFunc',
+     'System.Generics.Collections.TList<System.Classes.TBasicActionLink>.TEnumerator',
+     'System.Generics.Collections.TList<System.Classes.TBasicActionLink>.arrayofT',
+     'System.Generics.Collections.TList<System.Classes.TComponent>',
+     'System.Generics.Collections.TList<System.Classes.TComponent>.ParrayofT',
+     'System.Generics.Collections.TList<System.Classes.TComponent>.TEmptyFunc',
+     'System.Generics.Collections.TList<System.Classes.TComponent>.TEnumerator',
+     'System.Generics.Collections.TList<System.Classes.TComponent>.arrayofT',
+     'System.Generics.Collections.TListHelper.TInternalCompareFunc',
+     'System.Generics.Collections.TListHelper.TInternalNotifyProc',
+     'System.Generics.Collections.TPair<System.Integer,System.Classes.IInterfaceList>',
+     'System.Generics.Defaults.IComparer<System.Classes.TBasicActionLink>',
+     'System.Generics.Defaults.IComparer<System.Classes.TComponent>',
+     'System.Generics.Defaults.IEqualityComparer<System.Integer>',
+     'System.HRESULT',
+     'System.IEnumerable',
+     'System.IEnumerable<System.Classes.TBasicActionLink>',
+     'System.IEnumerable<System.Classes.TComponent>',
+     'System.IInterface',
+     'System.Int64',
+     'System.Integer',
+     'System.NativeInt',
+     'System.PAnsiChar',
+     'System.PCurrency',
+     'System.PExtended',
+     'System.PInt64',
+     'System.PInterfaceEntry',
+     'System.PInterfaceTable',
+     'System.PResStringRec',
+     'System.PShortString',
+     'System.PVariant',
+     'System.PWideChar',
+     'System.Pointer',
+     'System.ShortInt',
+     'System.ShortString',
+     'System.Single',
+     'System.SmallInt',
+     'System.SysUtils.TEncoding',
+     'System.SysUtils.TProc',
+     'System.TArray<System.Byte>',
+     'System.TArray<System.Char>',
+     'System.TArray<System.Classes.IInterfaceList>',
+     'System.TArray<System.Classes.IInterfaceList>',
+     'System.TArray<System.Classes.TBasicActionLink>',
+     'System.TArray<System.Classes.TComponent>',
+     'System.TArray<System.Generics.Collections.TPair<System.Integer,System.Classes.IInterfaceList>>',
+     'System.TArray<System.Integer>',
+     'System.TArray<System.TObject>',
+     'System.TArray<System.string>',
+     'System.TClass',
+     'System.TDateTime',
+     'System.TExtended80Rec',
+     'System.TFloatSpecial',
+     'System.TGUID',
+     'System.TObject',
+     'System.TVarRec',
+     'System.Types.IAsyncResult',
+     'System.Types.TDirection',
+     'System.Types.TDuplicates',
+     'System.Types.TPoint',
+     'System.Types.TRect',
+     'System.Types.TSmallPoint',
+     'System.Types.TSplitRectType',
+     'System.UInt64',
+     'System.Word',
+     'System.string'],
+    []);
 
 finalization
   ALRttiFinalization;
