@@ -160,7 +160,7 @@
     <Base>true</Base>
   </PropertyGroup>
   <PropertyGroup Condition="&#39;$(Base)&#39;!=&#39;&#39;">
-    <DCC_UnitSearchPath>..\..\..\Source;..\..\..\Embarcadero\Alexandria\11_3\fmx;..\..\..\Embarcadero\Alexandria\11_3\rtl\ios;..\..\..\Embarcadero\Alexandria\11_3\rtl\android;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+    <DCC_UnitSearchPath>..\..\..\Source;..\..\..\Embarcadero\Alexandria\fmx;..\..\..\Embarcadero\Alexandria\rtl\ios;..\..\..\Embarcadero\Alexandria\rtl\osx;..\..\..\Embarcadero\Alexandria\rtl\android;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
     <AUP_WRITE_EXTERNAL_STORAGE>true</AUP_WRITE_EXTERNAL_STORAGE>
     <AUP_CALL_PHONE>true</AUP_CALL_PHONE>
@@ -467,7 +467,7 @@
     <JavaReference Include="android\Merged\libs\32bit\androidx.versionedparcelable-versionedparcelable-1.1.1.jar">
       <ContainerId>ClassesdexFile</ContainerId>
     </JavaReference>
-    <JavaReference Include="android\Merged\libs\32bit\com.alcinoe-alcinoe-common-1.0.0.jar">
+    <JavaReference Include="android\Merged\libs\32bit\com.alcinoe-alcinoe-common-1.0.1.jar">
       <ContainerId>ClassesdexFile</ContainerId>
     </JavaReference>
     <JavaReference Include="android\Merged\libs\32bit\com.alcinoe-alcinoe-datepicker-1.0.0.jar">
@@ -536,7 +536,7 @@
     <JavaReference Include="android\Merged\libs\64bit\androidx.versionedparcelable-versionedparcelable-1.1.1.jar">
       <ContainerId>ClassesdexFile64</ContainerId>
     </JavaReference>
-    <JavaReference Include="android\Merged\libs\64bit\com.alcinoe-alcinoe-common-1.0.0.jar">
+    <JavaReference Include="android\Merged\libs\64bit\com.alcinoe-alcinoe-common-1.0.1.jar">
       <ContainerId>ClassesdexFile64</ContainerId>
     </JavaReference>
     <JavaReference Include="android\Merged\libs\64bit\com.alcinoe-alcinoe-datepicker-1.0.0.jar">

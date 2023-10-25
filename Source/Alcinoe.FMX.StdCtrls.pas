@@ -31,7 +31,7 @@ uses
   FMX.ImgList,
   Alcinoe.FMX.Ani,
   Alcinoe.FMX.Graphics,
-  Alcinoe.FMX.InertialMovement,
+  Alcinoe.FMX.ScrollEngine,
   Alcinoe.FMX.Objects;
 
 type
@@ -117,9 +117,7 @@ type
     property OnPainting;
     property OnPaint;
     property OnResize;
-    {$IF CompilerVersion >= 32} // tokyo
     property OnResized;
-    {$ENDIF}
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~}
@@ -138,18 +136,15 @@ type
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALTrackThumb = class(TALRectangle)
   private
-    [Weak] fValueRange: TValueRange;
-    [Weak] FTrack: TALCustomTrack;
-    [Weak] FGlyph: TALTrackThumbGlyph;
-    FDownOffset: TPointF;
-    fTrackDownOffset: single;
+    fValueRange: TValueRange;
+    FTrack: TALCustomTrack;
+    FGlyph: TALTrackThumbGlyph;
+    fMouseDownPos: TPointF;
     FPressed: Boolean;
-    FDeadZoneBeforeAcquireScrolling: Integer;
-    fScrollingAcquiredByMe: boolean;
-    fScrollingAcquiredByOther: boolean;
-    fScrollingAcquiredByOtherMessageID: integer;
-    procedure setScrollingAcquiredByMe(const Value: boolean);
-    procedure ScrollingAcquiredByOtherHandler(const Sender: TObject; const M: TMessage);
+    fScrollCapturedByMe: boolean;
+    fScrollCapturedByOther: boolean;
+    procedure setScrollCapturedByMe(const Value: boolean);
+    procedure ScrollCapturedByOtherHandler(const Sender: TObject; const M: TMessage);
     function PointToValue(X, Y: Single): Single;
   public
     constructor Create(const ATrack: TALCustomTrack; const aValueRange: TValueRange; const aWithGlyphObj: boolean); reintroduce;
@@ -160,7 +155,6 @@ type
     procedure DoMouseLeave; override;
     function GetDefaultTouchTargetExpansion: TRectF; override;
     property IsPressed: Boolean read FPressed;
-    property DeadZoneBeforeAcquireScrolling: Integer read FDeadZoneBeforeAcquireScrolling write FDeadZoneBeforeAcquireScrolling default 5;
   published
     property TouchTargetExpansion;
     property Locked default True;
@@ -212,9 +206,9 @@ type
     FTracking: Boolean;
     FThumbSize: Single;
     FMinThumbSize: Single;
-    [Weak] FThumb: TALTrackThumb;
-    [Weak] FBackGround: TALTrackBackground;
-    [Weak] FHighlight: TALTrackHighlight;
+    FThumb: TALTrackThumb;
+    FBackGround: TALTrackBackground;
+    FHighlight: TALTrackHighlight;
     procedure SetViewportSize(const Value: Single); virtual;
     function GetViewportSize: Single; virtual;
     function GetFrequency: Single; virtual;
@@ -340,9 +334,7 @@ type
     property OnPainting;
     property OnPaint;
     property OnResize;
-    {$IF CompilerVersion >= 32} // tokyo
     property OnResized;
-    {$ENDIF}
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~}
@@ -419,9 +411,7 @@ type
     property OnPainting;
     property OnPaint;
     property OnResize;
-    {$IF CompilerVersion >= 32} // tokyo
     property OnResized;
-    {$ENDIF}
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~}
@@ -430,7 +420,7 @@ type
   private
     FMaxValueRange: TValueRange;
   protected
-    [Weak] FMaxThumb: TALTrackThumb;
+    FMaxThumb: TALTrackThumb;
     procedure SetViewportSize(const Value: Single); override;
     procedure SetFrequency(const Value: Single); override;
     procedure SetMax(const Value: Single); override;
@@ -520,9 +510,7 @@ type
     property OnPainting;
     property OnPaint;
     property OnResize;
-    {$IF CompilerVersion >= 32} // tokyo
     property OnResized;
-    {$ENDIF}
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~}
@@ -622,9 +610,7 @@ type
     property OnPainting;
     property OnPaint;
     property OnResize;
-    {$IF CompilerVersion >= 32} // tokyo
     property OnResized;
-    {$ENDIF}
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~}
@@ -674,8 +660,8 @@ type
     DefaultSwitchAnimationDuration = 0.2;
     TrackingSensitivity = 3;
   private
-    [Weak] FThumb: TALSwitchThumb;
-    [Weak] FBackGround: TALSwitchBackground;
+    FThumb: TALSwitchThumb;
+    FBackGround: TALSwitchBackground;
     FThumbRect: TrectF;
     FPressed, FTracking: Boolean;
     FPressedThumbPos, FSavedPos: TPointF;
@@ -771,15 +757,6 @@ type
     property OnAnimationFinish: TNotifyEvent read FOnAnimationFinish write FOnAnimationFinish;
   end;
 
-{$IFDEF debug}
-var
-  AlDebugAniIndicatorMakeBufBitmapCount: integer;
-  AlDebugCheckBoxMakeBufBitmapCount: integer;
-
-  AlDebugAniIndicatorMakeBufBitmapStopWatch: TstopWatch;
-  AlDebugCheckBoxMakeBufBitmapStopWatch: TstopWatch;
-{$endif}
-
 procedure Register;
 
 implementation
@@ -870,56 +847,47 @@ begin
      (SameValue(fBufSize.cx, Size.Size.cx, TEpsilon.position)) and
      (SameValue(fBufSize.cy, Size.Size.cy, TEpsilon.position)) then exit(fBufBitmap);
 
+  {$IFDEF debug}
+  if FBufBitmap <> nil then
+    ALLog('TALAniIndicator.MakeBufBitmap', 'BufBitmap is being recreated | Name: ' + Name, TalLogType.warn);
+  {$endif}
   clearBufBitmap;
   fBufSize := Size.Size;
 
-  {$IFDEF debug}
-  ALLog('TALAniIndicator.MakeBufBitmap', 'Name: ' + Name, TalLogType.verbose);
-  inc(AlDebugAniIndicatorMakeBufBitmapCount);
-  AlDebugAniIndicatorMakeBufBitmapStopWatch.Start;
-  try
-  {$endif}
-
-    {$IFDEF ALDPK}
-    var LFileName: String := '';
-    if TFile.Exists(getActiveProject.fileName) then begin
-      var LDProjSrc := ALGetStringFromFile(getActiveProject.fileName, TEncoding.utf8);
-      //<RcItem Include="resources\account_100x100.png">
-      //    <ResourceType>RCDATA</ResourceType>
-      //    <ResourceId>account_100x100</ResourceId>
-      //</RcItem>
-      Var P1: Integer := ALposIgnoreCaseW('<ResourceId>'+fResourceName+'</ResourceId>', LDProjSrc);
-      While (P1 > 1) and ((LDProjSrc[P1-1] <> '=') or (LDProjSrc[P1] <> '"')) do dec(P1);
-      if (P1 > 0) then begin
-        var P2: Integer := ALPosW('"', LDProjSrc, P1+1);
-        if P2 > P1 then begin
-          LFileName := extractFilePath(getActiveProject.fileName) + ALcopyStr(LDProjSrc, P1+1, P2-P1-1);
-          if not TFile.Exists(LFileName) then LFileName := '';
-        end;
-      end;
-    end;
-    if LFileName = '' then begin
-      LFileName := extractFilePath(getActiveProject.fileName) + 'Resources\' + fResourceName; // by default all the resources files must be located in the sub-folder /Resources/ of the project
-      if not TFile.Exists(LFileName) then begin
-        LFileName := LFileName + '.png';
+  {$IFDEF ALDPK}
+  var LFileName: String := '';
+  if TFile.Exists(getActiveProject.fileName) then begin
+    var LDProjSrc := ALGetStringFromFile(getActiveProject.fileName, TEncoding.utf8);
+    //<RcItem Include="resources\account_100x100.png">
+    //    <ResourceType>RCDATA</ResourceType>
+    //    <ResourceId>account_100x100</ResourceId>
+    //</RcItem>
+    Var P1: Integer := ALposIgnoreCaseW('<ResourceId>'+fResourceName+'</ResourceId>', LDProjSrc);
+    While (P1 > 1) and ((LDProjSrc[P1-1] <> '=') or (LDProjSrc[P1] <> '"')) do dec(P1);
+    if (P1 > 0) then begin
+      var P2: Integer := ALPosW('"', LDProjSrc, P1+1);
+      if P2 > P1 then begin
+        LFileName := extractFilePath(getActiveProject.fileName) + ALcopyStr(LDProjSrc, P1+1, P2-P1-1);
         if not TFile.Exists(LFileName) then LFileName := '';
       end;
     end;
-    {$ENDIF}
-    fBufBitmapRect := LocalRect;
-    {$IFDEF ALDPK}
-    if LFileName <> '' then fBufBitmap := ALLoadFitIntoFileImageV3(LFileName, Width * (fframeCount div fRowCount) * FScreenScale, Height * fRowCount * FScreenScale)
-    else fBufBitmap := nil;
-    {$ELSE}
-    fBufBitmap := ALLoadFitIntoResourceImageV3(fResourceName, Width * (fframeCount div fRowCount) * FScreenScale, Height * fRowCount * FScreenScale);
-    {$ENDIF}
-    result := fBufBitmap;
-
-  {$IFDEF debug}
-  finally
-    AlDebugAniIndicatorMakeBufBitmapStopWatch.Stop;
   end;
-  {$endif}
+  if LFileName = '' then begin
+    LFileName := extractFilePath(getActiveProject.fileName) + 'Resources\' + fResourceName; // by default all the resources files must be located in the sub-folder /Resources/ of the project
+    if not TFile.Exists(LFileName) then begin
+      LFileName := LFileName + '.png';
+      if not TFile.Exists(LFileName) then LFileName := '';
+    end;
+  end;
+  {$ENDIF}
+  fBufBitmapRect := LocalRect;
+  {$IFDEF ALDPK}
+  if LFileName <> '' then fBufBitmap := ALLoadFitIntoFileImageV3(LFileName, Width * (fframeCount div fRowCount) * FScreenScale, Height * fRowCount * FScreenScale)
+  else fBufBitmap := nil;
+  {$ELSE}
+  fBufBitmap := ALLoadFitIntoResourceImageV3(fResourceName, Width * (fframeCount div fRowCount) * FScreenScale, Height * fRowCount * FScreenScale);
+  {$ENDIF}
+  result := fBufBitmap;
 
 end;
 
@@ -1067,18 +1035,16 @@ begin
     fGlyph.Name := 'Glyph';
   end
   else fGlyph := nil;
-  FDeadZoneBeforeAcquireScrolling := 5;
-  FDownOffset := TpointF.Create(0, 0);
-  fTrackDownOffset := 0;
-  fScrollingAcquiredByMe := False;
-  fScrollingAcquiredByOther := False;
-  fScrollingAcquiredByOtherMessageID := TMessageManager.DefaultManager.SubscribeToMessage(TALScrollingAcquiredMessage, ScrollingAcquiredByOtherHandler);
+  fMouseDownPos := TpointF.Zero;
+  fScrollCapturedByMe := False;
+  fScrollCapturedByOther := False;
+  TMessageManager.DefaultManager.SubscribeToMessage(TALScrollCapturedMessage, ScrollCapturedByOtherHandler);
 end;
 
 {*******************************}
 destructor TALTrackThumb.Destroy;
 begin
-  TMessageManager.DefaultManager.Unsubscribe(TALScrollingAcquiredMessage, fScrollingAcquiredByOtherMessageID);
+  TMessageManager.DefaultManager.Unsubscribe(TALScrollCapturedMessage, ScrollCapturedByOtherHandler);
   inherited;
 end;
 
@@ -1090,12 +1056,12 @@ begin
   if (Parent is TControl) then begin
     if FTrack.Orientation = TOrientation.Horizontal then begin
       P := FTrack.ScreenToLocal(LocalToScreen(TPointF.Create(X, 0)));
-      P.X := P.X - FDownOffset.X + Width / 2;
+      P.X := P.X - fMouseDownPos.X + Width / 2;
       Result := _PosToValue(FTrack.Min, FTrack.Max, FTrack.ViewportSize, Self.Width, FTrack.Width, P.X, FTrack.FIgnoreViewportSize);
     end
     else begin
       P := FTrack.ScreenToLocal(LocalToScreen(TPointF.Create(0, Y)));
-      P.Y := P.Y - FDownOffset.Y + Height / 2;
+      P.Y := P.Y - fMouseDownPos.Y + Height / 2;
       Result := _PosToValue(FTrack.Min, FTrack.Max, FTrack.ViewportSize, Self.Height, FTrack.Height, P.Y, FTrack.FIgnoreViewportSize);
     end;
   end;
@@ -1116,43 +1082,52 @@ begin
     Result := inherited ;
 end;
 
-{*********************************************************************}
-procedure TALTrackThumb.setScrollingAcquiredByMe(const Value: boolean);
+{******************************************************************}
+procedure TALTrackThumb.setScrollCapturedByMe(const Value: boolean);
 begin
-  if Value <> fScrollingAcquiredByMe  then begin
-    fScrollingAcquiredByMe := Value;
-    TMessageManager.DefaultManager.SendMessage(self, TALScrollingAcquiredMessage.Create(Value), True);
+  if Value <> fScrollCapturedByMe  then begin
+    {$IFDEF DEBUG}
+    //ALLog('TALTrackThumb.setScrollCapturedByMe', 'Value: ' + ALBoolToStrW(Value), TalLogType.verbose);
+    {$ENDIF}
+    fScrollCapturedByMe := Value;
+    TMessageManager.DefaultManager.SendMessage(self, TALScrollCapturedMessage.Create(Value), True);
   end;
 end;
 
-{************************************************************************************************}
-procedure TALTrackThumb.ScrollingAcquiredByOtherHandler(const Sender: TObject; const M: TMessage);
+{*********************************************************************************************}
+procedure TALTrackThumb.ScrollCapturedByOtherHandler(const Sender: TObject; const M: TMessage);
 begin
-  //the scrolling was acquired or released by another control (like a scrollbox for exemple)
-  //the problem is that the scrolling could be acquired BEFORE the mousedown is fired in parent control (baah yes)
-  //so we need the var fScrollingAcquiredByOther to handle this
+  //the scrolling was Captured or released by another control (like a scrollbox for exemple)
+  //the problem is that the scrolling could be Captured BEFORE the mousedown is fired in parent control (baah yes)
+  //so we need the var fScrollCapturedByOther to handle this
   if (Sender = self) then exit;
-  if TALScrollingAcquiredMessage(M).Acquired then begin
+  {$IFDEF DEBUG}
+  //ALLog(
+  //  'TALTrackThumb.ScrollCapturedByOtherHandler',
+  //  'Captured: ' + ALBoolToStrW(TALScrollCapturedMessage(M).Captured)+ ' | ' +
+  //  'Pressed: ' + ALBoolToStrW(FPressed),
+  //  TalLogType.verbose);
+  {$ENDIF}
+  if TALScrollCapturedMessage(M).Captured then begin
     if FPressed then begin
       FPressed := False;
       if (not FValueRange.Tracking) then FValueRange.Tracking := True;
     end;
-    fScrollingAcquiredByOther := True;
+    fScrollCapturedByOther := True;
   end
-  else fScrollingAcquiredByOther := False;
+  else fScrollCapturedByOther := False;
 end;
 
 {****************************************************************************************}
 procedure TALTrackThumb.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
   inherited;
-  if (not fScrollingAcquiredByOther) and (Button = TMouseButton.mbLeft) and Enabled then begin
+  if (not fScrollCapturedByOther) and (Button = TMouseButton.mbLeft) and Enabled then begin
     BringToFront;
     repaint;
     FPressed := True;
-    setScrollingAcquiredByMe(False);
-    FDownOffset := PointF(X, Y);
-    fTrackDownOffset := FTrack.ScreenToLocal(LocalToScreen(TPointF.Create(X, 0))).x;
+    setScrollCapturedByMe(False);
+    fMouseDownPos := PointF(X, Y);
     FTrack.SetFocus;
     fValueRange.Tracking := FTrack.Tracking;
     StartTriggerAnimation(Self, 'IsPressed');
@@ -1166,8 +1141,9 @@ begin
   inherited;
   if FPressed and Enabled then begin
 
-    if (not fScrollingAcquiredByMe) and
-       (abs(FTrack.ScreenToLocal(LocalToScreen(TPointF.Create(x, 0))).x - fTrackDownOffset) > fDeadZoneBeforeAcquireScrolling) then setScrollingAcquiredByMe(True);
+    if (not fScrollCapturedByMe) and
+       (abs(fMouseDownPos.x - x) > abs(fMouseDownPos.y - y)) and
+       (abs(fMouseDownPos.x - x) > TALScrollEngine.DefaultTouchSlop) then setScrollCapturedByMe(True);
 
     try
       FValueRange.Value := PointToValue(X, Y);
@@ -1187,7 +1163,7 @@ begin
   inherited;
   if FPressed then begin
 
-    setScrollingAcquiredByMe(False);
+    setScrollCapturedByMe(False);
 
     FPressed := False;
     try
@@ -1209,7 +1185,7 @@ begin
   inherited;
   if FPressed then begin
 
-    setScrollingAcquiredByMe(False);
+    setScrollCapturedByMe(False);
 
     FPressed := False;
     try
@@ -1245,7 +1221,7 @@ type
   {**************************************}
   TALValueRangeTrack = class (TValueRange)
   private
-    [Weak] FTrack: TALCustomTrack;
+    FTrack: TALCustomTrack;
     FValueChanged: Boolean;
   public
     constructor Create(AOwner: TComponent); override;
@@ -2049,123 +2025,114 @@ begin
      (SameValue(fBufSize.cy, Size.Size.cy, TEpsilon.position)) and
      (FbufResourceName = LResourceName) then exit(fBufBitmap);
 
+  {$IFDEF debug}
+  if FBufBitmap <> nil then
+    ALLog('TALCheckbox.MakeBufBitmap', 'BufBitmap is being recreated | Name: ' + Name, TalLogType.warn);
+  {$endif}
   clearBufBitmap;
   fBufSize := Size.Size;
   FbufResourceName := LResourceName;
 
-  {$IFDEF debug}
-  ALLog('TALCheckbox.MakeBufBitmap', 'Name: ' + Name, TalLogType.verbose);
-  inc(AlDebugCheckBoxMakeBufBitmapCount);
-  AlDebugCheckBoxMakeBufBitmapStopWatch.Start;
-  try
-  {$endif}
-
-    {$IFDEF ALDPK}
-    LFileName := extractFilePath(getActiveProject.fileName) + 'resources\' + LResourceName; // by default all the resources files must be located in the sub-folder /resources/ of the project
-    if not TFile.Exists(LFileName) then begin
-      LFileName := LFileName + '.png';
-      if not TFile.Exists(LFileName) then LFileName := '';
-    end;
-    {$ENDIF}
-
-    case FWrapMode of
-
-      //Display the image with its original dimensions:
-      //* The image is placed in the upper-left corner of the rectangle of the control.
-      //* If the image is larger than the control's rectangle, then only the upper-left part of the image,
-      //  which fits in the rectangle of the control, is shown. The image is not resized.
-      TALImageWrapMode.Original:
-        begin
-          Result := nil; // todo
-        end;
-
-      //Best fit the image in the rectangle of the control:
-      //* If any dimension of the image is larger than the rectangle of the control, then scales down the image
-      //  (keeping image proportions – the ratio between the width and height) to fit the whole image in the rectangle
-      //  of the control. That is, either the width of the resized image is equal to the width of the control's rectangle
-      //  or the height of the resized image is equal to the height of the rectangle of the control. The whole image
-      //  should be displayed. The image is displayed centered in the rectangle of the control.
-      // * If the original image is smaller than the rectangle of the control, then the image is stretched to best fit in
-      //  the rectangle of the control. Whole the image should be displayed. The image is displayed centered in the rectangle of the control.
-      TALImageWrapMode.Fit:
-        begin
-          fBufBitmapRect := ALAlignDimensionToPixelRound(LocalRect, FScreenScale); // to have the pixel aligned width and height
-          {$IFDEF ALDPK}
-          if LFileName <> '' then fBufBitmap := ALLoadFitIntoFileImageV3(LFileName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale)
-          else fBufBitmap := nil;
-          {$ELSE}
-          fBufBitmap := ALLoadFitIntoResourceImageV3(LResourceName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale);
-          {$ENDIF}
-          result := fBufBitmap;
-          if result <> nil then fBufBitmapRect := TrectF.Create(0,0, result.Width/FScreenScale, result.Height/FScreenScale).
-                                                    CenterAt(fBufBitmapRect);
-        end;
-
-      //Stretch the image to fill the entire rectangle of the control.
-      TALImageWrapMode.Stretch:
-        begin
-          Result := nil; // todo
-        end;
-
-      //Tile (multiply) the image to cover the entire rectangle of the control:
-      //* If the image is larger than the rectangle of the control, then only the
-      //  upper-left part of the image, which fits in the rectangle of the control, is shown. The image is not resized.
-      //* If the image (original size) is smaller than the rectangle of the control, then the multiple images are tiled
-      //  (placed one next to another) to fill the entire rectangle of the control. The images are placed beginning from
-      //  the upper-left corner of the rectangle of the control.
-      TALImageWrapMode.Tile:
-        begin
-          Result := nil; // todo
-        end;
-
-      //Center the image to the rectangle of the control:
-      //* The image is always displayed at its original size (regardless whether the rectangle of the control is larger or smaller than the image size).
-      TALImageWrapMode.Center:
-        begin
-          Result := nil; // todo
-        end;
-
-      //Fit the image in the rectangle of the control:
-      //* If any dimension of the image is larger than the rectangle of the control, then scales down the image (keeping image proportions--the ratio between the width and height)
-      //  to fit the whole image in the rectangle of the control. That is, either the width of the resized image is equal to the width of the control's rectangle or the height of the
-      //  resized image is equal to the height of the control's rectangle. Whole the image should be displayed. The image is displayed centered in the rectangle of the control.
-      //* If the original image is smaller than the rectangle of the control, then the image is not resized. The image is displayed centered in the rectangle of the control.
-      TALImageWrapMode.Place:
-        begin
-          Result := nil; // todo
-        end;
-
-      //Best fit the image in the rectangle of the control:
-      //* If any dimension of the image is larger than the rectangle of the control, then scales down the image
-      //  (keeping image proportions – the ratio between the width and height) to fit the height or the width of the image in the rectangle
-      //  of the control and crop the extra part of the image. That is, the width of the resized image is equal to the width of the control's rectangle
-      //  AND the height of the resized image is equal to the height of the rectangle of the control.
-      // * If the original image is smaller than the rectangle of the control, then the image is stretched to best fit in
-      //  the rectangle of the control. Whole the image should be displayed.
-      TALImageWrapMode.FitAndCrop:
-        begin
-          fBufBitmapRect := ALAlignDimensionToPixelRound(LocalRect, FScreenScale); // to have the pixel aligned width and height
-          {$IFDEF ALDPK}
-          if LFileName <> '' then fBufBitmap := ALLoadFitIntoAndCropFileImageV3(LFileName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale)
-          else fBufBitmap := nil;
-          {$ELSE}
-          fBufBitmap := ALLoadFitIntoAndCropResourceImageV3(LResourceName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale);
-          {$ENDIF}
-          result := fBufBitmap;
-          if result <> nil then fBufBitmapRect := TrectF.Create(0,0, result.Width/FScreenScale, result.Height/FScreenScale).
-                                                    CenterAt(fBufBitmapRect);
-        end;
-
-      //to hide a stupid warning else
-      else Result := nil;
-
-    end;
-
-  {$IFDEF debug}
-  finally
-    AlDebugCheckBoxMakeBufBitmapStopWatch.Stop;
+  {$IFDEF ALDPK}
+  LFileName := extractFilePath(getActiveProject.fileName) + 'resources\' + LResourceName; // by default all the resources files must be located in the sub-folder /resources/ of the project
+  if not TFile.Exists(LFileName) then begin
+    LFileName := LFileName + '.png';
+    if not TFile.Exists(LFileName) then LFileName := '';
   end;
-  {$endif}
+  {$ENDIF}
+
+  case FWrapMode of
+
+    //Display the image with its original dimensions:
+    //* The image is placed in the upper-left corner of the rectangle of the control.
+    //* If the image is larger than the control's rectangle, then only the upper-left part of the image,
+    //  which fits in the rectangle of the control, is shown. The image is not resized.
+    TALImageWrapMode.Original:
+      begin
+        Result := nil; // todo
+      end;
+
+    //Best fit the image in the rectangle of the control:
+    //* If any dimension of the image is larger than the rectangle of the control, then scales down the image
+    //  (keeping image proportions – the ratio between the width and height) to fit the whole image in the rectangle
+    //  of the control. That is, either the width of the resized image is equal to the width of the control's rectangle
+    //  or the height of the resized image is equal to the height of the rectangle of the control. The whole image
+    //  should be displayed. The image is displayed centered in the rectangle of the control.
+    // * If the original image is smaller than the rectangle of the control, then the image is stretched to best fit in
+    //  the rectangle of the control. Whole the image should be displayed. The image is displayed centered in the rectangle of the control.
+    TALImageWrapMode.Fit:
+      begin
+        fBufBitmapRect := ALAlignDimensionToPixelRound(LocalRect, FScreenScale); // to have the pixel aligned width and height
+        {$IFDEF ALDPK}
+        if LFileName <> '' then fBufBitmap := ALLoadFitIntoFileImageV3(LFileName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale)
+        else fBufBitmap := nil;
+        {$ELSE}
+        fBufBitmap := ALLoadFitIntoResourceImageV3(LResourceName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale);
+        {$ENDIF}
+        result := fBufBitmap;
+        if result <> nil then fBufBitmapRect := TrectF.Create(0,0, result.Width/FScreenScale, result.Height/FScreenScale).
+                                                  CenterAt(fBufBitmapRect);
+      end;
+
+    //Stretch the image to fill the entire rectangle of the control.
+    TALImageWrapMode.Stretch:
+      begin
+        Result := nil; // todo
+      end;
+
+    //Tile (multiply) the image to cover the entire rectangle of the control:
+    //* If the image is larger than the rectangle of the control, then only the
+    //  upper-left part of the image, which fits in the rectangle of the control, is shown. The image is not resized.
+    //* If the image (original size) is smaller than the rectangle of the control, then the multiple images are tiled
+    //  (placed one next to another) to fill the entire rectangle of the control. The images are placed beginning from
+    //  the upper-left corner of the rectangle of the control.
+    TALImageWrapMode.Tile:
+      begin
+        Result := nil; // todo
+      end;
+
+    //Center the image to the rectangle of the control:
+    //* The image is always displayed at its original size (regardless whether the rectangle of the control is larger or smaller than the image size).
+    TALImageWrapMode.Center:
+      begin
+        Result := nil; // todo
+      end;
+
+    //Fit the image in the rectangle of the control:
+    //* If any dimension of the image is larger than the rectangle of the control, then scales down the image (keeping image proportions--the ratio between the width and height)
+    //  to fit the whole image in the rectangle of the control. That is, either the width of the resized image is equal to the width of the control's rectangle or the height of the
+    //  resized image is equal to the height of the control's rectangle. Whole the image should be displayed. The image is displayed centered in the rectangle of the control.
+    //* If the original image is smaller than the rectangle of the control, then the image is not resized. The image is displayed centered in the rectangle of the control.
+    TALImageWrapMode.Place:
+      begin
+        Result := nil; // todo
+      end;
+
+    //Best fit the image in the rectangle of the control:
+    //* If any dimension of the image is larger than the rectangle of the control, then scales down the image
+    //  (keeping image proportions – the ratio between the width and height) to fit the height or the width of the image in the rectangle
+    //  of the control and crop the extra part of the image. That is, the width of the resized image is equal to the width of the control's rectangle
+    //  AND the height of the resized image is equal to the height of the rectangle of the control.
+    // * If the original image is smaller than the rectangle of the control, then the image is stretched to best fit in
+    //  the rectangle of the control. Whole the image should be displayed.
+    TALImageWrapMode.FitAndCrop:
+      begin
+        fBufBitmapRect := ALAlignDimensionToPixelRound(LocalRect, FScreenScale); // to have the pixel aligned width and height
+        {$IFDEF ALDPK}
+        if LFileName <> '' then fBufBitmap := ALLoadFitIntoAndCropFileImageV3(LFileName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale)
+        else fBufBitmap := nil;
+        {$ELSE}
+        fBufBitmap := ALLoadFitIntoAndCropResourceImageV3(LResourceName, fBufBitmapRect.Width * FScreenScale, fBufBitmapRect.Height * FScreenScale);
+        {$ENDIF}
+        result := fBufBitmap;
+        if result <> nil then fBufBitmapRect := TrectF.Create(0,0, result.Width/FScreenScale, result.Height/FScreenScale).
+                                                  CenterAt(fBufBitmapRect);
+      end;
+
+    //to hide a stupid warning else
+    else Result := nil;
+
+  end;
 
 end;
 
@@ -2405,7 +2372,7 @@ begin
   //-----
   FAnimation := TALFloatAnimation.Create;
   FAnimation.AnimationType := TAnimationType.In;
-  FAnimation.Interpolation := TInterpolationType.Linear;
+  FAnimation.Interpolation := TALInterpolationType.Linear;
   FAnimation.OnProcess := doAnimationProcess;
   FAnimation.OnFinish := DoAnimationEnd;
   FAnimation.Enabled := False;
@@ -2730,9 +2697,5 @@ end;
 
 initialization
   RegisterFmxClasses([TALAniIndicator, TALScrollBar, TALTrackBar, TALRangeTrackBar, TALCheckBox, TALRadioButton, TALSwitch]);
-  {$IFDEF debug}
-  AlDebugAniIndicatorMakeBufBitmapStopWatch := TstopWatch.Create;
-  AlDebugCheckBoxMakeBufBitmapStopWatch := TstopWatch.Create;
-  {$endif}
 
 end.

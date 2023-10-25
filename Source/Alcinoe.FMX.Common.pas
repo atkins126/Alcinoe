@@ -34,13 +34,13 @@ type
     fblur: Single;
     fOffsetX: Single;
     fOffsetY: Single;
-    fShadowColor: TAlphaColor;
+    fColor: TAlphaColor;
     FOnChanged: TNotifyEvent;
     procedure SetEnabled(const Value: boolean);
     procedure setblur(const Value: Single);
     procedure setOffsetX(const Value: Single);
     procedure setOffsetY(const Value: Single);
-    procedure setShadowColor(const Value: TAlphaColor);
+    procedure setColor(const Value: TAlphaColor);
     function IsblurStored: Boolean;
     function IsOffsetXStored: Boolean;
     function IsOffsetYStored: Boolean;
@@ -54,19 +54,19 @@ type
     property blur: Single read fblur write setblur stored IsblurStored;
     property OffsetX: Single read fOffsetX write setOffsetX stored IsOffsetXStored;
     property OffsetY: Single read fOffsetY write setOffsetY stored IsOffsetYStored;
-    property ShadowColor: TAlphaColor read fShadowColor write setShadowColor default $96000000;
+    property Color: TAlphaColor read fColor write setColor default $96000000;
   end;
 
 type
 
-  TALCustomConvertFontFamilyProc = function(const AFamily: TFontName; const aFontStyles: TfontStyles): TFontName;
+  TALCustomConvertFontFamilyProc = function(const AFamily: TFontName): TFontName;
 
 var
 
   ALCustomConvertFontFamilyProc: TALCustomConvertFontFamilyProc;
 
-{*************************************************************************************************}
-function  ALConvertFontFamily(const AFamily: TFontName; const aFontStyles: TfontStyles): TFontName;
+{*****************************************************************}
+function  ALConvertFontFamily(const AFamily: TFontName): TFontName;
 function  ALTranslate(const AText: string): string;
 Procedure ALFmxMakeBufBitmaps(const aControl: TControl);
 function  ALAlignAbsolutePointToPixelRound(const Point: TPointF; const Scale: single): TpointF;
@@ -310,7 +310,7 @@ begin
   fblur := 12;
   fOffsetX := 0;
   fOffsetY := 0;
-  fShadowColor := $96000000;
+  fColor := $96000000;
   FOnChanged := nil;
 end;
 
@@ -325,7 +325,7 @@ begin
     fblur := TALShadow(Source).fblur;
     fOffsetX := TALShadow(Source).fOffsetX;
     fOffsetY := TALShadow(Source).fOffsetY;
-    fShadowColor := TALShadow(Source).fShadowColor;
+    fColor := TALShadow(Source).fColor;
     FOnChanged := LSaveChange;
     if Assigned(FOnChanged) then FOnChanged(Self);
   end
@@ -386,21 +386,21 @@ begin
   end;
 end;
 
-{***********************************************************}
-procedure TALShadow.setShadowColor(const Value: TAlphaColor);
+{*****************************************************}
+procedure TALShadow.setColor(const Value: TAlphaColor);
 begin
-  if FShadowColor <> Value then begin
-    FShadowColor := Value;
+  if FColor <> Value then begin
+    FColor := Value;
     if Assigned(FOnChanged) then FOnChanged(Self);
   end;
 end;
 
-{************************************************************************************************}
-function ALConvertFontFamily(const AFamily: TFontName; const aFontStyles: TfontStyles): TFontName;
+{****************************************************************}
+function ALConvertFontFamily(const AFamily: TFontName): TFontName;
 begin
   if AFamily = '' then Exit('');
   if Assigned(ALCustomConvertFontFamilyProc) then begin
-    Result := ALCustomConvertFontFamilyProc(AFamily, aFontStyles);
+    Result := ALCustomConvertFontFamilyProc(AFamily);
     if Result = '' then Result := AFamily;
     Exit;
   end;
@@ -424,17 +424,15 @@ Procedure ALFmxMakeBufBitmaps(const aControl: TControl);
 var LChild: TControl;
 begin
 
-  //
-  //if aControl is TPresentedControl then TPresentedControl(aControl).ApplyStyleLookup; // this to generate child controls
-  //                                                                                    // that can be TALText for exemple
-  //                                                                                    // (for the Tlabel)
-  acontrol.DisableDisappear := true; // this to keep the style when the control get out of the visible are
-                                     // else the style will be freed to be reaplied a little later
+  // This is used to generate child controls.
+  // For instance, TALText can be used for the TLabel.
+  //if aControl is TPresentedControl then TPresentedControl(aControl).ApplyStyleLookup;
 
-  if (aControl is TALText) then begin
-    TALText(aControl).doubleBuffered := True;
-    TALText(aControl).MakeBufBitmap;
-  end
+  // This ensures the style is retained when the control exits the visible area.
+  // Otherwise, the style will be released and reapplied shortly after.
+  acontrol.DisableDisappear := true;
+
+  if (aControl is TALText) then TALText(aControl).MakeBufBitmap
   else if (aControl is TALRectangle) then begin
     TALRectangle(aControl).doubleBuffered := True;
     TALRectangle(aControl).MakeBufBitmap;

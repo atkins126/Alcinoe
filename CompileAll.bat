@@ -42,7 +42,7 @@ REM ----------------
 
 :INIT_ENVIRONMENT
 
-call .\InitEnvironment.bat
+call "%~dp0InitEnvironment.bat"
 IF ERRORLEVEL 1 goto ERROR
 echo.
 
@@ -54,6 +54,36 @@ REM --------------
 if not exist "%ALBaseDir%\Source\Alcinoe.inc" goto ERROR
 
 
+REM --------------------------------------------
+REM Copy and patch localy the delphi source code
+REM --------------------------------------------
+
+:COPY_AND_PATCH_DELPHI_SOURCE
+
+echo ------------------
+echo Delphi source code
+echo ------------------
+echo.
+
+set ALCopyAndPatchDelphiSource=
+set /P ALCopyAndPatchDelphiSource=Copy the Delphi source code and patch it locally (Y/N, default=Y)?: %=%
+more < nul > nul & REM This instruction to clear the ERRORLEVEL because previous instruction set ERRORLEVEL to 1 if empty input
+echo.
+
+if "%ALCopyAndPatchDelphiSource%"=="" set ALCopyAndPatchDelphiSource=Y
+if "%ALCopyAndPatchDelphiSource%"=="y" set ALCopyAndPatchDelphiSource=Y
+if "%ALCopyAndPatchDelphiSource%"=="n" set ALCopyAndPatchDelphiSource=N
+if "%ALCopyAndPatchDelphiSource%"=="Y" goto DO_COPY_AND_PATCH_DELPHI_SOURCE
+if "%ALCopyAndPatchDelphiSource%"=="N" goto DOWNLOAD_LIBRARIES
+goto COPY_AND_PATCH_DELPHI_SOURCE
+
+:DO_COPY_AND_PATCH_DELPHI_SOURCE
+
+call "%ALBaseDir%\Embarcadero\%ALDelphiName%\Update.bat"
+IF ERRORLEVEL 1 goto ERROR
+echo.
+
+
 REM ----------------------
 REM Download the libraries
 REM ----------------------
@@ -61,7 +91,7 @@ REM ----------------------
 :DOWNLOAD_LIBRARIES
 
 echo ---------
-echo LIBRARIES
+echo Libraries
 echo ---------
 echo.
 
@@ -79,11 +109,11 @@ goto DOWNLOAD_LIBRARIES
 
 :DO_DOWNLOAD_LIBRARIES
 
-call %ALBaseDir%\Libraries\ios\DownloadLibraries.bat
+call "%ALBaseDir%\Libraries\ios\DownloadLibraries.bat"
 IF ERRORLEVEL 1 goto ERROR
 echo.
 
-call %ALBaseDir%\Libraries\jar\DownloadLibraries.bat
+call "%ALBaseDir%\Libraries\jar\DownloadLibraries.bat"
 IF ERRORLEVEL 1 goto ERROR
 echo.
 
@@ -155,7 +185,7 @@ goto RUN_TESTS
 
 :DO_RUN_TESTS
 
-call %ALBaseDir%\Tests\RunTests.bat
+call "%ALBaseDir%\Tests\RunTests.bat"
 IF ERRORLEVEL 1 goto ERROR
 echo.
 
@@ -267,6 +297,7 @@ goto BUILD_DEMOS
 
 :DO_BUILD_DEMOS
 
+Call :BUILD_FMX_DEMO "%ALBaseDir%\Demos\ALAnimation" "_Source" "ALAnimationDemo.dproj"
 Call :BUILD_VCL_DEMO "%ALBaseDir%\Demos\ALCipher" "_Source" "ALCipherDemo.dproj"
 Call :BUILD_FMX_DEMO "%ALBaseDir%\Demos\ALConfetti" "_Source" "ALConfettiDemo.dproj"
 Call :BUILD_VCL_DEMO "%ALBaseDir%\Demos\ALDatabaseBenchmark" "_Source" "ALDatabaseBenchmark.dproj"

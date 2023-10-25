@@ -33,8 +33,9 @@ us to patch the original Delphi source files:
 * [Root Class Not Found' Error in Delphi IDE When Opening a Class Inherited via an Include Directive](https://quality.embarcadero.com/browse/RSP-42021)
 * [Their is no propagation of mouse event under Firemonkey](https://quality.embarcadero.com/browse/RSP-24397)
 * [Performance Issue - Comparing Equality Between Two Strings](https://quality.embarcadero.com/browse/RSP-42011)
+* [Introduce IsVisibleObject function for improved optimization on TScrollBox](https://quality.embarcadero.com/browse/RSP-42357)
 * [BeginUpdate/Endupdate block with add or remove of child objects : misconception](https://quality.embarcadero.com/browse/RSP-21013)
-* [The width and height of a TContext3D object must be defined as single-precision floating-point numbers, not as integers](https://quality.embarcadero.com/browse/RSP-41516)
+* [The width and height of a TContext3D object must be defined as single-precision, not as integers](https://quality.embarcadero.com/browse/RSP-41516)
 * [TTextLayout.PositionAtPoint / TTextLayoutD2D.DoPositionAtPoint totally broken in Alexandria](https://quality.embarcadero.com/browse/RSP-39734)
 * [Regression in Alexandria: FMX.StrokeBuilder.pas Revamp Leads to TARC Drawing Issues](https://quality.embarcadero.com/browse/RSP-41618)
 * [GL_TEXTURE_EXTERNAL_OES not supported](https://quality.embarcadero.com/browse/RSP-16830)
@@ -56,47 +57,45 @@ us to patch the original Delphi source files:
 * [Miss CLLocationManager.accuracyAuthorization in iOSapi.CoreLocation.pas](https://quality.embarcadero.com/browse/RSP-41352)
 * [Miss constant kCLLocationAccuracyReduced in iOSapi.CoreLocation.pas](https://quality.embarcadero.com/browse/RSP-41388)
 * [iOS/OSX: Declaration for CLRegion.initCircularRegionWithCenter is incorrect](https://quality.embarcadero.com/browse/RSP-15717)
+* [Missing function declaration for maximumFramesPerSecond in iOSapi.UIKit.UIScreen](https://quality.embarcadero.com/browse/RSP-42455)
 
     
 Install Alcinoe
 ---------------
 
-We need some time to rename unit/class/function names. To 
-help you automatically perform this renaming task in your 
-project to the latest version of Alcinoe, we provide you 
-with the tool called CodeRenaming. You can find this tool 
-at the following link: [CodeRenaming](https://github.com/MagicFoundation/Alcinoe/tree/master/Tools/CodeRenaming).
+To set up Alcinoe, first execute [CompileAll.bat](https://github.com/MagicFoundation/Alcinoe/tree/master/CompileAll.bat). This 
+batch file handles a series of tasks: it retrieves and 
+patches the original Delphi source code, downloads the 
+necessary iOS/Android libraries, constructs the Alcinoe 
+JAR files, builds the BPL (Borland Package Library), 
+compiles tools from the [{alcinoe}\Tools](https://github.com/MagicFoundation/Alcinoe/tree/master/Tools/) directory, and 
+finally compiles all demos in the [{alcinoe}\Demos](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/) 
+directory. Please be aware that some demos utilize 
+components from [devexpress](https://www.devexpress.com/).
 
-If you plan to use the FMX (FireMonkey) framework with 
-Alcinoe, you will need to patch the original Delphi 
-source code. To do this, you need to go to [{alcinoe}\Embarcadero\Alexandria\11_3](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/Alexandria/11_3/) 
-and run [update.bat](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/Alexandria/11_3/update.bat) 
-to retrieve and patch the original Delphi source code. 
-The batch file assumes that the original source code is 
-located in c:\Program Files (x86)\Embarcadero\Studio\22.0\source\ 
-and that you have GIT in your path. Later, you will need to 
-include all subdirectories located in [{alcinoe}\Embarcadero\Alexandria\11_3](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/Alexandria/11_3/)
-in your project search path.
+If your goal is to use only the non-visual components 
+from Alcinoe, no further installation steps are necessary. 
+Just ensure to include [{alcinoe}\Source](https://github.com/MagicFoundation/Alcinoe/tree/master/Source) in your project's 
+search path.
 
-You will also need to run [CompileAll.bat](https://github.com/MagicFoundation/Alcinoe/tree/master/CompileAll.bat) 
-to download the iOS/Android libraries, build the 
-Alcinoe Jars, build the BPL, build all tools located 
-in [{alcinoe}\Tools](https://github.com/MagicFoundation/Alcinoe/tree/master/Tools/), 
-and finally build all demos located in [{alcinoe}\Demos](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/). 
-Note that some demos use [devexpress](https://www.devexpress.com/).
+For those wanting to use Alcinoe's visual components 
+during design time, a few more steps are required. You 
+will need to install the BPL: Open Delphi, navigate to 
+Component > Install Packages... and select the BPL from 
+[{alcinoe}\Libraries\bpl\Alcinoe\Win32\\{YourDelphiVersion}\Alcinoe{YourDelphiVersion}.bpl](https://github.com/MagicFoundation/Alcinoe/tree/master/Libraries/bpl/Alcinoe/Win32). 
+Also, remember to include both [{alcinoe}\Source](https://github.com/MagicFoundation/Alcinoe/tree/master/Source) and all 
+subdirectories from [{alcinoe}\Embarcadero\\{YourDelphiVersion}](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/) 
+in your search path.
 
-If you don't plan to use any Alcinoe visual components at 
-design time, you don't need to install anything. Just add 
-[{alcinoe}\Source](https://github.com/MagicFoundation/Alcinoe/tree/master/Source) 
-to the search path of your project.
 
-However, if you want to use visual components at design time, 
-you need to install the BPL. Launch Delphi and go to 
-Component > Install Packages... > and choose the BPL located 
-in [{alcinoe}\Libraries\bpl\Alcinoe\Win32\Alexandria\AlcinoeAlexandria.bpl](https://github.com/MagicFoundation/Alcinoe/tree/master/Libraries/bpl/Alcinoe/Win32/Alexandria). 
-You also need to add [{alcinoe}\Source](https://github.com/MagicFoundation/Alcinoe/tree/master/Source) 
-and all subdirectories located in [{alcinoe}\Embarcadero\Alexandria\11_3](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/Alexandria/11_3/) 
-to your search path.
+Update Alcinoe
+--------------
+
+We occasionally need to rename units, classes, and 
+functions. To assist you in automatically updating 
+these names in your project to align with the latest 
+version of Alcinoe, we offer a tool called CodeRenaming. 
+You can find this tool at the following link: [CodeRenaming](https://github.com/MagicFoundation/Alcinoe/tree/master/Tools/CodeRenaming)
 
 
 Propose a change using GitHub
@@ -334,13 +333,7 @@ Improved FireMonkey controls
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/img-5.jpg?raw=true" alt="RangeTrackBar" width="600" style="width:600px;"  />
 
-<p align="left">
-  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/img-15.jpg?raw=true" alt="video player for FireMonkey" width="250" style="width:250px;"/>
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/img-14.jpg?raw=true" alt="video player for FireMonkey" width="250" style="width:250px;"/>
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/img-16.jpg?raw=true" alt="video player for FireMonkey" width="250" style="width:250px;"/>
-</p>
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/tabcontrol.gif?raw=true" alt="tabcontrol" width="360" style="width:360px;"/>
 
 Learn more at [{alcinoe}/Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls)
   
@@ -355,6 +348,78 @@ high-performance confetti falling animation. Learn more at
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/confetti.gif?raw=true" alt="confetti" width="564" style="width:564px;" />
 
 
+Interpolated Animation
+----------------------
+
+The TALAnimation component is a refined iteration of Delphi's foundational
+TAnimation object, meticulously tailored for mobile platforms. By forgoing the
+traditional Timer mechanism and instead adopting platform-specific technologies,
+this component offers a vastly improved animation experience for mobile users.
+On Android, animations are seamlessly integrated with the Choreographer,
+ensuring they sync perfectly with the device's refresh rate. Meanwhile, on iOS,
+the precision of DisplayLink is harnessed, leading to optimized and fluid
+animation rendering. Beyond these foundational changes, one of the most notable
+enhancements is the capability to support custom interpolation algorithms. This
+offers developers the flexibility to design unique and intricate animation
+patterns, moving beyond the traditional ease-in or ease-out sequences.
+
+<p align="left">
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/interpolated1.gif?raw=true" alt="Interpolated Animation" width="320" style="width:320px;"/>
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/interpolated2.gif?raw=true" alt="Interpolated Animation" width="320" style="width:320px;"/>
+</p>
+
+Learn more at 
+[{alcinoe}/Demos/ALAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALAnimation)
+  
+
+SpringForce Animation
+---------------------
+
+Inspired by Android's SpringForce, the TALSpringForceAnimation Component brings
+the intrigue of physics-based animations to the Delphi platform. This component
+captures the real-world dynamism of objects influenced by spring mechanics. The
+resulting animations are ones that stretch, bounce, and settle, mirroring
+real-world behaviors and offering a tangible sense of realism to users.
+Developers have the added advantage of being able to adjust various physical
+properties of the spring, such as its stiffness and damping ratio. This ensures
+that a broad spectrum of animation behaviors can be realized, catering to the
+specific nuances of different applications.
+  
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/springforce.gif?raw=true" alt="springforce" width="320" style="width:320px;" />
+
+Learn more at 
+[{alcinoe}/Demos/ALAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALAnimation)
+  
+
+Scrolling Engine
+----------------
+
+TALOverScroller and TALVelocityTracker are essential components of the
+TALScrollEngine, playing crucial roles in refining user interface interactions.
+While TALOverScroller is designed to animate and manage actions like scrolling
+and flinging, offering a decelerating animation as users scroll past a view's
+edge to indicate the boundary, TALVelocityTracker measures the velocity of
+touch events, helping to determine the speed and direction of user gestures.
+Together within the TALScrollEngine, they elevate the overall user experience
+by offering smooth animations and intuitive touch feedback.
+
+Building a scrolling engine is a complex endeavor, requiring expertise in
+various domains, including physics. Rather than starting from scratch and
+potentially reinventing the wheel, we looked towards proven solutions. To this
+end, we utilized the robust and well-tested code from Android's VelocityTracker
+and OverScroller. By translating their Java and C++ codes into Delphi, we've
+ensured that the resultant TALScrollEngine not only meets but exceeds the
+standard for scrolling dynamics. Leveraging the reliability and efficiency of
+Android's scrolling mechanisms, the TALScrollEngine offers Delphi developers a
+top-notch scrolling experience, rooted in established and trusted technologies.
+
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/scrollingengine.gif?raw=true" alt="scrollingengine" />
+
+Learn more at 
+[{alcinoe}/Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls)
+  
+
 Firebase cloud messaging
 ------------------------
 
@@ -364,7 +429,7 @@ permit you to send alert notifications with images in
 Android and iOS. Learn more at 
 [{alcinoe}\Demos\ALNotificationService](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALNotificationService)
 
-  
+
 GeoPositioning for Android/iOS
 ------------------------------
 

@@ -1183,7 +1183,6 @@ begin
   fTextPromptControl.Anchors := [TAnchorKind.akLeft, TAnchorKind.akTop, TAnchorKind.akRight, TAnchorKind.akBottom];
   fTextPromptControl.TextSettings.Assign(FTextSettings);
   fTextPromptControl.color := TalphaColorRec.Null;
-  fTextPromptControl.doubleBuffered := True;
   FOnChangeTracking := nil;
   fReturnKeyType := TReturnKeyType.Default;
   inherited onchangeTracking := OnChangeTrackingImpl;
@@ -1503,7 +1502,7 @@ begin
   if (AutoConvertFontFamily) and
      (TextSettings.Font.Family <> '') and
      (not (csDesigning in ComponentState)) then
-      TextSettings.Font.Family := ALConvertFontFamily(TextSettings.Font.Family, TextSettings.Font.Style);
+      TextSettings.Font.Family := ALConvertFontFamily(TextSettings.Font.Family);
   //-----
   inherited;
   //-----
