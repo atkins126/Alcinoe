@@ -655,14 +655,14 @@ var
 
 {***}
 const
-  {$IFNDEF ALCompilerVersionSupported}
+  {$IFNDEF ALCompilerVersionSupported122}
     {$MESSAGE WARN 'Check if System.TypInfo.BooleanIdents is still the same and adjust the IFDEF'}
   {$IFEND}
   ALBooleanIdentsA: array [Boolean] of AnsiString = ('False', 'True');
   ALBooleanIdentsW: array [Boolean] of String = ('False', 'True');
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.AfterString is still the same and adjust the IFDEF'}
 {$IFEND}
 // P points a length field of ShortString.
@@ -671,8 +671,8 @@ begin
   Result := P + P^ + 1;
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.GetEnumName(TypeInfo: PTypeInfo; Value: Integer... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALGetEnumNameA(TypeInfo: PTypeInfo; Value: Integer): ansistring;
@@ -733,8 +733,8 @@ begin
   result := System.TypInfo.GetEnumName(PropInfo^.PropType^, Value);
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.GetEnumNameValue(TypeInfo: PTypeInfo... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALGetEnumNameValue(TypeInfo: PTypeInfo; const Name: AnsiString): Integer; overload;
@@ -776,8 +776,8 @@ begin
   Result := -1;
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.GetEnumValue(TypeInfo: PTypeInfo... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALTryGetEnumValue(TypeInfo: PTypeInfo; const Name: ansistring; Var EnumValue: Integer): boolean;
@@ -815,8 +815,8 @@ begin
   result := ALTryGetEnumValue(PropInfo^.PropType^, Name, EnumValue);
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.GetEnumNameValue(TypeInfo: PTypeInfo... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALGetEnumNameValue(TypeInfo: PTypeInfo; const Name: String): Integer; overload;
@@ -856,8 +856,8 @@ begin
   Result := -1;
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.GetEnumValue(TypeInfo: PTypeInfo... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALTryGetEnumValue(TypeInfo: PTypeInfo; const Name: string; Var EnumValue: Integer): boolean;
@@ -923,14 +923,14 @@ end;
 
 {**}
 type
-  {$IFNDEF ALCompilerVersionSupported}
+  {$IFNDEF ALCompilerVersionSupported122}
     {$MESSAGE WARN 'Check if System.TypInfo.TLargestSet/PLargestSet is still the same and adjust the IFDEF'}
   {$IFEND}
   TLargestSet = set of byte;
   PLargestSet = ^TLargestSet;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.SetToString(TypeInfo: PTypeInfo; Value: Integer... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALSetToStringA(TypeInfo: PTypeInfo; Value: Integer; const Brackets: Boolean = False): ansistring;
@@ -967,8 +967,8 @@ begin
     Result := '[' + Result + ']';
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.SetToString(PropInfo: PPropInfo; Value: Integer... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALSetToStringA(PropInfo: PPropInfo; Value: Integer; const Brackets: Boolean = False): ansistring;
@@ -988,8 +988,8 @@ begin
   System.TypInfo.SetToString(PropInfo, Value, Brackets);
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.StringToSet(TypeInfo: PTypeInfo; const Value: string)... is still the same and adjust the IFDEF'}
 {$IFEND}
 function ALTryStringToSet(TypeInfo: PTypeInfo; const Value: ansistring; Var SetInt: Integer): Boolean;
@@ -1063,8 +1063,8 @@ begin
   result := ALTryStringToSet(PropInfo^.PropType^, Value, SetInt);
 end;
 
-{**********************************}
-{$IFNDEF ALCompilerVersionSupported}
+{*************************************}
+{$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if System.TypInfo.StringToSet(TypeInfo: PTypeInfo; const Value: string)... is still the same and adjust the IFDEF'}
 {$IFEND}
 {$WARN WIDECHAR_REDUCED OFF}

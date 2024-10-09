@@ -5,7 +5,8 @@ interface
 uses
   Macapi.ObjectiveC,
   iOSapi.CocoaTypes,
-  iOSapi.Foundation;
+  iOSapi.Foundation,
+  Alcinoe.iOSapi.Foundation;
 
 {$M+}
 
@@ -573,16 +574,6 @@ const
 
 implementation
 
-// {$IF defined(IOS) and NOT defined(CPUARM)} => https://stackoverflow.com/questions/52475704/how-to-link-correctly-apple-ios-library
-
-uses
-  Posix.Dlfcn;
-
-var
-  AuthenticationServicesModule: THandle;
-
-// {$ENDIF IOS} => https://stackoverflow.com/questions/52475704/how-to-link-correctly-apple-ios-library
-
 {**********************************************}
 function ASAuthorizationScopeFullName: NSString;
 begin
@@ -648,15 +639,5 @@ end;
 //begin
 //  Result := CocoaPointerConst(libAuthenticationServices, 'ASWebAuthenticationSessionErrorDomain');
 //end;
-
-// {$IF defined(IOS) and NOT defined(CPUARM)} => https://stackoverflow.com/questions/52475704/how-to-link-correctly-apple-ios-library
-
-initialization
-  AuthenticationServicesModule := dlopen(MarshaledAString(libAuthenticationServices), RTLD_LAZY);
-
-finalization
-  dlclose(AuthenticationServicesModule);
-
-// {$ENDIF IOS} => https://stackoverflow.com/questions/52475704/how-to-link-correctly-apple-ios-library
 
 end.

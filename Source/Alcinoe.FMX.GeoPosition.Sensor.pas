@@ -97,6 +97,7 @@ uses
   Macapi.ObjectiveC,
   iOSapi.CoreLocation,
   iOSapi.Foundation,
+  Alcinoe.iOSapi.CoreLocation,
   {$ENDIF}
   FMX.Platform;
 
@@ -314,8 +315,9 @@ begin
   {$REGION ' ANDROID'}
   {$IF defined(android)}
   if (AUseGooglePlayServicesIfAvailable) and
-     (TJGooglePlayServicesUtil
+     (TJGoogleApiAvailability
         .JavaClass
+        .getInstance
         .isGooglePlayServicesAvailable(TAndroidHelper.Activity) = TJConnectionResult.JavaClass.SUCCESS) then begin
     FLocationManager := nil;
     FAndroidLocationListener := nil;

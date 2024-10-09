@@ -1,6 +1,8 @@
 del Unit1.dcu /s
 del classes.dex /s
+del classes2.dex /s
 del Project1.apk /s
+del Project1.apk.idsig /s
 del Project1.exe /s
 del Project1.o /s
 del Unit1.o /s
@@ -13,3 +15,5 @@ del Project1 /s
 del Project1.rsm /s
 del Project1.dproj.local /s
 del Project1.identcache /s
+del sk4d.dll /s
+del libsk4d.so /s
