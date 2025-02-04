@@ -1,14 +1,19 @@
 program ALFmxControlsDemo;
 
-{$R *.dres}
+{$R 'Resources.res' 'Resources\Resources.rc'}
+
+{$I Alcinoe.inc}
 
 uses
   System.StartUpCopy,
   FMX.Forms,
   FMX.Types,
   FMX.Skia,
+  {$IF defined(ALAppleOS)}
+  FMX.Context.Metal,
+  {$ENDIF}
   Main in 'Main.pas' {MainForm},
-  ScrollBox in 'ScrollBox.pas' {ScrollBoxForm};
+  ScrollBoxDemo in 'ScrollBoxDemo.pas' {ScrollBoxDemoForm};
 
 {$R *.res}
 
@@ -21,7 +26,10 @@ begin
   GlobalUseVulkan := False;
   {$ENDIF}
   //GlobalUseGPUCanvas := True;
-  //GlobalUseMetal := True;
+  {$IF defined(ALAppleOS)}
+  if TCustomContextMetal.IsMetalSupported then
+    GlobalUseMetal := True;
+  {$ENDIF}
   Application.Initialize;
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;

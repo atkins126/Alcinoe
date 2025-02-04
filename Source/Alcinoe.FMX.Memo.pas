@@ -151,6 +151,8 @@ type
     function getLineCount: integer; override;
     function getLineHeight: Single; override; // It includes the line spacing
     property NativeView: TALIosMemoTextView read GetNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
+    Procedure SetSelection(const AIndex: integer); overload; override;
   end;
 {$endif}
 {$ENDREGION}
@@ -290,6 +292,8 @@ type
     function getLineCount: integer; override;
     function getLineHeight: Single; override; // It includes the line spacing
     property NativeView: TALMacMemoScrollView read GetNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
+    Procedure SetSelection(const AIndex: integer); overload; override;
   end;
 
 {$endif}
@@ -324,33 +328,79 @@ type
 
   {*************************}
   [ComponentPlatforms($FFFF)]
-  TALMemo = class(TALBaseEdit, IALAutosizeControl)
+  TALMemo = class(TALBaseEdit)
   public
     type
       // -------------
       // TTextSettings
-      TMemoTextSettings = class(TALBaseEdit.TTextSettings)
+      TTextSettings = class(TALBaseEdit.TTextSettings)
+      protected
+        function GetDefaultVertAlign: TALTextVertAlign; override;
       published
         property LineHeightMultiplier;
       end;
+      // -------------------
+      // TDisabledStateStyle
+      TDisabledStateStyle = class(TALBaseEdit.TDisabledStateStyle)
+      public
+        type
+          TTextSettings = class(TALBaseEdit.TDisabledStateStyle.TTextSettings)
+          protected
+            function GetDefaultVertAlign: TALTextVertAlign; override;
+          end;
+      protected
+        function CreateTextSettings(const AParent: TALBaseTextSettings): TALBaseEdit.TBaseStateStyle.TTextSettings; override;
+      end;
+      // ------------------
+      // THoveredStateStyle
+      THoveredStateStyle = class(TALBaseEdit.THoveredStateStyle)
+      public
+        type
+          TTextSettings = class(TALBaseEdit.THoveredStateStyle.TTextSettings)
+          protected
+            function GetDefaultVertAlign: TALTextVertAlign; override;
+          end;
+      protected
+        function CreateTextSettings(const AParent: TALBaseTextSettings): TALBaseEdit.TBaseStateStyle.TTextSettings; override;
+      end;
+      // ------------------
+      // TFocusedStateStyle
+      TFocusedStateStyle = class(TALBaseEdit.TFocusedStateStyle)
+      public
+        type
+          TTextSettings = class(TALBaseEdit.TFocusedStateStyle.TTextSettings)
+          protected
+            function GetDefaultVertAlign: TALTextVertAlign; override;
+          end;
+      protected
+        function CreateTextSettings(const AParent: TALBaseTextSettings): TALBaseEdit.TBaseStateStyle.TTextSettings; override;
+      end;
+      // ------------
+      // TStateStyles
+      TStateStyles = class(TALBaseEdit.TStateStyles)
+      protected
+        function CreateDisabledStateStyle(const AParent: TObject): TALBaseEdit.TDisabledStateStyle; override;
+        function CreateHoveredStateStyle(const AParent: TObject): TALBaseEdit.THoveredStateStyle; override;
+        function CreateFocusedStateStyle(const AParent: TObject): TALBaseEdit.TFocusedStateStyle; override;
+      end;
   private
     FAutosizeLineCount: Integer;
-    function GetTextSettings: TMemoTextSettings;
-    procedure SetTextSettings(const Value: TMemoTextSettings);
+    function GetTextSettings: TTextSettings;
+    procedure SetTextSettings(const Value: TTextSettings);
   protected
     function GetDefaultSize: TSizeF; override;
+    function GetAutoSize: Boolean; override;
     procedure SetAutosizeLineCount(const Value: Integer); virtual;
+    function CreateStateStyles: TALBaseEdit.TStateStyles; override;
     function CreateTextSettings: TALBaseEdit.TTextSettings; override;
     function CreateEditControl: TALBaseEditControl; override;
     procedure AdjustSize; override;
-    { IALAutosizeControl }
-    function HasUnconstrainedAutosizeX: Boolean; virtual;
-    function HasUnconstrainedAutosizeY: Boolean; virtual;
   public
     constructor Create(AOwner: TComponent); override;
+    function HasUnconstrainedAutosizeX: Boolean; override;
   published
     property AutoSizeLineCount: Integer read FAutosizeLineCount write SetAutosizeLineCount Default 0;
-    property TextSettings: TMemoTextSettings read GetTextSettings write SetTextSettings;
+    property TextSettings: TTextSettings read GetTextSettings write SetTextSettings;
   end;
 
 procedure Register;
@@ -375,14 +425,15 @@ uses
   Macapi.CoreText,
   FMX.Helpers.Mac,
   FMX.Consts,
-  Alcinoe.StringUtils,
   {$ELSEIF defined(MSWINDOWS)}
   Winapi.Windows,
   {$endif}
   {$IFDEF ALDPK}
   DesignIntf,
   {$ENDIF}
+  Alcinoe.StringUtils,
   Alcinoe.FMX.Graphics,
+  Alcinoe.FMX.Controls,
   Alcinoe.Common;
 
 {$REGION ' Android'}
@@ -501,7 +552,7 @@ end;
 function TALIosMemoTextView.canBecomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosMemoTextView.canBecomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALIosMemoTextView.canBecomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := UITextView(Super).canBecomeFirstResponder and TControl(fMemoControl.Owner).canFocus;
 end;
@@ -510,7 +561,7 @@ end;
 function TALIosMemoTextView.becomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosMemoTextView.becomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALIosMemoTextView.becomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := UITextView(Super).becomeFirstResponder;
   if (not TControl(FMemoControl.Owner).IsFocused) then
@@ -547,7 +598,7 @@ end;
 procedure TALIosMemoTextViewDelegate.textViewDidChange(textView: UITextView);
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosMemoTextViewDelegate.textViewDidChange', TalLogType.VERBOSE);
+  ALLog('TALIosMemoTextViewDelegate.textViewDidChange');
   {$ENDIF}
   fMemoControl.DoChange;
 end;
@@ -573,7 +624,7 @@ end;
 function TALIosMemoTextViewDelegate.textViewShouldChangeTextInRangeReplacementText(textView: UITextView; shouldChangeTextInRange: NSRange; replacementText: NSString): Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosMemoTextViewDelegate.textViewShouldChangeTextInRangeReplacementText', TalLogType.VERBOSE);
+  ALLog('TALIosMemoTextViewDelegate.textViewShouldChangeTextInRangeReplacementText');
   {$ENDIF}
   if FMemoControl.maxLength > 0 then begin
     var LText: NSString := textView.text;
@@ -945,6 +996,18 @@ begin
     result := result * textsettings.LineHeightMultiplier;
 end;
 
+{************************************************************************************}
+Procedure TALIosMemoControl.setSelection(const AStart: integer; const AStop: Integer);
+begin
+  NativeView.View.setSelectedRange(NSMakeRange(AStart, AStop-AStart));
+end;
+
+{**************************************************************}
+Procedure TALIosMemoControl.setSelection(const AIndex: integer);
+begin
+  NativeView.View.setSelectedRange(NSMakeRange(AIndex, 0));
+end;
+
 {$endif}
 {$ENDREGION}
 
@@ -984,7 +1047,7 @@ end;
 function TALMacMemoScrollView.acceptsFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoScrollView.acceptsFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacMemoScrollView.acceptsFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := NSScrollView(Super).acceptsFirstResponder and TControl(fMemoControl.Owner).canFocus;
 end;
@@ -993,7 +1056,7 @@ end;
 function TALMacMemoScrollView.becomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoScrollView.becomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacMemoScrollView.becomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := NSScrollView(Super).becomeFirstResponder;
   if (not TControl(FMemoControl.Owner).IsFocused) then
@@ -1035,7 +1098,7 @@ end;
 function TALMacMemoTextView.acceptsFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoTextView.acceptsFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacMemoTextView.acceptsFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := NSTextView(Super).acceptsFirstResponder and TControl(fMemoControl.Owner).canFocus;
 end;
@@ -1044,7 +1107,7 @@ end;
 function TALMacMemoTextView.becomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoTextView.becomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacMemoTextView.becomeFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := NSTextView(Super).becomeFirstResponder;
   if (not TControl(FMemoControl.Owner).IsFocused) then
@@ -1069,7 +1132,7 @@ end;
 procedure TALMacMemoTextViewDelegate.textDidChange(notification: NSNotification);
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoTextViewDelegate.textDidChange', TalLogType.VERBOSE);
+  ALLog('TALMacMemoTextViewDelegate.textDidChange');
   {$ENDIF}
   fMemoControl.DoChange;
 end;
@@ -1090,7 +1153,7 @@ end;
 function TALMacMemoTextViewDelegate.textViewShouldChangeTextInRangeReplacementString(textView: NSTextView; shouldChangeTextInRange: NSRange; replacementString: NSString): boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoTextViewDelegate.textViewShouldChangeTextInRangeReplacementText', TalLogType.VERBOSE);
+  ALLog('TALMacMemoTextViewDelegate.textViewShouldChangeTextInRangeReplacementText');
   {$ENDIF}
   if FMemoControl.maxLength > 0 then begin
     var LText: NSString := TALNSText.wrap(NSObjectToID(textView)).&String;
@@ -1129,7 +1192,7 @@ end;
 function TALMacMemoPlaceHolder.acceptsFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacMemoPlaceHolder.acceptsFirstResponder', 'control.name: ' + fMemoControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacMemoPlaceHolder.acceptsFirstResponder', 'control.name: ' + fMemoControl.parent.Name);
   {$ENDIF}
   Result := False;
   FmemoControl.NativeView.View.becomeFirstResponder;
@@ -1448,6 +1511,18 @@ begin
     result := result * textsettings.LineHeightMultiplier;
 end;
 
+{************************************************************************************}
+Procedure TALMacMemoControl.setSelection(const AStart: integer; const AStop: Integer);
+begin
+  FTextView.View.setSelectedRange(NSMakeRange(AStart, AStop-AStart));
+end;
+
+{**************************************************************}
+Procedure TALMacMemoControl.setSelection(const AIndex: integer);
+begin
+  FTextView.View.setSelectedRange(NSMakeRange(AIndex, 0));
+end;
+
 {$endif}
 {$ENDREGION}
 
@@ -1504,32 +1579,83 @@ end;
 {$endif}
 {$ENDREGION}
 
+{***************************************************************************************}
+function TALMemo.TDisabledStateStyle.TTextSettings.GetDefaultVertAlign: TALTextVertAlign;
+begin
+  Result := TALTextVertAlign.Leading;
+end;
+
+{*************************************************************************************************************************************}
+function TALMemo.TDisabledStateStyle.CreateTextSettings(const AParent: TALBaseTextSettings): TALBaseEdit.TBaseStateStyle.TTextSettings;
+begin
+  Result := TTextSettings.Create(AParent);
+end;
+
+{**************************************************************************************}
+function TALMemo.THoveredStateStyle.TTextSettings.GetDefaultVertAlign: TALTextVertAlign;
+begin
+  Result := TALTextVertAlign.Leading;
+end;
+
+{************************************************************************************************************************************}
+function TALMemo.THoveredStateStyle.CreateTextSettings(const AParent: TALBaseTextSettings): TALBaseEdit.TBaseStateStyle.TTextSettings;
+begin
+  Result := TTextSettings.Create(AParent);
+end;
+
+{**************************************************************************************}
+function TALMemo.TFocusedStateStyle.TTextSettings.GetDefaultVertAlign: TALTextVertAlign;
+begin
+  Result := TALTextVertAlign.Leading;
+end;
+
+{************************************************************************************************************************************}
+function TALMemo.TFocusedStateStyle.CreateTextSettings(const AParent: TALBaseTextSettings): TALBaseEdit.TBaseStateStyle.TTextSettings;
+begin
+  Result := TTextSettings.Create(AParent);
+end;
+
+{**************************************************************************************************************}
+function TALMemo.TStateStyles.CreateDisabledStateStyle(const AParent: TObject): TALBaseEdit.TDisabledStateStyle;
+begin
+  result := TDisabledStateStyle.Create(AParent);
+end;
+
+{************************************************************************************************************}
+function TALMemo.TStateStyles.CreateHoveredStateStyle(const AParent: TObject): TALBaseEdit.THoveredStateStyle;
+begin
+  result := THoveredStateStyle.Create(AParent);
+end;
+
+{************************************************************************************************************}
+function TALMemo.TStateStyles.CreateFocusedStateStyle(const AParent: TObject): TALBaseEdit.TFocusedStateStyle;
+begin
+  Result := TFocusedStateStyle.Create(AParent);
+end;
+
+{*******************************************************************}
+function TALMemo.TTextSettings.GetDefaultVertAlign: TALTextVertAlign;
+begin
+  result := TALTextVertAlign.Leading;
+end;
+
 {*********************************************}
 constructor TALMemo.Create(AOwner: TComponent);
-
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  procedure _UpdateTextSettings(const ATextSettings: TALBaseTextSettings);
-  begin
-    var LTextSettingsChanged: TNotifyEvent := ATextSettings.OnChanged;
-    ATextSettings.OnChanged := nil;
-    ATextSettings.DefaultVertAlign := TALTextVertAlign.Leading;
-    ATextSettings.VertAlign := ATextSettings.DefaultVertAlign;
-    ATextSettings.OnChanged := LTextSettingsChanged;
-  end;
-
 begin
   inherited;
-  _UpdateTextSettings(TextSettings);
-  _UpdateTextSettings(StateStyles.Disabled.TextSettings);
-  _UpdateTextSettings(StateStyles.Hovered.TextSettings);
-  _UpdateTextSettings(StateStyles.Focused.TextSettings);
   FAutosizeLineCount := 0;
+end;
+
+{***********************************************************}
+function TALMemo.CreateStateStyles: TALBaseEdit.TStateStyles;
+begin
+  Result := TStateStyles.Create(self);
 end;
 
 {*************************************************************}
 function TALMemo.CreateTextSettings: TALBaseEdit.TTextSettings;
 begin
-  result := TMemoTextSettings.Create;
+  result := TTextSettings.Create;
 end;
 
 {*****************************************************}
@@ -1546,14 +1672,14 @@ begin
   {$ENDIF}
 end;
 
-{**************************************************}
-function TALMemo.GetTextSettings: TMemoTextSettings;
+{**********************************************}
+function TALMemo.GetTextSettings: TTextSettings;
 begin
-  result := TMemoTextSettings(inherited TextSettings);
+  result := TTextSettings(inherited TextSettings);
 end;
 
-{****************************************************************}
-procedure TALMemo.SetTextSettings(const Value: TMemoTextSettings);
+{************************************************************}
+procedure TALMemo.SetTextSettings(const Value: TTextSettings);
 begin
   inherited TextSettings := Value;
 end;
@@ -1563,8 +1689,21 @@ procedure TALMemo.AdjustSize;
 begin
   if (not (csLoading in ComponentState)) and // loaded will call again AdjustSize
      (not (csDestroying in ComponentState)) and // if csDestroying do not do autosize
+     (scene <> nil) and // SetNewScene will call again AdjustSize
      (TNonReentrantHelper.EnterSection(FIsAdjustingSize)) then begin // non-reantrant
     try
+
+      if isupdating then begin
+        FAdjustSizeOnEndUpdate := True;
+        Exit;
+      end
+      else
+        FAdjustSizeOnEndUpdate := False;
+
+      {$IF defined(debug)}
+      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeX)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeY));
+      {$ENDIF}
+
       Var LInlinedLabelText := (LabelText <> '') and (LabelTextSettings.Layout = TLabelTextLayout.Inline);
       if LInlinedLabelText then MakeBufLabelTextDrawable;
 
@@ -1585,14 +1724,14 @@ begin
         if IsPixelAlignmentEnabled then LAdjustement := ALAlignDimensionToPixelRound(LAdjustement, ALGetScreenScale, TEpsilon.Position);
 
         If LInlinedLabelText then begin
-          SetBounds(
+          SetFixedSizeBounds(
             Position.X,
             Position.Y,
             Width,
             (LLineHeight * AutoSizeLineCount) + LAdjustement + LStrokeSize.Top + LStrokeSize.bottom + padding.Top + padding.Bottom + BufLabelTextDrawableRect.Height + LabelTextSettings.Margins.Top + LabelTextSettings.Margins.bottom);
         end
         else begin
-          SetBounds(
+          SetFixedSizeBounds(
             Position.X,
             Position.Y,
             Width,
@@ -1625,24 +1764,16 @@ begin
   result := False;
 end;
 
-{**************************************************}
-function TALMemo.HasUnconstrainedAutosizeY: Boolean;
-begin
-  result := (FAutoSizeLineCount > 0) and
-            (not (Align in [TAlignLayout.Client,
-                            TAlignLayout.Contents,
-                            TAlignLayout.Left,
-                            TAlignLayout.Right,
-                            TAlignLayout.MostLeft,
-                            TAlignLayout.MostRight,
-                            TAlignLayout.Vertical,
-                            TAlignLayout.HorzCenter]));
-end;
-
 {**************************************}
 function TALMemo.GetDefaultSize: TSizeF;
 begin
   Result := TSizeF.Create(200, 75);
+end;
+
+{************************************}
+function TALMemo.GetAutoSize: Boolean;
+begin
+  result := FAutoSizeLineCount > 0;
 end;
 
 {***********************************************************}
@@ -1651,7 +1782,6 @@ begin
   if FAutoSizeLineCount <> Value then begin
     FAutoSizeLineCount := Max(0, Value);
     AdjustSize;
-    repaint;
   end;
 end;
 

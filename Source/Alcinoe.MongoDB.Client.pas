@@ -61,21 +61,21 @@ end;
 Exemple tail monitoring :
 
 aMongoDBTailMonitoringThread := TAlMongoDBTailMonitoringThread.Create(
-                                  aDBHost,
-                                  aDBPort,
-                                  'test.cappedCollectionExemple'
-                                  '{}', // the query
-                                  '{fieldA:1, fieldB:1}', // the return fields selector
+  aDBHost,
+  aDBPort,
+  'test.cappedCollectionExemple'
+  '{}', // the query
+  '{fieldA:1, fieldB:1}', // the return fields selector
 
-                                  Procedure (Sender: TObject; JSONRowData: TALJSONNodeA)
-                                  begin
-                                    writeln('New item added in cappedCollectionExemple: ' + JSONRowData.childnodes['fieldA'].text);
-                                  end,
+  Procedure (Sender: TObject; JSONRowData: TALJSONNodeA)
+  begin
+    writeln('New item added in cappedCollectionExemple: ' + JSONRowData.childnodes['fieldA'].text);
+  end,
 
-                                  procedure (Sender: TObject; Error: Exception)
-                                  begin
-                                    writeln(Error.message);
-                                  end);
+  procedure (Sender: TObject; Error: Exception)
+  begin
+    writeln(Error.message);
+  end);
 ....
 aMongoDBTailMonitoringThread.free;
 *******************************************************************************)
@@ -110,7 +110,7 @@ type
     TALMongoDBClientSelectDataOnNewRowFunct = reference to Procedure(
                                                              JSONRowData: TALJSONNodeA;
                                                              const ViewTag: AnsiString;
-                                                             ExtData: Pointer;
+                                                             Context: Pointer;
                                                              Var Continue: Boolean);
 
     {-------------------------------------------------------------------------------------}
@@ -132,42 +132,47 @@ type
     //                            read all the data unless it closes the connection.
     // 7	      Partial	          Get partial results from a mongos if some shards are down (instead of throwing an error)
     // 8-31	                      Reserved	Must be set to 0.
-    TALMongoDBClientSelectDataFlags = set of (sfTailMonitoring,  // it's TailableCursor + AwaitData option. If we are at the end of the data, wait for new data rather than returning no data
-                                                                 // a good explanation can be found here: http://docs.mongodb.org/manual/tutorial/create-tailable-cursor/
-                                                                 //                                       http://shtylman.com/post/the-tail-of-mongodb/
-                                                                 // use only with TALMongoDBClientSelectDataOnNewRowFunct
-                                              sfSlaveOk,         // Allow query of replica slave.
-                                                                 // Note that you should use this flag even if you do not use the automatic routing to secondaries.
-                                                                 // If you connect directly to a secondary in a replica set, you still need to set this flag, which basically tells
-                                                                 // the database that you are aware that you might be getting older data and you're okay with that.
-                                                                 // If you do not call this, you'll get "not master" errors when you try to query.
-                                              sfNoCursorTimeout, // The server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use.
-                                                                 // Set this option to prevent that.
-                                              sfPartial);        // Get partial results from a mongos if some shards are down (instead of throwing an error)
+    TALMongoDBClientSelectDataFlags = set of (
+      sfTailMonitoring,  // it's TailableCursor + AwaitData option. If we are at the end of the data, wait for new data rather than returning no data
+                         // a good explanation can be found here: http://docs.mongodb.org/manual/tutorial/create-tailable-cursor/
+                         //                                       http://shtylman.com/post/the-tail-of-mongodb/
+                         // use only with TALMongoDBClientSelectDataOnNewRowFunct
+      sfSlaveOk,         // Allow query of replica slave.
+                         // Note that you should use this flag even if you do not use the automatic routing to secondaries.
+                         // If you connect directly to a secondary in a replica set, you still need to set this flag, which basically tells
+                         // the database that you are aware that you might be getting older data and you're okay with that.
+                         // If you do not call this, you'll get "not master" errors when you try to query.
+      sfNoCursorTimeout, // The server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use.
+                         // Set this option to prevent that.
+      sfPartial);        // Get partial results from a mongos if some shards are down (instead of throwing an error)
 
-    {--------------------------------------------------}
-    TALMongoDBClientRunCommandFlags = set of (cfSlaveOk,         // Allow query of replica slave.
-                                                                 // Note that you should use this flag even if you do not use the automatic routing to secondaries.
-                                                                 // If you connect directly to a secondary in a replica set, you still need to set this flag, which basically tells
-                                                                 // the database that you are aware that you might be getting older data and you're okay with that.
-                                                                 // If you do not call this, you'll get "not master" errors when you try to query.
-                                              cfNoCursorTimeout, // The server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use.
-                                                                 // Set this option to prevent that.
-                                              cfPartial);        // Get partial results from a mongos if some shards are down (instead of throwing an error)
+    {----------------------------------------}
+    TALMongoDBClientRunCommandFlags = set of (
+      cfSlaveOk,         // Allow query of replica slave.
+                         // Note that you should use this flag even if you do not use the automatic routing to secondaries.
+                         // If you connect directly to a secondary in a replica set, you still need to set this flag, which basically tells
+                         // the database that you are aware that you might be getting older data and you're okay with that.
+                         // If you do not call this, you'll get "not master" errors when you try to query.
+      cfNoCursorTimeout, // The server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use.
+                         // Set this option to prevent that.
+      cfPartial);        // Get partial results from a mongos if some shards are down (instead of throwing an error)
 
-    {-------------------------------------------------}
-    TALMongoDBClientUpdateDataFlags = set of (ufUpsert,       // If set, the database will insert the supplied object into the collection if no matching document is found.
-                                              ufMultiUpdate); // If set, the database will update all matching objects in the collection. Otherwise only updates first matching doc.
+    {----------------------------------------}
+    TALMongoDBClientUpdateDataFlags = set of (
+      ufUpsert,       // If set, the database will insert the supplied object into the collection if no matching document is found.
+      ufMultiUpdate); // If set, the database will update all matching objects in the collection. Otherwise only updates first matching doc.
 
-    {-----------------------------------------------------------}
-    TALMongoDBClientInsertDataFlags = set of (ifContinueOnError); // If set, the database will not stop processing a bulk insert if one fails (eg due to duplicate IDs).
-                                                                  // This makes bulk insert behave similarly to a series of single inserts, except lastError will be set
-                                                                  // if any insert fails, not just the last one. If multiple errors occur, only the most recent will be
-                                                                  // reported by getLastError. (new in 1.9.1)
+    {----------------------------------------}
+    TALMongoDBClientInsertDataFlags = set of (
+      ifContinueOnError); // If set, the database will not stop processing a bulk insert if one fails (eg due to duplicate IDs).
+                          // This makes bulk insert behave similarly to a series of single inserts, except lastError will be set
+                          // if any insert fails, not just the last one. If multiple errors occur, only the most recent will be
+                          // reported by getLastError. (new in 1.9.1)
 
-    {--------------------------------------------------------}
-    TALMongoDBClientDeleteDataFlags = set of (dfSingleRemove); // If set, the database will remove only the first matching document in the
-                                                               // collection. Otherwise all matching documents will be removed.
+    {----------------------------------------}
+    TALMongoDBClientDeleteDataFlags = set of (
+      dfSingleRemove); // If set, the database will remove only the first matching document in the
+                       // collection. Otherwise all matching documents will be removed.
 
     {---------------------------------------------}
     EAlMongoDBClientException = class(EALException)
@@ -275,7 +280,7 @@ type
                   var numberReturned: integer;   // number of documents in the reply
                   documents: TALJSONNodeA;        // documents
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const RowTag: AnsiString;      // the node name under with all the fields of a single record will be stored in the JSON/XML result document.
                   const ViewTag: AnsiString;     // the node name under with all records will be stored in the JSON/XML result document.
                   var continue: boolean);
@@ -296,7 +301,7 @@ type
                   var numberReturned: integer;             // number of documents in the reply
                   documents: TALJSONNodeA;                  // documents
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const RowTag: AnsiString;                // the node name under with all the fields of a single record will be stored in the JSON/XML result document.
                   const ViewTag: AnsiString;               // the node name under with all records will be stored in the JSON/XML result document.
                   var continue: boolean);
@@ -310,7 +315,7 @@ type
                   var numberReturned: integer;            // number of documents in the reply
                   documents: TALJSONNodeA;                 // documents
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const RowTag: AnsiString;               // the node name under with all the fields of a single record will be stored in the JSON/XML result document.
                   const ViewTag: AnsiString;              // the node name under with all records will be stored in the JSON/XML result document.
                   var continue: boolean);
@@ -428,7 +433,7 @@ type
                                            // cache or not. Values <= 0 deactivate the cache
                   JSONDATA: TALJSONNodeA;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
                   const Query: AnsiString;
@@ -437,14 +442,14 @@ type
                   Skip: integer;
                   First: Integer;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
                   const Query: AnsiString;
                   const ReturnFieldsSelector: AnsiString;
                   flags: TALMongoDBClientSelectDataFlags;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
                   const Query: AnsiString;
@@ -474,13 +479,13 @@ type
                   Skip: integer;
                   First: Integer;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
                   const Query: AnsiString;
                   const ReturnFieldsSelector: AnsiString;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
                   const Query: AnsiString;
@@ -511,13 +516,13 @@ type
                                            // cache or not. Values <= 0 deactivate the cache
                   JSONDATA: TALJSONNodeA;
                   OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure RunCommand(
                   const DatabaseName: AnsiString;
                   const Command: AnsiString;
                   flags: TALMongoDBClientRunCommandFlags;
                   OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure RunCommand(
                   const DatabaseName: AnsiString;
                   const Command: AnsiString;
@@ -533,7 +538,7 @@ type
                   const DatabaseName: AnsiString;
                   const Command: AnsiString;
                   OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-                  ExtData: Pointer); overload; virtual;
+                  Context: Pointer); overload; virtual;
       Procedure RunCommand(
                   const DatabaseName: AnsiString;
                   const Command: AnsiString;
@@ -701,7 +706,7 @@ type
                                            // cache or not. Values <= 0 deactivate the cache
                   JSONDATA: TALJSONNodeA;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
@@ -711,7 +716,7 @@ type
                   Skip: integer;
                   First: Integer;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
@@ -719,7 +724,7 @@ type
                   const ReturnFieldsSelector: AnsiString;
                   flags: TALMongoDBClientSelectDataFlags;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
@@ -753,14 +758,14 @@ type
                   Skip: integer;
                   First: Integer;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
                   const Query: AnsiString;
                   const ReturnFieldsSelector: AnsiString;
                   OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure SelectData(
                   const FullCollectionName: AnsiString;
@@ -795,14 +800,14 @@ type
                                            // cache or not. Values <= 0 deactivate the cache
                   JSONDATA: TALJSONNodeA;
                   OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure RunCommand(
                   const DatabaseName: AnsiString;
                   const Command: AnsiString;
                   flags: TALMongoDBClientRunCommandFlags;
                   OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure RunCommand(
                   const DatabaseName: AnsiString;
@@ -821,7 +826,7 @@ type
                   const DatabaseName: AnsiString;
                   const Command: AnsiString;
                   OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-                  ExtData: Pointer;
+                  Context: Pointer;
                   const ConnectionSocket: TSocket = INVALID_SOCKET); overload; virtual;
       Procedure RunCommand(
                   const DatabaseName: AnsiString;
@@ -951,7 +956,7 @@ type
       property Port: integer read fPort;
     end;
 
-    {-------------------------------------------------------------------------------------------------------}
+    {--------------------------------------------------------------------------------------------------------}
     TAlMongoDBTailMonitoringThreadEvent = reference to Procedure (Sender: TObject; JSONRowData: TALJSONNodeA);
     TAlMongoDBTailMonitoringThreadException = reference to procedure (Sender: TObject; Error: Exception);
 
@@ -1868,7 +1873,7 @@ Procedure TAlBaseMongoDBClient.ParseOPREPLYMessage(
             var numberReturned: integer;   // number of documents in the reply
             documents: TALJSONNodeA;        // documents
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const RowTag: AnsiString;      // the node name under with all the fields of a single record will be stored in the JSON/XML result document.
             const ViewTag: AnsiString;     // the node name under with all records will be stored in the JSON/XML result document.
             var continue: boolean);
@@ -1981,7 +1986,7 @@ begin
       end;
       if assigned(OnNewRowFunct) then begin
         Continue := True;
-        OnNewRowFunct(LJsonNode1, ViewTag, ExtData, Continue);
+        OnNewRowFunct(LJsonNode1, ViewTag, Context, Continue);
         documents.ChildNodes.Clear;
         if Not Continue then exit;
       end;
@@ -2021,7 +2026,7 @@ Procedure TAlBaseMongoDBClient.OP_QUERY(
             var numberReturned: integer;             // number of documents in the reply
             documents: TALJSONNodeA;                  // documents
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const RowTag: AnsiString;                // the node name under with all the fields of a single record will be stored in the JSON/XML result document.
             const ViewTag: AnsiString;               // the node name under with all records will be stored in the JSON/XML result document.
             var continue: boolean);
@@ -2049,7 +2054,7 @@ begin
     numberReturned,
     documents,
     OnNewRowFunct,
-    ExtData,
+    Context,
     RowTag,
     ViewTag,
     continue);
@@ -2066,7 +2071,7 @@ Procedure TAlBaseMongoDBClient.OP_GET_MORE(
             var numberReturned: integer;            // number of documents in the reply
             documents: TALJSONNodeA;                 // documents
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const RowTag: AnsiString;               // the node name under with all the fields of a single record will be stored in the JSON/XML result document.
             const ViewTag: AnsiString;              // the node name under with all records will be stored in the JSON/XML result document.
             var continue: boolean);
@@ -2091,7 +2096,7 @@ begin
     numberReturned,
     documents,
     OnNewRowFunct,
-    ExtData,
+    Context,
     RowTag,
     ViewTag,
     continue);
@@ -2432,7 +2437,7 @@ Procedure TAlMongoDBClient.SelectData(
                                      // cache or not. Values <= 0 deactivate the cache
             JSONDATA: TALJSONNodeA;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 
 Var LViewRec: TALJSONNodeA;
     LJSONDocument: TALJSONNodeA;
@@ -2573,7 +2578,7 @@ begin
         LNumberReturned, // number of documents in the reply
         LViewRec,
         OnNewRowFunct,
-        ExtData,
+        Context,
         RowTag,
         ViewTag,
         LContinue);
@@ -2602,7 +2607,7 @@ begin
             LNumberReturned,
             LViewRec,
             OnNewRowFunct,
-            ExtData,
+            Context,
             RowTag,
             ViewTag,
             LContinue);
@@ -2672,7 +2677,7 @@ Procedure TAlMongoDBClient.SelectData(
             Skip: integer;
             First: Integer;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 begin
   SelectData(
     FullCollectionName,
@@ -2686,7 +2691,7 @@ begin
     -1, // CacheThreshold,
     nil, //JSONDATA,
     OnNewRowFunct,
-    ExtData);
+    Context);
 end;
 
 {************************************}
@@ -2696,7 +2701,7 @@ Procedure TAlMongoDBClient.SelectData(
             const ReturnFieldsSelector: AnsiString;
             flags: TALMongoDBClientSelectDataFlags;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 begin
   SelectData(
     FullCollectionName,
@@ -2710,7 +2715,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewRowFunct,
-    ExtData);
+    Context);
 end;
 
 {************************************}
@@ -2736,7 +2741,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -2760,7 +2765,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -2783,7 +2788,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -2794,7 +2799,7 @@ Procedure TAlMongoDBClient.SelectData(
             Skip: integer;
             First: Integer;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 begin
   SelectData(
     FullCollectionName,
@@ -2808,7 +2813,7 @@ begin
     -1, // CacheThreshold,
     nil, //JSONDATA,
     OnNewRowFunct,
-    ExtData);
+    Context);
 end;
 
 {************************************}
@@ -2817,7 +2822,7 @@ Procedure TAlMongoDBClient.SelectData(
             const Query: AnsiString;
             const ReturnFieldsSelector: AnsiString;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 begin
   SelectData(
     FullCollectionName,
@@ -2831,7 +2836,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewRowFunct,
-    ExtData);
+    Context);
 end;
 
 {************************************}
@@ -2856,7 +2861,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -2879,7 +2884,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -2901,7 +2906,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -2915,7 +2920,7 @@ Procedure TAlMongoDBClient.RunCommand(
                                      // cache or not. Values <= 0 deactivate the cache
             JSONDATA: TALJSONNodeA;
             OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 
 Var LViewRec: TALJSONNodeA;
     LRowRec: TALJSONNodeA;
@@ -3048,7 +3053,7 @@ begin
       LNumberReturned, // number of documents in the reply
       LViewRec,
       nil,
-      ExtData,
+      Context,
       RowTag,
       ViewTag,
       LContinue);
@@ -3090,7 +3095,7 @@ begin
           OnNewBatchRowFunct(
             LFirstBatchRec.ChildNodes[I], // JSONRowData: TALJSONNodeA;
             ViewTag, // const ViewTag: AnsiString;
-            ExtData, // ExtData: Pointer;
+            Context, // Context: Pointer;
             LContinue); // Var Continue: Boolean);
           if not LContinue then break;
         end;
@@ -3123,7 +3128,7 @@ begin
                 LNumberReturned,
                 LFirstBatchRec, // documents
                 OnNewBatchRowFunct,
-                ExtData,
+                Context,
                 '', // RowTag,
                 ViewTag,
                 LContinue);
@@ -3180,7 +3185,7 @@ Procedure TAlMongoDBClient.RunCommand(
             const Command: AnsiString;
             flags: TALMongoDBClientRunCommandFlags;
             OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 begin
   RunCommand(
     DatabaseName,
@@ -3191,7 +3196,7 @@ begin
     -1, // CacheThreshold,
     nil, //JSONDATA,
     OnNewBatchRowFunct,
-    ExtData);
+    Context);
 end;
 
 {************************************}
@@ -3211,7 +3216,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -3230,7 +3235,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -3238,7 +3243,7 @@ Procedure TAlMongoDBClient.RunCommand(
             const DatabaseName: AnsiString;
             const Command: AnsiString;
             OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-            ExtData: Pointer);
+            Context: Pointer);
 begin
   RunCommand(
     DatabaseName,
@@ -3249,7 +3254,7 @@ begin
     -1, // CacheThreshold,
     nil, //JSONDATA,
     OnNewBatchRowFunct,
-    ExtData);
+    Context);
 end;
 
 {************************************}
@@ -3268,7 +3273,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -3286,7 +3291,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil); // ExtData
+    nil); // Context
 end;
 
 {************************************}
@@ -4049,7 +4054,7 @@ Procedure TAlMongoDBConnectionPoolClient.SelectData(
                                      // cache or not. Values <= 0 deactivate the cache
             JSONDATA: TALJSONNodeA;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 
 Var LViewRec: TALJSONNodeA;
@@ -4196,7 +4201,7 @@ begin
         LNumberReturned, // number of documents in the reply
         LViewRec,
         OnNewRowFunct,
-        ExtData,
+        Context,
         RowTag,
         ViewTag,
         LContinue);
@@ -4223,7 +4228,7 @@ begin
             LNumberReturned,
             LViewRec,
             OnNewRowFunct,
-            ExtData,
+            Context,
             RowTag,
             ViewTag,
             LContinue);
@@ -4294,7 +4299,7 @@ Procedure TAlMongoDBConnectionPoolClient.SelectData(
             Skip: integer;
             First: Integer;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 begin
   SelectData(
@@ -4309,7 +4314,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewRowFunct,
-    ExtData,
+    Context,
     ConnectionSocket);
 end;
 
@@ -4320,7 +4325,7 @@ Procedure TAlMongoDBConnectionPoolClient.SelectData(
             const ReturnFieldsSelector: AnsiString;
             flags: TALMongoDBClientSelectDataFlags;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 begin
   SelectData(
@@ -4335,7 +4340,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewRowFunct,
-    ExtData,
+    Context,
     ConnectionSocket);
 end;
 
@@ -4363,7 +4368,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4389,7 +4394,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4414,7 +4419,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4426,7 +4431,7 @@ Procedure TAlMongoDBConnectionPoolClient.SelectData(
             Skip: integer;
             First: Integer;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 begin
   SelectData(
@@ -4441,7 +4446,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewRowFunct,
-    ExtData,
+    Context,
     ConnectionSocket);
 end;
 
@@ -4451,7 +4456,7 @@ Procedure TAlMongoDBConnectionPoolClient.SelectData(
             const Query: AnsiString;
             const ReturnFieldsSelector: AnsiString;
             OnNewRowFunct: TALMongoDBClientSelectDataOnNewRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 begin
   SelectData(
@@ -4466,7 +4471,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewRowFunct,
-    ExtData,
+    Context,
     ConnectionSocket);
 end;
 
@@ -4493,7 +4498,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4518,7 +4523,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4542,7 +4547,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4557,7 +4562,7 @@ Procedure TAlMongoDBConnectionPoolClient.RunCommand(
                                      // cache or not. Values <= 0 deactivate the cache
             JSONDATA: TALJSONNodeA;
             OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 
 Var LViewRec: TALJSONNodeA;
@@ -4702,7 +4707,7 @@ begin
         LNumberReturned, // number of documents in the reply
         LViewRec,
         nil,
-        ExtData,
+        Context,
         RowTag,
         ViewTag,
         LContinue);
@@ -4744,7 +4749,7 @@ begin
             OnNewBatchRowFunct(
               LFirstBatchRec.ChildNodes[I], // JSONRowData: TALJSONNodeA;
               ViewTag, // const ViewTag: AnsiString;
-              ExtData, // ExtData: Pointer;
+              Context, // Context: Pointer;
               LContinue); // Var Continue: Boolean);
             if not LContinue then break;
           end;
@@ -4777,7 +4782,7 @@ begin
                   LNumberReturned,
                   LFirstBatchRec, // documents
                   OnNewBatchRowFunct,
-                  ExtData,
+                  Context,
                   '', // RowTag,
                   ViewTag,
                   LContinue);
@@ -4847,7 +4852,7 @@ Procedure TAlMongoDBConnectionPoolClient.RunCommand(
             const Command: AnsiString;
             flags: TALMongoDBClientRunCommandFlags;
             OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 begin
   RunCommand(
@@ -4859,7 +4864,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewBatchRowFunct,
-    ExtData,
+    Context,
     ConnectionSocket);
 end;
 
@@ -4881,7 +4886,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4902,7 +4907,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4911,7 +4916,7 @@ Procedure TAlMongoDBConnectionPoolClient.RunCommand(
             const DatabaseName: AnsiString;
             const Command: AnsiString;
             OnNewBatchRowFunct: TALMongoDBClientRunCommandOnNewBatchRowFunct;
-            ExtData: Pointer;
+            Context: Pointer;
             const ConnectionSocket: TSocket = INVALID_SOCKET);
 begin
   RunCommand(
@@ -4923,7 +4928,7 @@ begin
     -1, // CacheThreshold,
     nil, // JSONDATA,
     OnNewBatchRowFunct,
-    ExtData,
+    Context,
     ConnectionSocket);
 end;
 
@@ -4944,7 +4949,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -4964,7 +4969,7 @@ begin
     -1, // CacheThreshold,
     JSONDATA,
     nil, // OnNewBatchRowFunct,
-    nil, // ExtData,
+    nil, // Context,
     ConnectionSocket);
 end;
 
@@ -5644,7 +5649,7 @@ begin
         [sfTailMonitoring, sfNoCursorTimeout], // sfNoCursorTimeout because if the doEvent is too long then the cursor will timeout
         Procedure (JSONRowData: TALJSONNodeA;
                    const ViewTag: AnsiString;
-                   ExtData: Pointer;
+                   Context: Pointer;
                    Var Continue: Boolean)
         begin
           doEvent(JSONRowData);

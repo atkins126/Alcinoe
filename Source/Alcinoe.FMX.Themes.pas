@@ -192,22 +192,22 @@ begin
       var LPrevIsHtml := TextSettings.IsHtml;
       TextSettings.Reset;
       TextSettings.Font.Size := RoundTo(TextSettings.Font.DefaultSize * LRatio, -2);
-      TextSettings.LetterSpacing := RoundTo(TextSettings.DefaultLetterSpacing * LRatio, -2);
       TextSettings.IsHtml := LPrevIsHtml;
+      TextSettings.LetterSpacing := RoundTo(TextSettings.DefaultLetterSpacing * LRatio, -2);
       //--
       LPrevIsHtml := LabelTextSettings.IsHtml;
       LabelTextSettings.Reset;
       LabelTextSettings.Font.Size := RoundTo(LabelTextSettings.Font.DefaultSize * LRatio, -2);
+      LabelTextSettings.IsHtml := LPrevIsHtml;
       LabelTextSettings.LetterSpacing := RoundTo(LabelTextSettings.DefaultLetterSpacing * LRatio, -2);
       LabelTextSettings.Margins.Rect := ALScaleRect(LabelTextSettings.Margins.DefaultValue, LRatio).RoundTo(-2);
-      LabelTextSettings.IsHtml := LPrevIsHtml;
       //--
       LPrevIsHtml := SupportingTextSettings.IsHtml;
       SupportingTextSettings.Reset;
       SupportingTextSettings.Font.Size := RoundTo(SupportingTextSettings.Font.DefaultSize * LRatio, -2);
+      SupportingTextSettings.IsHtml := LPrevIsHtml;
       SupportingTextSettings.LetterSpacing := RoundTo(SupportingTextSettings.DefaultLetterSpacing * LRatio, -2);
       //SupportingTextSettings.Margins.Rect := ALScaleRect(SupportingTextSettings.Margins.DefaultValue, LRatio).RoundTo(-2);
-      SupportingTextSettings.IsHtml := LPrevIsHtml;
       //--
       StateStyles.Reset;
     Finally
@@ -911,8 +911,8 @@ begin
       var LPrevIsHtml := TextSettings.IsHtml;
       TextSettings.Reset;
       TextSettings.Font.Size := RoundTo(TextSettings.Font.DefaultSize * LRatio, -2);
-      TextSettings.LetterSpacing := RoundTo(TextSettings.DefaultLetterSpacing * LRatio, -2);
       TextSettings.IsHtml := LPrevIsHtml;
+      TextSettings.LetterSpacing := RoundTo(TextSettings.DefaultLetterSpacing * LRatio, -2);
       StateStyles.Reset;
     Finally
       EndUpdate;
@@ -2617,7 +2617,7 @@ begin
   end;
 end;
 
-{*************************************************************************************}
+{***********************************************************************************}
 //https://m3.material.io/components/switch/specs#e27a8630-f5e0-481a-ad24-0e8ebb8a8619
 procedure ALApplyMaterial3LightSwitchTheme(const ASwitch: TALSwitch; const AHeight: Single = 32);
 begin
@@ -2742,7 +2742,7 @@ begin
   end;
 end;
 
-{*************************************************************************************}
+{***********************************************************************************}
 //https://m3.material.io/components/switch/specs#e27a8630-f5e0-481a-ad24-0e8ebb8a8619
 procedure ALApplyMaterial3DarkSwitchTheme(const ASwitch: TALSwitch; const AHeight: Single = 32);
 begin
@@ -2918,6 +2918,7 @@ begin
       InactiveTrack.Shadow.Reset;
       InactiveTrack.stopIndicator.Reset;
       InactiveTrack.stopIndicator.Size := RoundTo(InactiveTrack.stopIndicator.DefaultSize * LRatio, -2);
+      InactiveTrack.StateStyles.Reset;
       //--
       ActiveTrack.Margins.Rect := ALScaleRect(ActiveTrack.Margins.DefaultValue, LRatio).RoundTo(-2);
       ActiveTrack.Padding.Rect := ALScaleRect(ActiveTrack.Padding.DefaultValue, LRatio).RoundTo(-2);
@@ -2934,6 +2935,7 @@ begin
       ActiveTrack.Shadow.Reset;
       ActiveTrack.stopIndicator.Reset;
       ActiveTrack.stopIndicator.Size := RoundTo(ActiveTrack.stopIndicator.DefaultSize * LRatio, -2);
+      ActiveTrack.StateStyles.Reset;
       //--
       Thumb.Margins.Rect := ALScaleRect(Thumb.Margins.DefaultValue, LRatio).RoundTo(-2);
       Thumb.Padding.Rect := ALScaleRect(Thumb.Padding.DefaultValue, LRatio).RoundTo(-2);

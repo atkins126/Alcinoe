@@ -59,7 +59,19 @@ uses
   Androidapi.JNIBridge,
   Androidapi.JNI.GraphicsContentViewText,
   {$ENDIF}
-  FMX.Types;
+  FMX.Types,
+  Alcinoe.Common;
+
+var
+  // https://developer.apple.com/documentation/quartzcore/optimizing_promotion_refresh_rates_for_iphone_13_pro_and_ipad_pro?language=objc
+  // Important: Be selective when requesting the maximum frame rate. If your animation
+  // requests 120Hz but can’t keep up, it may render poorly. But the same
+  // animation may be able to maintain a steady cadence at a lower rate.
+  // => That's pure bullsheet! How are we supposed to know if the hardware will
+  // even support 120Hz?
+  ALMinimumFramesPerSecond: Integer = 80;
+  ALMaximumFramesPerSecond: Integer = 120;
+  ALPreferredFramesPerSecond: Integer = 120;
 
 type
 
@@ -83,8 +95,9 @@ type
     FTimerEvent: TNotifyEvent;
     FInterval: Cardinal;
     FEnabled: Boolean;
-    procedure SetEnabled(const Value: Boolean);
-    procedure SetInterval(const Value: Cardinal);
+  protected
+    procedure SetEnabled(Value: Boolean); virtual;
+    procedure SetInterval(Value: Cardinal); virtual;
   public
     constructor Create(AOwner: TComponent); virtual;
     destructor Destroy; override;
@@ -118,8 +131,9 @@ type
     FTimerEvent: TNotifyEvent;
     FInterval: Cardinal;
     FEnabled: Boolean;
-    procedure SetEnabled(const Value: Boolean);
-    procedure SetInterval(const Value: Cardinal);
+  protected
+    procedure SetEnabled(Value: Boolean); virtual;
+    procedure SetInterval(Value: Cardinal); virtual;
   public
     constructor Create(AOwner: TComponent); virtual;
     destructor Destroy; override;
@@ -134,7 +148,6 @@ type
   private
     FAniList: TList<TALAnimation>;
     FTime: Double;
-    procedure OneStep;
     procedure DoSyncTimer(Sender: TObject);
   public
     constructor Create; reintroduce;
@@ -148,6 +161,9 @@ type
   public const
     DefaultAniFrameRate = 60;
   public class var
+    // The AniFrameRate property is unnecessary on Android and iOS since
+    // the animation is synchronized with the system's Choreographer (Android)
+    // or DisplayLink (iOS)
     AniFrameRate: Integer;
   private class var
     FAniThread: TALAniThread;
@@ -209,6 +225,19 @@ type
     procedure Start; override;
     procedure Stop; override;
     procedure StopAtCurrent; override;
+  end;
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  TALDisplayTimer = class(TALDisplayAnimation)
+  private
+    FInterval: Single;
+    FIntervalTimeLeft: Single;
+  protected
+    procedure ProcessTick(const ATime, ADeltaTime: Double); override;
+  public
+    constructor Create; override;
+    procedure Start; override;
+    property Interval: Single read FInterval write FInterval;
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~}
@@ -691,6 +720,36 @@ type
     property InitialVelocity: Single read GetInitialVelocity write SetInitialVelocity stored InitialVelocityStored nodefault;
   end;
 
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  // Converted from Chromium's source code:
+  // https://github.com/chromium/chrome/browser/resources/lens/overlay/cubic_bezier.ts
+  // - JavaScript "ease-in" corresponds to: cubic-bezier(0.42, 0, 1, 1)
+  // - JavaScript "ease-out" corresponds to: cubic-bezier(0, 0, 0.58, 1)
+  // - JavaScript "ease-in-out" corresponds to: cubic-bezier(0.42, 0, 0.58, 1)
+  TALCubicBezier = class
+  private
+    const
+      BEZIER_EPSILON = 1e-7;
+      CUBIC_BEZIER_SPLINE_SAMPLES = 11;
+      MAX_NEWTON_METHOD_ITERATIONS = 4;
+  private
+    P1, P2: TALPointD;
+    A, B, C: TALPointD;
+    SplineSamples: array[0..CUBIC_BEZIER_SPLINE_SAMPLES - 1] of Double;
+    procedure InitCoefficients(const P1, P2: TALPointD);
+    procedure InitSpline;
+    function SampleCurveX(T: Double): Double;
+    function SampleCurveDerivativeX(T: Double): Double;
+    function SampleCurveY(T: Double): Double;
+    function ToFinite(N: Double): Double;
+  public
+    constructor Create(X1, Y1, X2, Y2: Double);
+    // Determines the Y value of the cubic Bezier curve for a given X value.
+    function SolveForY(X: Double): Double;
+    // Finds the parameter T (a value between 0 and 1) for a given X value on the curve.
+    function SolveCurveX(X: Double): Double;
+  end;
+
 procedure Register;
 
 implementation
@@ -700,11 +759,12 @@ uses
   System.math,
   System.Math.Vectors,
   {$IFDEF IOS}
+  Macapi.Helpers,
   Macapi.ObjCRuntime,
+  Alcinoe.iOSapi.QuartzCore,
   {$ENDIF}
   FMX.Ani,
-  FMX.Utils,
-  Alcinoe.Common;
+  FMX.Utils;
 
 {*****************************************************}
 // Taken from android.view.animation.BounceInterpolator
@@ -863,7 +923,7 @@ procedure TALChoreographerThread.TChoreographerFrameCallback.doFrame(frameTimeNa
 begin
 
   {$IFDEF DEBUG}
-  //ALLog('TALChoreographerThread.TChoreographerFrameCallback.doFrame', TalLogType.verbose);
+  //ALLog('TALChoreographerThread.TChoreographerFrameCallback.doFrame');
   {$ENDIF}
 
   if assigned(fChoreographerThread.FTimerEvent) then
@@ -891,8 +951,8 @@ begin
   inherited;
 end;
 
-{****************************************************************}
-procedure TALChoreographerThread.SetEnabled(const Value: Boolean);
+{**********************************************************}
+procedure TALChoreographerThread.SetEnabled(Value: Boolean);
 begin
   if FEnabled <> Value then begin
     FEnabled := Value;
@@ -901,10 +961,10 @@ begin
   end;
 end;
 
-{******************************************************************}
-procedure TALChoreographerThread.SetInterval(const Value: Cardinal);
+{************************************************************}
+procedure TALChoreographerThread.SetInterval(Value: Cardinal);
 begin
-  FInterval := Max(Value, 1);
+  FInterval := Value;
 end;
 
 {$ENDIF}
@@ -923,7 +983,7 @@ procedure TALDisplayLinkThread.TDisplayLinkListener.displayLinkUpdated;
 begin
 
   {$IFDEF DEBUG}
-  //ALLog('TALDisplayLinkThread.TDisplayLinkListener.displayLinkUpdated', TalLogType.verbose);
+  //ALLog('TALDisplayLinkThread.TDisplayLinkListener.displayLinkUpdated');
   {$ENDIF}
 
   if assigned(fDisplayLinkThread.FTimerEvent) then
@@ -944,6 +1004,19 @@ begin
   fDisplayLinkListener := TDisplayLinkListener.Create(self);
   fDisplayLink := TCADisplayLink.Wrap(TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated')));
   fDisplayLink.retain;
+  if GlobalUseMetal then begin
+    // In OpenGL, the animation appears more jerky when using
+    // a high frame rate
+    if TOSVersion.Check(17) then begin
+      var LFrameRateRange: CAFrameRateRange;
+      LFrameRateRange.minimum := ALMinimumFramesPerSecond;
+      LFrameRateRange.maximum := ALMaximumFramesPerSecond;
+      LFrameRateRange.preferred := ALPreferredFramesPerSecond;
+      TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFrameRateRange(LFrameRateRange);
+    end
+    else
+      TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
+  end;
   fDisplayLink.addToRunLoop(TNSRunLoop.Wrap(TNSRunLoop.OCClass.currentRunLoop), NSRunLoopCommonModes); // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
   fDisplayLink.setPaused(true);
   FTimerEvent := nil;
@@ -963,8 +1036,8 @@ begin
   inherited;
 end;
 
-{**************************************************************}
-procedure TALDisplayLinkThread.SetEnabled(const Value: Boolean);
+{********************************************************}
+procedure TALDisplayLinkThread.SetEnabled(Value: Boolean);
 begin
   if FEnabled <> Value then begin
     FEnabled := Value;
@@ -973,10 +1046,10 @@ begin
   end;
 end;
 
-{****************************************************************}
-procedure TALDisplayLinkThread.SetInterval(const Value: Cardinal);
+{**********************************************************}
+procedure TALDisplayLinkThread.SetInterval(Value: Cardinal);
 begin
-  FInterval := Max(Value, 1);
+  FInterval := Value;
 end;
 
 {$ENDIF}
@@ -985,7 +1058,7 @@ end;
 constructor TALAniThread.Create;
 begin
   inherited Create(nil);
-  TALAnimation.AniFrameRate := EnsureRange(TALAnimation.AniFrameRate, 5, 100);
+  TALAnimation.AniFrameRate := EnsureRange(TALAnimation.AniFrameRate, 5, 120);
   Interval := Trunc(1000 / TALAnimation.AniFrameRate / 10) * 10;
   if (Interval <= 0) then
     Interval := 1;
@@ -1024,16 +1097,7 @@ end;
 {**************************************************}
 procedure TALAniThread.DoSyncTimer(Sender: TObject);
 begin
-  OneStep;
-  if TALAnimation.AniFrameRate < 5 then
-    TALAnimation.AniFrameRate := 5;
-  Interval := Trunc(1000 / TALAnimation.AniFrameRate / 10) * 10;
-  if (Interval <= 0) then Interval := 1;
-end;
-
-{*****************************}
-procedure TALAniThread.OneStep;
-begin
+  {$IF not defined(ALDPK)}
   var NewTime := ALElapsedTimeSecondsAsDouble;
   var LDeltaTime := NewTime - FTime;
   FTime := NewTime;
@@ -1049,6 +1113,7 @@ begin
         I := FAniList.Count - 1;
     end;
   end;
+  {$ENDIF}
 end;
 
 {******************************}
@@ -1187,6 +1252,70 @@ begin
 
   FRunning := False;
   DoFinish;
+end;
+
+{*********************************}
+constructor TALDisplayTimer.Create;
+begin
+  inherited Create;
+  FInterval := 0.05;
+end;
+
+{*********************************************************************}
+procedure TALDisplayTimer.ProcessTick(const ATime, ADeltaTime: Double);
+begin
+  if (not FRunning) or FPause then
+    Exit;
+
+  if (FDelay > 0) and (FDelayTimeLeft <> 0) then begin
+    FDelayTimeLeft := FDelayTimeLeft - ADeltaTime;
+    if FDelayTimeLeft <= 0 then begin
+      FDelayTimeLeft := 0;
+      FirstFrame;
+      ProcessAnimation;
+      DoProcess;
+    end;
+    Exit;
+  end;
+
+  FIntervalTimeLeft := FIntervalTimeLeft - ADeltaTime;
+  if CompareValue(FIntervalTimeLeft, 0, 0.001) > 0 then exit;
+  FIntervalTimeLeft := FInterval;
+
+  FTime := FTime + ADeltaTime;
+
+  ProcessAnimation;
+  DoProcess;
+
+  if not FRunning then begin
+    if AniThread <> nil then
+      AniThread.RemoveAnimation(Self);
+    DoFinish;
+  end;
+end;
+
+{******************************}
+procedure TALDisplayTimer.Start;
+begin
+  if (FRunning) then
+    Exit;
+  FEnabled := True;
+  FRunning := True;
+  FTime := 0;
+  FIntervalTimeLeft := FInterval;
+  FDelayTimeLeft := FDelay;
+  if FDelay = 0 then begin
+    FirstFrame;
+    ProcessAnimation;
+    DoProcess;
+  end;
+
+  if AniThread = nil then
+    FAniThread := TALAniThread.Create;
+
+  AniThread.AddAnimation(Self);
+  if not AniThread.Enabled then
+    Stop;
 end;
 
 {******************************************}
@@ -2770,6 +2899,131 @@ end;
 procedure TALSpringForcePropertyAnimation.StopAtCurrent;
 begin
   FSpringForceAnimation.StopAtCurrent;
+end;
+
+{********************************************************}
+constructor TALCubicBezier.Create(X1, Y1, X2, Y2: Double);
+begin
+  P1 := TALPointD.Create(X1, Y1);
+  P2 := TALPointD.Create(X2, Y2);
+  InitCoefficients(P1, P2);
+  InitSpline;
+end;
+
+{*****************************************************************}
+procedure TALCubicBezier.InitCoefficients(const P1, P2: TALPointD);
+begin
+  // Calculate the polynomial coefficients, implicit first and last control
+  // points are (0,0) and (1,1). First, for x.
+  c.x := 3 * p1.x;
+  b.x := 3 * (p2.x - p1.x) - c.x;
+  a.x := 1 - c.x - b.x;
+
+  // Now for y.
+  c.y := toFinite(3 * p1.y);
+  b.y := toFinite(3 * (p2.y - p1.y) - c.y);
+  a.y := toFinite(1 - c.y - b.y);
+end;
+
+{**********************************}
+procedure TALCubicBezier.InitSpline;
+begin
+  const deltaT = 1 / (CUBIC_BEZIER_SPLINE_SAMPLES - 1);
+  for var i := 0 to CUBIC_BEZIER_SPLINE_SAMPLES - 1 do
+    splineSamples[i] := sampleCurveX(i * deltaT);
+end;
+
+{******************************************************}
+function TALCubicBezier.SampleCurveX(T: Double): Double;
+begin
+  // `ax t^3 + bx t^2 + cx t' expanded using Horner's rule.
+  // The x values are in the range [0, 1]. So it isn't needed toFinite
+  // clamping.
+  // https://drafts.csswg.org/css-easing-1/#funcdef-cubic-bezier-easing-function-cubic-bezier
+  result := ((a.x * t + b.x) * t + c.x) * t;
+end;
+
+{****************************************************************}
+function TALCubicBezier.SampleCurveDerivativeX(T: Double): Double;
+begin
+  Result := (3 * a.x * t + 2 * b.x) * t + c.x;
+end;
+
+{******************************************************}
+function TALCubicBezier.SampleCurveY(T: Double): Double;
+begin
+  Result := toFinite(((a.y * t + b.y) * t + c.y) * t);
+end;
+
+{**************************************************}
+function TALCubicBezier.ToFinite(N: Double): Double;
+begin
+  if IsInfinite(N) then
+    Result := IfThen(N > 0, MaxInt, -MaxInt)
+  else
+    Result := N;
+end;
+
+{*****************************************************}
+function TALCubicBezier.SolveCurveX(X: Double): Double;
+begin
+  var t0: Double := NAN;
+  var t1: Double := NAN;
+  var x2: Double{ := NAN};
+  var d2: Double;
+
+  var t2: Double := x;
+
+  // Linear interpolation of spline curve for initial guess.
+  const deltaT = 1 / (CUBIC_BEZIER_SPLINE_SAMPLES - 1);
+  for var i := 1 to CUBIC_BEZIER_SPLINE_SAMPLES - 1 do begin
+    if (x <= splineSamples[i]) then begin
+      t1 := deltaT * i;
+      t0 := t1 - deltaT;
+      t2 := t0 + (t1 - t0) * (x - splineSamples[i - 1]) / (splineSamples[i] - splineSamples[i - 1]);
+      break;
+    end;
+  end;
+
+  // Perform a few iterations of Newton's method -- normally very fast.
+  // See https://en.wikipedia.org/wiki/Newton%27s_method.
+  for var i := 0 to MAX_NEWTON_METHOD_ITERATIONS - 1 do begin
+    x2 := sampleCurveX(t2) - x;
+    if (abs(x2) < BEZIER_EPSILON) then
+      exit(t2);
+    d2 := sampleCurveDerivativeX(t2);
+    if (abs(d2) < BEZIER_EPSILON) then
+      break;
+    t2 := t2 - x2 / d2;
+  end;
+  if ((not IsNan(x2)) and (abs(x2) < BEZIER_EPSILON)) then
+    exit(t2);
+
+  // Fall back to the bisection method for reliability.
+  if ((not IsNan(t0)) and (not IsNan(t1))) then begin
+    while (t0 < t1) do begin
+      x2 := sampleCurveX(t2);
+      if (abs(x2 - x) < BEZIER_EPSILON) then
+        exit(t2);
+
+      if (x > x2) then
+        t0 := t2
+      else
+        t1 := t2;
+
+      t2 := (t1 + t0) * 0.5;
+    end;
+  end;
+
+  // Failed to solve.
+  result := t2;
+end;
+
+{***************************************************}
+function TALCubicBezier.SolveForY(X: Double): Double;
+begin
+  x := max(0, min(1, x));
+  Result := sampleCurveY(solveCurveX(x));
 end;
 
 {*****************}

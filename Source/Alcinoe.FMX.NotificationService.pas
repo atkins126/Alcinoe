@@ -240,6 +240,7 @@ uses
   FMX.Helpers.iOS,
   {$ENDIF}
   ALcinoe.FMX.Graphics,
+  ALcinoe.FMX.Common,
   Alcinoe.HTTP.Client.Net.Pool,
   Alcinoe.stringUtils,
   Alcinoe.Common;
@@ -604,7 +605,7 @@ begin
       LNotification.FLargeIconUrl,
       //
       // const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessProc;
-      procedure (const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AExtData: TObject)
+      procedure (const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject)
       begin
         var LContentStream := AContentStream;
         TThread.Synchronize(nil,
@@ -616,7 +617,7 @@ begin
       end,
       //
       // const AOnErrorCallBack: TALNetHttpClientPoolOnErrorProc;
-      procedure (const AErrMessage: string; var AExtData: Tobject)
+      procedure (const AErrMessage: string; var AContext: Tobject)
       begin
         TThread.Synchronize(nil,
           procedure
@@ -643,17 +644,21 @@ begin
     if (ANotification.FLargeIconStream <> nil) and (ANotification.FLargeIconStream.Size > 0)  then begin
       try
 
-        var LtmpBitmap := ALLoadFromStreamToJBitmap(ANotification.FLargeIconStream);
-        try
-          var W := LtmpBitmap.getWidth;
-          var H := LtmpBitmap.getHeight;
-          if W > H then W := H
-          else H := W;
-          LLargeIconBitmap := ALLoadFromJBitmapAndFitIntoAndCropToJBitmap(LtmpBitmap, W, H);
-        finally
-          if not LtmpBitmap.equals(LLargeIconBitmap) then LtmpBitmap.recycle;
-          LtmpBitmap := nil;
-        end;
+        var LIconSize := ALGetImageDimensions(ANotification.FLargeIconStream);
+        if LIconSize.Width > LIconSize.Height then LIconSize.Width := LIconSize.Height
+        else LIconSize.Height := LIconSize.Width;
+        LLargeIconBitmap := ALCreateJBitmapFromResource(
+                              '', // const AResourceName: String;
+                              ANotification.FLargeIconStream, // const AResourceStream: TStream;
+                              '', // const AMaskResourceName: String;
+                              nil, // const AMaskBitmap: JBitmap;
+                              0, // const AScale: Single;
+                              LIconSize.Width, LIconSize.Height, // const W, H: single;
+                              TALImageWrapMode.fitAndCrop, // const AWrapMode: TALImageWrapMode;
+                              TpointF.Create(-50,-50), // const ACropCenter: TpointF;
+                              0, // const ABlurRadius: single;
+                              0, // const AXRadius: Single;
+                              0); // const AYRadius: Single);
 
       except
         on E: Exception do begin
@@ -921,7 +926,7 @@ begin
 
     If MainActivity.checkSelfPermission(StringToJString('android.permission.POST_NOTIFICATIONS')) <> TJPackageManager.JavaClass.PERMISSION_GRANTED then begin
       {$IFDEF DEBUG}
-      allog('TALNotificationService.PermissionsRequestResultHandler', 'granted: ' + ALBoolToStrW(False), TalLogType.verbose);
+      allog('TALNotificationService.PermissionsRequestResultHandler', 'granted: ' + ALBoolToStrW(False));
       {$ENDIF}
       FIsRequestingNotificationPermission := False;
       if assigned(fOnAuthorizationRefused) then
@@ -929,7 +934,7 @@ begin
     end
     else begin
       {$IFDEF DEBUG}
-      allog('TALNotificationService.PermissionsRequestResultHandler', 'granted: ' + ALBoolToStrW(True), TalLogType.verbose);
+      allog('TALNotificationService.PermissionsRequestResultHandler', 'granted: ' + ALBoolToStrW(True));
       {$ENDIF}
       FIsRequestingNotificationPermission := False;
       if assigned(fOnAuthorizationGranted) then
@@ -960,7 +965,7 @@ begin
   // app is allowed to do.
 
   {$IFDEF DEBUG}
-  allog('TALNotificationService.UserNotificationCenterRequestAuthorizationWithOptionsCompletionHandler', 'granted: ' + ALBoolToStrW(granted), TalLogType.verbose);
+  allog('TALNotificationService.UserNotificationCenterRequestAuthorizationWithOptionsCompletionHandler', 'granted: ' + ALBoolToStrW(granted));
   {$ENDIF}
 
  if (not granted) then begin

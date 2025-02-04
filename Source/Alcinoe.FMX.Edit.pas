@@ -136,6 +136,8 @@ Type
     {$ELSEIF defined(MSWindows)}
     property NativeView: TALWinNativeView read GetNativeView;
     {$ENDIF}
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual; abstract;
+    Procedure SetSelection(const AIndex: integer); overload; virtual; abstract;
     property OnChange: TNotifyEvent read fOnChange write fOnChange;
     property OnReturnKey: TNotifyEvent read fOnReturnKey write fOnReturnKey;
     property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType;
@@ -277,6 +279,8 @@ type
     destructor Destroy; override;
     function getLineHeight: Single; override; // It includes the line spacing
     property NativeView: TALAndroidEditText read GetNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
+    Procedure SetSelection(const AIndex: integer); overload; override;
   end;
 
 {$endif}
@@ -380,6 +384,8 @@ type
     destructor Destroy; override;
     function getLineHeight: Single; override; // It includes the line spacing
     property NativeView: TALIosEditTextField read GetNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
+    Procedure SetSelection(const AIndex: integer); overload; override;
   end;
 
 {$endif}
@@ -478,6 +484,8 @@ type
     destructor Destroy; override;
     function getLineHeight: Single; override; // It includes the line spacing
     property NativeView: TALMacEditTextField read GetNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
+    Procedure SetSelection(const AIndex: integer); overload; override;
   end;
 
 {$endif}
@@ -505,6 +513,11 @@ type
     procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
     procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
     procedure WMChar(var Message: TWMChar); message WM_CHAR;
+    procedure WMSetText(var Message: TWMSetText); message WM_SETTEXT;
+    procedure WMPaste(var Message: TWMPaste); message WM_PASTE;
+    procedure WMCut(var Message: TWMCut); message WM_CUT;
+    procedure WMClear(var Message: TWMClear); message WM_CLEAR;
+    procedure WMUndo(var Message: TWMUndo); message WM_UNDO;
     procedure WMTextColor(var Message: WinApi.Messages.TMessage); message CN_CTLCOLOREDIT;
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
   protected
@@ -561,6 +574,8 @@ type
     constructor Create(AOwner: TComponent); override;
     function getLineHeight: Single; override; // It includes the line spacing
     property NativeView: TALWinEditView read GetNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
+    Procedure SetSelection(const AIndex: integer); overload; override;
   end;
 
 {$endif}
@@ -572,6 +587,27 @@ type
   TALBaseEdit = class(TALBaseRectangle, IVirtualKeyboardControl, IControlTypeSupportable, IALNativeControl)
   public
     type
+      // -------
+      // TStroke
+      TStroke = class(TALStrokeBrush)
+      protected
+        function GetDefaultColor: TAlphaColor; override;
+      end;
+      // -------------
+      // TTextSettings
+      TTextSettings = class(TALBaseTextSettings)
+      public
+        Type
+          TFont = Class(TALFont)
+          protected
+            function GetDefaultSize: Single; override;
+          End;
+      protected
+        function CreateFont: TALFont; override;
+      published
+        property Font;
+        property HorzAlign;
+      end;
       // ----------------
       // TLabelTextLayout
       TLabelTextLayout = (Floating, &Inline);
@@ -581,14 +617,27 @@ type
       // ------------------
       // TLabelTextSettings
       TLabelTextSettings = class(TALBaseTextSettings)
+      public
+        Type
+          TMargins = class(TALBounds)
+          protected
+            function GetDefaultValue: TRectF; override;
+          end;
+          TFont = Class(TALFont)
+          protected
+            function GetDefaultSize: Single; override;
+          End;
       private
-        FMargins: TBounds;
+        FMargins: TALBounds;
         FLayout: TLabelTextLayout;
         FAnimation: TLabelTextAnimation;
-        procedure SetMargins(const Value: TBounds);
+        procedure SetMargins(const Value: TALBounds);
         procedure SetLayout(const Value: TLabelTextLayout);
         procedure SetAnimation(const Value: TLabelTextAnimation);
         procedure MarginsChanged(Sender: TObject);
+      protected
+        function CreateMargins: TALBounds; virtual;
+        function CreateFont: TALFont; override;
       public
         constructor Create; override;
         destructor Destroy; override;
@@ -597,13 +646,13 @@ type
         procedure AlignToPixel; override;
       published
         property Font;
-        property Trimming;
-        property MaxLines;
         property Ellipsis;
+        property MaxLines;
+        property IsHtml;
+        property Trimming;
         property LineHeightMultiplier;
         property LetterSpacing;
-        property IsHtml;
-        property Margins: TBounds read FMargins write SetMargins;
+        property Margins: TALBounds read FMargins write SetMargins;
         property Layout: TLabelTextLayout read FLayout write SetLayout default TLabelTextLayout.Floating;
         property Animation: TLabelTextAnimation read FAnimation write SetAnimation default TLabelTextAnimation.Translation;
       end;
@@ -613,12 +662,25 @@ type
       // -----------------------
       // TSupportingTextSettings
       TSupportingTextSettings = class(TALBaseTextSettings)
+      public
+        Type
+          TMargins = class(TALBounds)
+          protected
+            function GetDefaultValue: TRectF; override;
+          end;
+          TFont = Class(TALFont)
+          protected
+            function GetDefaultSize: Single; override;
+          End;
       private
-        FMargins: TBounds;
+        FMargins: TALBounds;
         FLayout: TSupportingTextLayout;
-        procedure SetMargins(const Value: TBounds);
+        procedure SetMargins(const Value: TALBounds);
         procedure SetLayout(const Value: TSupportingTextLayout);
         procedure MarginsChanged(Sender: TObject);
+      protected
+        function CreateMargins: TALBounds; virtual;
+        function CreateFont: TALFont; override;
       public
         constructor Create; override;
         destructor Destroy; override;
@@ -627,47 +689,87 @@ type
         procedure AlignToPixel; override;
       published
         property Font;
-        property Trimming;
-        property MaxLines;
         property Ellipsis;
+        property MaxLines;
+        property IsHtml;
+        property Trimming;
         property LineHeightMultiplier;
         property LetterSpacing;
-        property IsHtml;
-        property Margins: TBounds read FMargins write SetMargins;
+        property Margins: TALBounds read FMargins write SetMargins;
         property Layout: TSupportingTextLayout read FLayout write SetLayout default TSupportingTextLayout.Floating;
-      end;
-      // -----------------------
-      // TStateStyleTextSettings
-      TStateStyleTextSettings = class(TALInheritBaseTextSettings)
-      published
-        property Font;
       end;
       // ---------------
       // TBaseStateStyle
       TBaseStateStyle = class(TALBaseStateStyle)
+      public
+        type
+          TStroke = class(TALInheritStrokeBrush)
+          protected
+            function GetDefaultColor: TAlphaColor; override;
+          end;
+          TTextSettings = class(TALInheritBaseTextSettings)
+          public
+            type
+              TFont = Class(TALFont)
+              protected
+                function GetDefaultSize: Single; override;
+              End;
+          protected
+            function CreateFont: TALFont; override;
+          published
+            property Font;
+          end;
+          TLabelTextSettings = class(TALInheritBaseTextSettings)
+          public
+            type
+              TFont = Class(TALFont)
+              protected
+                function GetDefaultSize: Single; override;
+              End;
+          protected
+            function CreateFont: TALFont; override;
+          published
+            property Font;
+          end;
+          TSupportingTextSettings = class(TALInheritBaseTextSettings)
+          public
+            type
+              TFont = Class(TALFont)
+              protected
+                function GetDefaultSize: Single; override;
+              End;
+          protected
+            function CreateFont: TALFont; override;
+          published
+            property Font;
+          end;
       private
         FPromptTextColor: TalphaColor;
         FTintColor: TalphaColor;
-        FTextSettings: TStateStyleTextSettings;
-        FLabelTextSettings: TStateStyleTextSettings;
-        FSupportingTextSettings: TStateStyleTextSettings;
-        FDefaultPromptTextColor: TalphaColor;
-        FDefaultTintColor: TalphaColor;
+        FTextSettings: TBaseStateStyle.TTextSettings;
+        FLabelTextSettings: TBaseStateStyle.TLabelTextSettings;
+        FSupportingTextSettings: TBaseStateStyle.TSupportingTextSettings;
         FPriorSupersedePromptTextColor: TalphaColor;
         FPriorSupersedeTintColor: TalphaColor;
         function GetStateStyleParent: TBaseStateStyle;
         function GetControlParent: TALBaseEdit;
         procedure SetPromptTextColor(const AValue: TAlphaColor);
         procedure SetTintColor(const AValue: TAlphaColor);
-        procedure SetTextSettings(const AValue: TStateStyleTextSettings);
-        procedure SetLabelTextSettings(const AValue: TStateStyleTextSettings);
-        procedure SetSupportingTextSettings(const AValue: TStateStyleTextSettings);
+        procedure SetTextSettings(const AValue: TBaseStateStyle.TTextSettings);
+        procedure SetLabelTextSettings(const AValue: TBaseStateStyle.TLabelTextSettings);
+        procedure SetSupportingTextSettings(const AValue: TBaseStateStyle.TSupportingTextSettings);
         procedure TextSettingsChanged(ASender: TObject);
         procedure LabelTextSettingsChanged(ASender: TObject);
         procedure SupportingTextSettingsChanged(ASender: TObject);
         function IsPromptTextColorStored: Boolean;
         function IsTintColorStored: Boolean;
       protected
+        function CreateStroke(const AParent: TALStrokeBrush): TALInheritStrokeBrush; override;
+        function CreateTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TTextSettings; virtual;
+        function CreateLabelTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TLabelTextSettings; virtual;
+        function CreateSupportingTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TSupportingTextSettings; virtual;
+        function GetDefaultPromptTextColor: TalphaColor; virtual;
+        function GetDefaultTintColor: TalphaColor; virtual;
         function GetInherit: Boolean; override;
         procedure DoSupersede; override;
       public
@@ -690,13 +792,13 @@ type
         procedure Interpolate(const ATo: TALBaseStateStyle; const ANormalizedTime: Single); override;
         property StateStyleParent: TBaseStateStyle read GetStateStyleParent;
         property ControlParent: TALBaseEdit read GetControlParent;
-        property DefaultPromptTextColor: TalphaColor read FDefaultPromptTextColor write FDefaultPromptTextColor;
-        property DefaultTintColor: TalphaColor read FDefaultTintColor write FDefaultTintColor;
+        property DefaultPromptTextColor: TalphaColor read GetDefaultPromptTextColor;
+        property DefaultTintColor: TalphaColor read GetDefaultTintColor;
       published
-        property LabelTextSettings: TStateStyleTextSettings read fLabelTextSettings write SetLabelTextSettings;
+        property LabelTextSettings: TBaseStateStyle.TLabelTextSettings read fLabelTextSettings write SetLabelTextSettings;
         property PromptTextColor: TAlphaColor read FPromptTextColor write SetPromptTextColor stored IsPromptTextColorStored;
-        property SupportingTextSettings: TStateStyleTextSettings read fSupportingTextSettings write SetSupportingTextSettings;
-        property TextSettings: TStateStyleTextSettings read fTextSettings write SetTextSettings;
+        property SupportingTextSettings: TBaseStateStyle.TSupportingTextSettings read fSupportingTextSettings write SetSupportingTextSettings;
+        property TextSettings: TBaseStateStyle.TTextSettings read fTextSettings write SetTextSettings;
         property TintColor: TAlphaColor read FTintColor write SetTintColor stored IsTintColorStored;
       end;
       // -------------------
@@ -751,12 +853,14 @@ type
         procedure HoveredChanged(ASender: TObject);
         procedure FocusedChanged(ASender: TObject);
       protected
-        function CreateSavedState: TALPersistentObserver; override;
+        function CreateDisabledStateStyle(const AParent: TObject): TDisabledStateStyle; virtual;
+        function CreateHoveredStateStyle(const AParent: TObject): THoveredStateStyle; virtual;
+        function CreateFocusedStateStyle(const AParent: TObject): TFocusedStateStyle; virtual;
         procedure StartTransition; override;
         procedure TransitionAnimationProcess(Sender: TObject); override;
         procedure TransitionAnimationFinish(Sender: TObject); override;
       public
-        constructor Create(const AParent: TALBaseEdit); reintroduce; virtual;
+        constructor Create(const AParent: TALControl); override;
         destructor Destroy; override;
         procedure Assign(Source: TPersistent); override;
         procedure Reset; override;
@@ -773,21 +877,12 @@ type
         property Focused: TFocusedStateStyle read FFocused write SetFocused;
         property Transition;
       end;
-      // -------------
-      // TTextSettings
-      TTextSettings = class(TALBaseTextSettings)
-      published
-        property Font;
-        property HorzAlign;
-      end;
   private
     fDefStyleAttr: String;
     fDefStyleRes: String;
     FAutoTranslate: Boolean;
     fOnChange: TNotifyEvent;
     fOnReturnKey: TNotifyEvent;
-    fOnEnter: TNotifyEvent;
-    fOnExit: TNotifyEvent;
     FTextSettings: TTextSettings;
     FPromptText: String;
     FPromptTextColor: TAlphaColor;
@@ -833,8 +928,6 @@ type
     procedure OnChangeImpl(Sender: TObject);
     procedure OnReturnKeyImpl(Sender: TObject);
     procedure SetOnReturnKey(const Value: TNotifyEvent);
-    procedure OnEnterImpl(Sender: TObject);
-    procedure OnExitImpl(Sender: TObject);
     procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
     function GetAutoCapitalizationType: TALAutoCapitalizationType;
     procedure SetPassword(const Value: Boolean);
@@ -860,8 +953,11 @@ type
     function GetControlType: TControlType;
     procedure SetControlType(const Value: TControlType);
   protected
-    FIsAdjustingSize: Boolean;
+    function CreateStroke: TALStrokeBrush; override;
     function CreateTextSettings: TTextSettings; virtual;
+    function CreateLabelTextSettings: TLabelTextSettings; virtual;
+    function CreateSupportingTextSettings: TSupportingTextSettings; virtual;
+    function CreateStateStyles: TStateStyles; virtual;
     function CreateEditControl: TALBaseEditControl; virtual;
     function GetEditControl: TALBaseEditControl; virtual;
     property EditControl: TALBaseEditControl read GetEditControl;
@@ -891,8 +987,9 @@ type
     procedure StrokeChanged(Sender: TObject); override;
     procedure SetSides(const Value: TSides); override;
     procedure FillChanged(Sender: TObject); override;
-    procedure DoResized; override;
-    procedure AdjustSize; virtual; abstract;
+    {$IF NOT DEFINED(ALSkiaCanvas)}
+    function GetRenderTargetRect(const ARect: TrectF): TRectF; override;
+    {$ENDIF}
     procedure Paint; override;
     Procedure CreateBufPromptTextDrawable(
                 var ABufDrawable: TALDrawable;
@@ -926,7 +1023,6 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure AlignToPixel; override;
-    procedure SetNewScene(AScene: IScene); override;
     {$IF defined(android)}
     property NativeView: TALAndroidNativeView read GetNativeView;
     {$ELSEIF defined(IOS)}
@@ -939,16 +1035,18 @@ type
     function HasNativeView: boolean;
     Procedure AddNativeView;
     Procedure RemoveNativeView;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual;
+    Procedure SetSelection(const AIndex: integer); overload; virtual;
     function getLineCount: integer;
     function getLineHeight: Single; // It includes the line spacing
     procedure MakeBufDrawable; override;
     procedure MakeBufPromptTextDrawable; virtual;
     procedure MakeBufLabelTextDrawable; virtual;
     procedure MakeBufSupportingTextDrawable; virtual;
-    procedure clearBufDrawable; override;
-    procedure clearBufPromptTextDrawable; virtual;
-    procedure clearBufLabelTextDrawable; virtual;
-    procedure clearBufSupportingTextDrawable; virtual;
+    procedure ClearBufDrawable; override;
+    procedure ClearBufPromptTextDrawable; virtual;
+    procedure ClearBufLabelTextDrawable; virtual;
+    procedure ClearBufSupportingTextDrawable; virtual;
     property Password: Boolean read GetPassword write SetPassword default False;
   published
     // Android only - the name of an attribute in the current theme that contains a reference to
@@ -963,6 +1061,7 @@ type
     property Align;
     property Anchors;
     property AutoCapitalizationType: TALAutoCapitalizationType read GetAutoCapitalizationType write SetAutoCapitalizationType default TALAutoCapitalizationType.acNone;
+    //property AutoSize;
     property AutoTranslate: Boolean read FAutoTranslate write FAutoTranslate default true; // Just the PromptText
     property CanFocus default True;
     //property CanParentFocus;
@@ -973,6 +1072,7 @@ type
     property Corners;
     property Cursor default crIBeam;
     //property DisableFocusEffect;
+    //property DoubleBuffered;
     property DragMode;
     property EnableDragHighlight;
     property Enabled;
@@ -1000,6 +1100,7 @@ type
     property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType default TReturnKeyType.Default;
     //property RotationAngle;
     //property RotationCenter;
+    //property Pivot;
     //property Scale;
     property Shadow;
     property Sides;
@@ -1026,8 +1127,8 @@ type
     property OnDragOver;
     property OnDragDrop;
     property OnDragEnd;
-    property OnEnter: TnotifyEvent Read fOnEnter Write fOnEnter;
-    property OnExit: TnotifyEvent Read fOnExit Write fOnExit;
+    property OnEnter;
+    property OnExit;
     property OnMouseEnter;
     property OnMouseLeave;
     property OnMouseDown;
@@ -1050,20 +1151,14 @@ type
 
   {*************************}
   [ComponentPlatforms($FFFF)]
-  TALEdit = class(TALBaseEdit, IALAutosizeControl)
-  private
-    FAutoSize: Boolean;
+  TALEdit = class(TALBaseEdit)
   protected
-    function GetAutoSize: Boolean; virtual;
-    procedure SetAutoSize(const Value: Boolean); virtual;
     procedure AdjustSize; override;
-    { IALAutosizeControl }
-    function HasUnconstrainedAutosizeX: Boolean; virtual;
-    function HasUnconstrainedAutosizeY: Boolean; virtual;
   public
     constructor Create(AOwner: TComponent); override;
+    function HasUnconstrainedAutosizeX: Boolean; override;
   published
-    property AutoSize: Boolean read GetAutoSize write SetAutoSize default True;
+    property AutoSize default True;
     property Password;
   end;
 
@@ -1101,7 +1196,6 @@ uses
   FMX.Helpers.Mac,
   FMX.Consts,
   Alcinoe.Macapi.Foundation,
-  Alcinoe.StringUtils,
   {$ELSEIF defined(MSWINDOWS)}
   Winapi.CommCtrl,
   Fmx.Forms,
@@ -1115,7 +1209,12 @@ uses
   {$ENDIF}
   Alcinoe.FMX.Memo,
   Alcinoe.FMX.BreakText,
+  Alcinoe.StringUtils,
   Alcinoe.Common;
+
+{**}
+Type
+  _TALBaseStateStyleAccessProtected = class(TALBaseStateStyle);
 
 {********************************************************}
 constructor TALBaseEditControl.Create(AOwner: TComponent);
@@ -1137,7 +1236,7 @@ begin
   inherited Destroy;
 end;
 
-{**********************}
+{********************}
 {$IF defined(android)}
 function TALBaseEditControl.GetNativeView: TALAndroidNativeView;
 begin
@@ -1145,7 +1244,7 @@ begin
 end;
 {$ENDIF}
 
-{**********************}
+{****************}
 {$IF defined(IOS)}
 function TALBaseEditControl.GetNativeView: TALIosNativeView;
 begin
@@ -1153,7 +1252,7 @@ begin
 end;
 {$ENDIF}
 
-{**********************}
+{********************}
 {$IF defined(ALMacOS)}
 function TALBaseEditControl.GetNativeView: TALMacNativeView;
 begin
@@ -1275,7 +1374,7 @@ begin
     {$IF defined(android)}
     ALVirtualKeyboardVisible := True;
     {$IF defined(DEBUG)}
-    ALLog('TALBaseEditControl.showVirtualKeyboard', 'control.name: ' + Name, TalLogType.VERBOSE);
+    ALLog('TALBaseEditControl.showVirtualKeyboard', 'control.name: ' + Name);
     {$ENDIF}
     MainActivity.getVirtualKeyboard.showFor(NativeView.View);
     {$ENDIF}
@@ -1296,7 +1395,7 @@ begin
     begin
       If not ALVirtualKeyboardVisible then begin
         {$IF defined(DEBUG)}
-        ALLog('TALBaseEditControl.hideVirtualKeyboard', TalLogType.VERBOSE);
+        ALLog('TALBaseEditControl.hideVirtualKeyboard');
         {$ENDIF}
         MainActivity.getVirtualKeyboard.hide;
       end;
@@ -1373,14 +1472,12 @@ begin
       'TALAndroidEditText.TALKeyPreImeListener.onKeyPreIme',
       'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
       'keyCode: ' + inttostr(keyCode) + ' | ' +
-      'event: ' + JstringToString(event.toString),
-      TalLogType.VERBOSE)
+      'event: ' + JstringToString(event.toString))
   else
     ALLog(
       'TALAndroidEditText.TALKeyPreImeListener.onKeyPreIme',
       'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
-      'keyCode: ' + inttostr(keyCode),
-      TalLogType.VERBOSE);
+      'keyCode: ' + inttostr(keyCode));
   {$ENDIF}
   if ((event = nil) or (event.getAction = AKEY_EVENT_ACTION_UP)) and
      (keyCode = AKEYCODE_BACK) then begin
@@ -1450,7 +1547,7 @@ end;
 procedure TALAndroidEditText.TALTextWatcher.afterTextChanged(s: JEditable);
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALAndroidEditText.TALTextWatcher.afterTextChanged', 'control.name: ' + FEditText.FEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALAndroidEditText.TALTextWatcher.afterTextChanged', 'control.name: ' + FEditText.FEditControl.parent.Name);
   {$ENDIF}
   FEditText.fEditControl.DoChange;
 end;
@@ -1484,14 +1581,12 @@ begin
        'TALAndroidEditText.TALEditorActionListener.onEditorAction',
        'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
        'actionId: ' + inttostr(actionId) + ' | ' +
-       'event: ' + JstringToString(event.toString),
-       TalLogType.VERBOSE)
+       'event: ' + JstringToString(event.toString))
    else
      ALLog(
        'TALAndroidEditText.TALEditorActionListener.onEditorAction',
        'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
-       'actionId: ' + inttostr(actionId),
-       TalLogType.VERBOSE);
+       'actionId: ' + inttostr(actionId));
   {$ENDIF}
   //IME_ACTION_DONE: the action key performs a "done" operation, typically meaning there is nothing more to input and the IME will be closed.
   //IME_ACTION_GO: the action key performs a "go" operation to take the user to the target of the text they typed. Typically used, for example, when entering a URL.
@@ -2000,15 +2095,15 @@ begin
   if isfocused and
      (M is TApplicationEventMessage) then begin
     case (M as TApplicationEventMessage).Value.Event of
-      TApplicationEvent.FinishedLaunching: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.FinishedLaunching', TalLogType.VERBOSE);
-      TApplicationEvent.BecameActive: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.BecameActive', TalLogType.VERBOSE);
-      TApplicationEvent.WillBecomeInactive: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillBecomeInactive', TalLogType.VERBOSE);
-      TApplicationEvent.EnteredBackground: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.EnteredBackground', TalLogType.VERBOSE);
-      TApplicationEvent.WillBecomeForeground: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillBecomeForeground', TalLogType.VERBOSE);
-      TApplicationEvent.WillTerminate: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillTerminate', TalLogType.VERBOSE);
-      TApplicationEvent.LowMemory: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.LowMemory', TalLogType.VERBOSE);
-      TApplicationEvent.TimeChange: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.TimeChange', TalLogType.VERBOSE);
-      TApplicationEvent.OpenURL: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.OpenURL', TalLogType.VERBOSE);
+      TApplicationEvent.FinishedLaunching: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.FinishedLaunching');
+      TApplicationEvent.BecameActive: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.BecameActive');
+      TApplicationEvent.WillBecomeInactive: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillBecomeInactive');
+      TApplicationEvent.EnteredBackground: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.EnteredBackground');
+      TApplicationEvent.WillBecomeForeground: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillBecomeForeground');
+      TApplicationEvent.WillTerminate: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillTerminate');
+      TApplicationEvent.LowMemory: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.LowMemory');
+      TApplicationEvent.TimeChange: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.TimeChange');
+      TApplicationEvent.OpenURL: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.OpenURL');
     end;
   end;
   {$ENDIF}
@@ -2025,6 +2120,18 @@ end;
 function TALAndroidEditControl.getLineHeight: Single;
 begin
   result := NativeView.view.getLineHeight / ALGetScreenScale;
+end;
+
+{****************************************************************************************}
+Procedure TALAndroidEditControl.setSelection(const AStart: integer; const AStop: Integer);
+begin
+  NativeView.View.setSelection(aStart, aStop);
+end;
+
+{******************************************************************}
+Procedure TALAndroidEditControl.setSelection(const AIndex: integer);
+begin
+  NativeView.view.setSelection(aindex);
 end;
 
 {$endif}
@@ -2128,7 +2235,7 @@ end;
 function TALIosEditTextField.canBecomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextField.canBecomeFirstResponder', 'control.name: ' + fEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALIosEditTextField.canBecomeFirstResponder', 'control.name: ' + fEditControl.parent.Name);
   {$ENDIF}
   Result := UITextField(Super).canBecomeFirstResponder and TControl(fEditControl.Owner).canFocus;
 end;
@@ -2137,7 +2244,7 @@ end;
 function TALIosEditTextField.becomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextField.becomeFirstResponder', 'control.name: ' + fEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALIosEditTextField.becomeFirstResponder', 'control.name: ' + fEditControl.parent.Name);
   {$ENDIF}
   Result := UITextField(Super).becomeFirstResponder;
   if (not TControl(fEditControl.Owner).IsFocused) then
@@ -2148,7 +2255,7 @@ end;
 procedure TALIosEditTextField.ControlEventEditingChanged;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextField.ControlEventEditingChanged', 'control.name: ' + fEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALIosEditTextField.ControlEventEditingChanged', 'control.name: ' + fEditControl.parent.Name);
   {$ENDIF}
   fEditControl.DoChange;
 end;
@@ -2181,8 +2288,7 @@ begin
   ALLog(
     'TALIosEditTextFieldDelegate.textField',
     'control.name: ' + FEditControl.parent.Name + ' | ' +
-    'replacementString: ' + NSStrToStr(replacementString),
-    TalLogType.VERBOSE);
+    'replacementString: ' + NSStrToStr(replacementString));
   {$ENDIF}
   if FEditControl.maxLength > 0 then begin
     var LText: NSString := TNSString.Wrap(textField.text);
@@ -2225,7 +2331,7 @@ end;
 function TALIosEditTextFieldDelegate.textFieldShouldReturn(textField: UITextField): Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextFieldDelegate.textFieldShouldReturn', 'control.name: ' + FEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALIosEditTextFieldDelegate.textFieldShouldReturn', 'control.name: ' + FEditControl.parent.Name);
   {$ENDIF}
   if assigned(fEditControl.OnReturnKey) then begin
     fEditControl.DoReturnKey;
@@ -2542,6 +2648,22 @@ begin
     result := result * textsettings.LineHeightMultiplier;
 end;
 
+{************************************************************************************}
+Procedure TALIosEditControl.setSelection(const AStart: integer; const AStop: Integer);
+begin
+  var LStartPosition: UITextPosition := NativeView.View.positionFromPosition(NativeView.View.beginningOfDocument, AStart);
+  var LEndPosition: UITextPosition := NativeView.View.positionFromPosition(LStartPosition, AStop - AStart);
+  NativeView.View.setSelectedTextRange(NativeView.View.textRangeFromPosition(LStartPosition, LEndPosition));
+end;
+
+{**************************************************************}
+Procedure TALIosEditControl.setSelection(const AIndex: integer);
+begin
+  var LStartPosition := NativeView.View.positionFromPosition(NativeView.View.beginningOfDocument, AIndex);
+  var LEndPosition := NativeView.View.positionFromPosition(LStartPosition, 0);
+  NativeView.View.setSelectedTextRange(NativeView.View.textRangeFromPosition(LStartPosition, LEndPosition));
+end;
+
 {$endif}
 {$ENDREGION}
 
@@ -2577,7 +2699,7 @@ end;
 function TALMacEditTextField.acceptsFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacEditTextField.acceptsFirstResponder', 'control.name: ' + fEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacEditTextField.acceptsFirstResponder', 'control.name: ' + fEditControl.parent.Name);
   {$ENDIF}
   Result := NSTextField(Super).acceptsFirstResponder and TControl(fEditControl.Owner).canFocus;
 end;
@@ -2586,7 +2708,7 @@ end;
 function TALMacEditTextField.becomeFirstResponder: Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALMacEditTextField.becomeFirstResponder', 'control.name: ' + fEditControl.parent.Name, TalLogType.VERBOSE);
+  ALLog('TALMacEditTextField.becomeFirstResponder', 'control.name: ' + fEditControl.parent.Name);
   {$ENDIF}
   Result := NSTextField(Super).becomeFirstResponder;
   if (not TControl(fEditControl.Owner).IsFocused) then
@@ -2925,6 +3047,18 @@ begin
     result := result * textsettings.LineHeightMultiplier;
 end;
 
+{************************************************************************************}
+Procedure TALMacEditControl.setSelection(const AStart: integer; const AStop: Integer);
+begin
+  NativeView.View.currentEditor.setSelectedRange(NSMakeRange(AStart, AStop-AStart));
+end;
+
+{**************************************************************}
+Procedure TALMacEditControl.setSelection(const AIndex: integer);
+begin
+  NativeView.View.currentEditor.setSelectedRange(NSMakeRange(AIndex, 0));
+end;
+
 {$endif}
 {$ENDREGION}
 
@@ -3061,6 +3195,46 @@ end;
 
 {****************************************************}
 procedure TALWinEditView.WMChar(var Message: TWMChar);
+begin
+  inherited;
+  invalidate;
+  fEditControl.DoChange;
+end;
+
+{**********************************************************}
+procedure TALWinEditView.WMSetText(var Message: TWMSetText);
+begin
+  inherited;
+  invalidate;
+  fEditControl.DoChange;
+end;
+
+{******************************************************}
+procedure TALWinEditView.WMPaste(var Message: TWMPaste);
+begin
+  inherited;
+  invalidate;
+  fEditControl.DoChange;
+end;
+
+{**************************************************}
+procedure TALWinEditView.WMCut(var Message: TWMCut);
+begin
+  inherited;
+  invalidate;
+  fEditControl.DoChange;
+end;
+
+{******************************************************}
+procedure TALWinEditView.WMClear(var Message: TWMClear);
+begin
+  inherited;
+  invalidate;
+  fEditControl.DoChange;
+end;
+
+{****************************************************}
+procedure TALWinEditView.WMUndo(var Message: TWMUndo);
 begin
   inherited;
   invalidate;
@@ -3395,14 +3569,56 @@ begin
   //   result := result * textsettings.LineHeightMultiplier;
 end;
 
+{************************************************************************************}
+Procedure TALWinEditControl.SetSelection(const AStart: integer; const AStop: Integer);
+begin
+  SendMessage(NativeView.Handle, EM_SETSEL, AStart, AStop);
+end;
+
+{**************************************************************}
+Procedure TALWinEditControl.SetSelection(const AIndex: integer);
+begin
+  SendMessage(NativeView.Handle, EM_SETSEL, AIndex, AIndex);
+end;
+
 {$endif}
 {$ENDREGION}
+
+{********************************************************}
+function TALBaseEdit.TStroke.GetDefaultColor: TAlphaColor;
+begin
+  Result := $FF7a7a7a;
+end;
+
+{**************************************************************}
+function TALBaseEdit.TTextSettings.TFont.GetDefaultSize: Single;
+begin
+  Result := 16;
+end;
+
+{*****************************************************}
+function TALBaseEdit.TTextSettings.CreateFont: TALFont;
+begin
+  Result := TFont.create;
+end;
+
+{***********************************************************************}
+function TALBaseEdit.TLabelTextSettings.TMargins.GetDefaultValue: TRectF;
+begin
+  Result := TRectF.Create(0,0,0,-4);
+end;
+
+{*******************************************************************}
+function TALBaseEdit.TLabelTextSettings.TFont.GetDefaultSize: Single;
+begin
+  Result := 12;
+end;
 
 {************************************************}
 constructor TALBaseEdit.TLabelTextSettings.Create;
 begin
   inherited create;
-  FMargins := TBounds.Create(TRectF.Create(0,0,0,-4));
+  FMargins := CreateMargins;
   FMargins.OnChange := MarginsChanged;
   FLayout := TLabelTextLayout.Floating;
   FAnimation := TLabelTextAnimation.Translation;
@@ -3413,6 +3629,18 @@ destructor TALBaseEdit.TLabelTextSettings.Destroy;
 begin
   ALFreeAndNil(FMargins);
   Inherited Destroy;
+end;
+
+{***************************************************************}
+function TALBaseEdit.TLabelTextSettings.CreateMargins: TALBounds;
+begin
+  Result := TMargins.Create;
+end;
+
+{**********************************************************}
+function TALBaseEdit.TLabelTextSettings.CreateFont: TALFont;
+begin
+  Result := TFont.create;
 end;
 
 {*******************************************************************}
@@ -3459,8 +3687,8 @@ begin
   end;
 end;
 
-{************************************************************************}
-procedure TALBaseEdit.TLabelTextSettings.SetMargins(const Value: TBounds);
+{**************************************************************************}
+procedure TALBaseEdit.TLabelTextSettings.SetMargins(const Value: TALBounds);
 begin
   FMargins.Assign(Value);
 end;
@@ -3489,11 +3717,23 @@ begin
   Change;
 end;
 
+{****************************************************************************}
+function TALBaseEdit.TSupportingTextSettings.TMargins.GetDefaultValue: TRectF;
+begin
+  Result := TRectF.Create(0,4,0,0);
+end;
+
+{************************************************************************}
+function TALBaseEdit.TSupportingTextSettings.TFont.GetDefaultSize: Single;
+begin
+  Result := 12;
+end;
+
 {*****************************************************}
 constructor TALBaseEdit.TSupportingTextSettings.Create;
 begin
   inherited create;
-  FMargins := TBounds.Create(TRectF.Create(0,4,0,0));
+  FMargins := CreateMargins;
   FMargins.OnChange := MarginsChanged;
   FLayout := TSupportingTextLayout.Floating;
 end;
@@ -3503,6 +3743,18 @@ destructor TALBaseEdit.TSupportingTextSettings.Destroy;
 begin
   ALFreeAndNil(FMargins);
   Inherited Destroy;
+end;
+
+{********************************************************************}
+function TALBaseEdit.TSupportingTextSettings.CreateMargins: TALBounds;
+begin
+  Result := TMargins.Create;
+end;
+
+{***************************************************************}
+function TALBaseEdit.TSupportingTextSettings.CreateFont: TALFont;
+begin
+  Result := TFont.create;
 end;
 
 {************************************************************************}
@@ -3547,8 +3799,8 @@ begin
   end;
 end;
 
-{*****************************************************************************}
-procedure TALBaseEdit.TSupportingTextSettings.SetMargins(const Value: TBounds);
+{*******************************************************************************}
+procedure TALBaseEdit.TSupportingTextSettings.SetMargins(const Value: TALBounds);
 begin
   FMargins.Assign(Value);
 end;
@@ -3568,44 +3820,71 @@ begin
   Change;
 end;
 
+{************************************************************************}
+function TALBaseEdit.TBaseStateStyle.TStroke.GetDefaultColor: TAlphaColor;
+begin
+  Result := $FF7a7a7a;
+end;
+
+{******************************************************************************}
+function TALBaseEdit.TBaseStateStyle.TTextSettings.TFont.GetDefaultSize: Single;
+begin
+  Result := 16;
+end;
+
+{*********************************************************************}
+function TALBaseEdit.TBaseStateStyle.TTextSettings.CreateFont: TALFont;
+begin
+  Result := TFont.create;
+end;
+
+{***********************************************************************************}
+function TALBaseEdit.TBaseStateStyle.TLabelTextSettings.TFont.GetDefaultSize: Single;
+begin
+  Result := 12;
+end;
+
+{**************************************************************************}
+function TALBaseEdit.TBaseStateStyle.TLabelTextSettings.CreateFont: TALFont;
+begin
+  Result := TFont.create;
+end;
+
+{****************************************************************************************}
+function TALBaseEdit.TBaseStateStyle.TSupportingTextSettings.TFont.GetDefaultSize: Single;
+begin
+  Result := 12;
+end;
+
+{*******************************************************************************}
+function TALBaseEdit.TBaseStateStyle.TSupportingTextSettings.CreateFont: TALFont;
+begin
+  Result := TFont.create;
+end;
+
 {*********************************************************************}
 constructor TALBaseEdit.TBaseStateStyle.Create(const AParent: TObject);
 begin
   inherited Create(AParent);
   //--
-  FDefaultPromptTextColor := TalphaColors.Null;
-  FDefaultTintColor := TalphaColors.Null;
-  //--
-  FPromptTextColor := FDefaultPromptTextColor;
-  FTintColor := FDefaultTintColor;
+  FPromptTextColor := DefaultPromptTextColor;
+  FTintColor := DefaultTintColor;
   //--
   if StateStyleParent <> nil then begin
-    FTextSettings := TStateStyleTextSettings.Create(StateStyleParent.TextSettings);
-    FLabelTextSettings := TStateStyleTextSettings.Create(StateStyleParent.LabelTextSettings);
-    FSupportingTextSettings := TStateStyleTextSettings.Create(StateStyleParent.SupportingTextSettings);
+    FTextSettings := CreateTextSettings(StateStyleParent.TextSettings);
+    FLabelTextSettings := CreateLabelTextSettings(StateStyleParent.LabelTextSettings);
+    FSupportingTextSettings := CreateSupportingTextSettings(StateStyleParent.SupportingTextSettings);
   end
   else if ControlParent <> nil then begin
-    FTextSettings := TStateStyleTextSettings.Create(ControlParent.TextSettings);
-    FLabelTextSettings := TStateStyleTextSettings.Create(ControlParent.LabelTextSettings);
-    FSupportingTextSettings := TStateStyleTextSettings.Create(ControlParent.SupportingTextSettings);
+    FTextSettings := CreateTextSettings(ControlParent.TextSettings);
+    FLabelTextSettings := CreateLabelTextSettings(ControlParent.LabelTextSettings);
+    FSupportingTextSettings := CreateSupportingTextSettings(ControlParent.SupportingTextSettings);
   end
   else begin
-    FTextSettings := TStateStyleTextSettings.Create(nil);
-    FLabelTextSettings := TStateStyleTextSettings.Create(nil);
-    FSupportingTextSettings := TStateStyleTextSettings.Create(nil);
+    FTextSettings := CreateTextSettings(nil);
+    FLabelTextSettings := CreateLabelTextSettings(nil);
+    FSupportingTextSettings := CreateSupportingTextSettings(nil);
   end;
-  //--
-  Stroke.DefaultColor := $FF7a7a7a;
-  Stroke.Color := Stroke.DefaultColor;
-  //--
-  FTextSettings.Font.DefaultSize := 16;
-  FTextSettings.Font.Size := FTextSettings.Font.DefaultSize;
-  //--
-  FLabelTextSettings.Font.DefaultSize := 12;
-  FLabelTextSettings.Font.Size := FLabelTextSettings.Font.DefaultSize;
-  //--
-  FSupportingTextSettings.Font.DefaultSize := 12;
-  FSupportingTextSettings.Font.Size := FSupportingTextSettings.Font.DefaultSize;
   //--
   FTextSettings.OnChanged := TextSettingsChanged;
   FLabelTextSettings.OnChanged := LabelTextSettingsChanged;
@@ -3629,6 +3908,30 @@ begin
   ALFreeAndNil(FLabelTextSettings);
   ALFreeAndNil(FSupportingTextSettings);
   inherited Destroy;
+end;
+
+{******************************************************************************************************}
+function TALBaseEdit.TBaseStateStyle.CreateStroke(const AParent: TALStrokeBrush): TALInheritStrokeBrush;
+begin
+  Result := TStroke.Create(AParent);
+end;
+
+{*************************************************************************************************************************}
+function TALBaseEdit.TBaseStateStyle.CreateTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TTextSettings;
+begin
+  result := TTextSettings.Create(AParent);
+end;
+
+{***********************************************************************************************************************************}
+function TALBaseEdit.TBaseStateStyle.CreateLabelTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TLabelTextSettings;
+begin
+  result := TLabelTextSettings.Create(AParent);
+end;
+
+{*********************************************************************************************************************************************}
+function TALBaseEdit.TBaseStateStyle.CreateSupportingTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TSupportingTextSettings;
+begin
+  result := TSupportingTextSettings.Create(AParent);
 end;
 
 {****************************************************************}
@@ -3803,22 +4106,34 @@ begin
   end;
 end;
 
-{*******************************************************************************************}
-procedure TALBaseEdit.TBaseStateStyle.SetTextSettings(const AValue: TStateStyleTextSettings);
+{*************************************************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.SetTextSettings(const AValue: TBaseStateStyle.TTextSettings);
 begin
   FTextSettings.Assign(AValue);
 end;
 
-{************************************************************************************************}
-procedure TALBaseEdit.TBaseStateStyle.SetLabelTextSettings(const AValue: TStateStyleTextSettings);
+{***********************************************************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.SetLabelTextSettings(const AValue: TBaseStateStyle.TLabelTextSettings);
 begin
   FLabelTextSettings.Assign(AValue);
 end;
 
-{*****************************************************************************************************}
-procedure TALBaseEdit.TBaseStateStyle.SetSupportingTextSettings(const AValue: TStateStyleTextSettings);
+{*********************************************************************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.SetSupportingTextSettings(const AValue: TBaseStateStyle.TSupportingTextSettings);
 begin
   FSupportingTextSettings.Assign(AValue);
+end;
+
+{**************************************************************************}
+function TALBaseEdit.TBaseStateStyle.GetDefaultPromptTextColor: TalphaColor;
+begin
+  Result := TAlphaColors.Null;
+end;
+
+{********************************************************************}
+function TALBaseEdit.TBaseStateStyle.GetDefaultTintColor: TalphaColor;
+begin
+  Result := TAlphaColors.Null;
 end;
 
 {*******************************************************}
@@ -3853,13 +4168,13 @@ end;
 {********************************************************************}
 function TALBaseEdit.TBaseStateStyle.IsPromptTextColorStored: Boolean;
 begin
-  result := FPromptTextColor <> FDefaultPromptTextColor;
+  result := FPromptTextColor <> DefaultPromptTextColor;
 end;
 
 {**************************************************************}
 function TALBaseEdit.TBaseStateStyle.IsTintColorStored: Boolean;
 begin
-  result := FTintColor <> FDefaultTintColor;
+  result := FTintColor <> DefaultTintColor;
 end;
 
 {****************************************************************}
@@ -3920,18 +4235,18 @@ begin
   Result := inherited GetInherit;
 end;
 
-{**********************************************************************}
-constructor TALBaseEdit.TStateStyles.Create(const AParent: TALBaseEdit);
+{*********************************************************************}
+constructor TALBaseEdit.TStateStyles.Create(const AParent: TALControl);
 begin
   inherited Create(AParent);
   //--
-  FDisabled := TDisabledStateStyle.Create(AParent);
+  FDisabled := CreateDisabledStateStyle(AParent);
   FDisabled.OnChanged := DisabledChanged;
   //--
-  FHovered := THoveredStateStyle.Create(AParent);
+  FHovered := CreateHoveredStateStyle(AParent);
   FHovered.OnChanged := HoveredChanged;
   //--
-  FFocused := TFocusedStateStyle.Create(AParent);
+  FFocused := CreateFocusedStateStyle(AParent);
   FFocused.OnChanged := FocusedChanged;
 end;
 
@@ -3944,12 +4259,22 @@ begin
   inherited Destroy;
 end;
 
-{************************************************************************}
-function TALBaseEdit.TStateStyles.CreateSavedState: TALPersistentObserver;
-type
-  TStateStylesClass = class of TStateStyles;
+{******************************************************************************************************}
+function TALBaseEdit.TStateStyles.CreateDisabledStateStyle(const AParent: TObject): TDisabledStateStyle;
 begin
-  result := TStateStylesClass(classtype).Create(nil{AParent});
+  result := TDisabledStateStyle.Create(AParent);
+end;
+
+{****************************************************************************************************}
+function TALBaseEdit.TStateStyles.CreateHoveredStateStyle(const AParent: TObject): THoveredStateStyle;
+begin
+  result := THoveredStateStyle.Create(AParent);
+end;
+
+{****************************************************************************************************}
+function TALBaseEdit.TStateStyles.CreateFocusedStateStyle(const AParent: TObject): TFocusedStateStyle;
+begin
+  Result := TFocusedStateStyle.Create(AParent);
 end;
 
 {*************************************************}
@@ -4113,12 +4438,8 @@ begin
   FAutoTranslate := true;
   fOnChange := nil;
   FOnReturnKey := nil;
-  fOnEnter := nil;
-  fOnExit := nil;
   //--
   FTextSettings := CreateTextSettings;
-  FTextSettings.Font.DefaultSize := 16;
-  FTextSettings.Font.Size := FTextSettings.Font.DefaultSize;
   FTextSettings.OnChanged := TextSettingsChanged;
   //--
   FPromptText := '';
@@ -4127,9 +4448,7 @@ begin
   FTintcolor := TAlphaColors.null;
   //--
   FLabelText := '';
-  FLabelTextSettings := TLabelTextSettings.create;
-  FLabelTextSettings.Font.DefaultSize := 12;
-  FLabelTextSettings.Font.Size := FLabelTextSettings.Font.DefaultSize;
+  FLabelTextSettings := CreateLabelTextSettings;
   FLabelTextSettings.OnChanged := LabelTextSettingsChanged;
   FlabelTextAnimation := TALFloatAnimation.Create;
   FlabelTextAnimation.StartValue := 0;
@@ -4140,15 +4459,12 @@ begin
   FlabelTextAnimation.OnFinish := labelTextAnimationFinish;
   //--
   FSupportingText := '';
-  FSupportingTextSettings := TSupportingTextSettings.Create;
-  FSupportingTextSettings.Font.DefaultSize := 12;
-  FSupportingTextSettings.Font.Size := FSupportingTextSettings.Font.DefaultSize;
+  FSupportingTextSettings := CreateSupportingTextSettings;
   FSupportingTextSettings.OnChanged := SupportingTextSettingsChanged;
   FSupportingTextMarginBottomUpdated := False;
   //--
   FIsTextEmpty := True;
   FNativeViewRemoved := False;
-  FIsAdjustingSize := False;
   //--
   fBufPromptTextDrawable := ALNullDrawable;
   //fBufPromptTextDrawableRect
@@ -4157,21 +4473,13 @@ begin
   fBufSupportingTextDrawable := ALNullDrawable;
   //fBufSupportingTextDrawableRect
   //--
+  {$IF defined(MSWindows) or defined(ALMacOS)}
+  FocusOnMouseDown := True;
+  {$ELSE}
   FocusOnMouseUp := True;
+  {$ENDIF}
   Cursor := crIBeam;
   CanFocus := True;
-  //--
-  var LFillChanged: TNotifyEvent := fill.OnChanged;
-  fill.OnChanged := nil;
-  fill.DefaultColor := $ffffffff;
-  fill.Color := fill.DefaultColor;
-  fill.OnChanged := LFillChanged;
-  //--
-  var LStrokeChanged: TNotifyEvent := stroke.OnChanged;
-  stroke.OnChanged := Nil;
-  stroke.DefaultColor := $FF7a7a7a;
-  stroke.Color := stroke.DefaultColor;
-  stroke.OnChanged := LStrokeChanged;
   //--
   var LPaddingChange: TNotifyEvent := Padding.OnChange;
   Padding.OnChange := nil;
@@ -4182,7 +4490,7 @@ begin
   {$IF defined(ALDPK)}
   FPrevStateStyles := TStateStyles.Create(nil);
   {$ENDIF}
-  FStateStyles := TStateStyles.Create(Self);
+  FStateStyles := CreateStateStyles;
   FStateStyles.OnChanged := StateStylesChanged;
   //--
   {$IF defined(DEBUG)}
@@ -4262,19 +4570,33 @@ begin
 end;
 
 {************************************************}
-procedure TALBaseEdit.SetNewScene(AScene: IScene);
+function TALBaseEdit.CreateStroke: TALStrokeBrush;
 begin
-  inherited SetNewScene(AScene);
-  // At design time, when a new TEdit/TMemo is added to the form,
-  // the size will not adjust and will remain at its default (200x50).
-  // Calling AdjustSize here will correct this.
-  AdjustSize;
+  Result := TStroke.Create;
 end;
 
 {*****************************************************}
 function TALBaseEdit.CreateTextSettings: TTextSettings;
 begin
   result := TTextSettings.Create;
+end;
+
+{***************************************************************}
+function TALBaseEdit.CreateLabelTextSettings: TLabelTextSettings;
+begin
+  result := TLabelTextSettings.Create;
+end;
+
+{*************************************************************************}
+function TALBaseEdit.CreateSupportingTextSettings: TSupportingTextSettings;
+begin
+  result := TSupportingTextSettings.Create;
+end;
+
+{***************************************************}
+function TALBaseEdit.CreateStateStyles: TStateStyles;
+begin
+  Result := TStateStyles.Create(Self);
 end;
 
 {*********************************************************}
@@ -4301,10 +4623,8 @@ begin
   FeditControl.SetSubComponent(True);
   FeditControl.Locked := True;
   FeditControl.OnReturnKey := nil; // noops operation
-  fEditControl.Align := TAlignLayout.Client;
+  fEditControl.Align := TALAlignLayout.Client;
   FeditControl.OnChange := OnChangeImpl;
-  FeditControl.OnEnter := OnEnterImpl;
-  FeditControl.OnExit := OnExitImpl;
   fEditControl.Password := false; // noops operation
   fEditControl.ReturnKeyType := tReturnKeyType.Default;  // noops operation
   fEditControl.KeyboardType := TVirtualKeyboardType.Default; // noops operation
@@ -4325,8 +4645,7 @@ procedure TALBaseEdit.Loaded;
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   procedure _ConvertFontFamily(const AStateStyle: TBaseStateStyle);
   begin
-    if (AStateStyle.TextSettings.Font.AutoConvert) and
-       (AStateStyle.TextSettings.Font.Family <> '') and
+    if (AStateStyle.TextSettings.Font.Family <> '') and
        (not (csDesigning in ComponentState)) then
       AStateStyle.TextSettings.Font.Family := ALConvertFontFamily(AStateStyle.TextSettings.Font.Family);
   end;
@@ -4338,13 +4657,11 @@ begin
   end;
   //--
   // csLoading is in ComponentState
-  if (TextSettings.Font.AutoConvert) and
-     (TextSettings.Font.Family <> '') and
+  if (TextSettings.Font.Family <> '') and
      (not (csDesigning in ComponentState)) then
     TextSettings.Font.Family := ALConvertFontFamily(TextSettings.Font.Family);
   //--
-  if (LabelTextSettings.Font.AutoConvert) and
-     (LabelTextSettings.Font.Family <> '') and
+  if (LabelTextSettings.Font.Family <> '') and
      (not (csDesigning in ComponentState)) then
     LabelTextSettings.Font.Family := ALConvertFontFamily(LabelTextSettings.Font.Family);
   //--
@@ -4352,8 +4669,19 @@ begin
   _ConvertFontFamily(StateStyles.Hovered);
   _ConvertFontFamily(StateStyles.Focused);
   //--
-  // remove csLoading from ComponentState
-  inherited;
+  // AdjustSize will be called in the following call to TextSettingsChanged(TextSettings)
+  // therefore, we must deactivate it in the inherited method to avoid calling it twice.
+  {$IF defined(debug)}
+  if FIsAdjustingSize then
+    Raise Exception.Create('Error D9247DBE-D093-415C-9537-11D7275EF141');
+  {$ENDIF}
+  FIsAdjustingSize := true;
+  Try
+    // remove csLoading from ComponentState
+    inherited;
+  Finally
+    FIsAdjustingSize := False;
+  End;
   //--
   if (AutoTranslate) and
      (PromptText <> '') and
@@ -4374,7 +4702,6 @@ begin
   //--
   TextSettingsChanged(TextSettings);
   //--
-  //AdjustSize; => Already called in TextSettingsChanged
   //UpdateEditControlStyle => Already called in TextSettingsChanged
   //--
   UpdateEditControlPromptText;
@@ -4465,7 +4792,7 @@ begin
 end;
 {$ENDIF}
 
-{******************}
+{********************}
 {$IF defined(ALMacOS)}
 function TALBaseEdit.GetEditControl: TALBaseEditControl;
 begin
@@ -4477,7 +4804,7 @@ begin
 end;
 {$ENDIF}
 
-{******************}
+{********************}
 {$IF defined(ALMacOS)}
 function TALBaseEdit.GetNativeView: TALMacNativeView;
 begin
@@ -4509,7 +4836,7 @@ end;
 procedure TALBaseEdit.DoEnter;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALBaseEdit.DoEnter', 'control.name: ' + Name, TalLogType.VERBOSE);
+  ALLog('TALBaseEdit.DoEnter', 'control.name: ' + Name);
   {$ENDIF}
   inherited DoEnter;
   StateStyles.startTransition;
@@ -4530,7 +4857,7 @@ begin
   if IsFocused then begin
     ALVirtualKeyboardVisible := True;
     {$IF defined(DEBUG)}
-    ALLog('TALBaseEdit.showVirtualKeyboard', 'control.name: ' + Name, TalLogType.VERBOSE);
+    ALLog('TALBaseEdit.showVirtualKeyboard', 'control.name: ' + Name);
     {$ENDIF}
     MainActivity.getVirtualKeyboard.showFor(NativeView.View);
   end;
@@ -4541,7 +4868,7 @@ end;
 procedure TALBaseEdit.DoExit;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALBaseEdit.DoExit', 'control.name: ' + Name, TalLogType.VERBOSE);
+  ALLog('TALBaseEdit.DoExit', 'control.name: ' + Name);
   {$ENDIF}
   inherited DoExit;
   StateStyles.startTransition;
@@ -4566,7 +4893,7 @@ begin
     begin
       If not ALVirtualKeyboardVisible then begin
         {$IF defined(DEBUG)}
-        ALLog('TALBaseEdit.hideVirtualKeyboard', TalLogType.VERBOSE);
+        ALLog('TALBaseEdit.hideVirtualKeyboard');
         {$ENDIF}
         MainActivity.getVirtualKeyboard.hide;
       end;
@@ -4697,7 +5024,6 @@ procedure TALBaseEdit.TextSettingsChanged(Sender: TObject);
       if APrevStateStyle.TextSettings.font.Slant = AToStateStyle.TextSettings.font.Slant then AToStateStyle.TextSettings.font.Slant := TextSettings.font.Slant;
       if APrevStateStyle.TextSettings.font.Stretch = AToStateStyle.TextSettings.font.Stretch then AToStateStyle.TextSettings.font.Stretch := TextSettings.font.Stretch;
       if APrevStateStyle.TextSettings.font.Color = AToStateStyle.TextSettings.font.Color then AToStateStyle.TextSettings.font.Color := TextSettings.font.Color;
-      if APrevStateStyle.TextSettings.font.AutoConvert = AToStateStyle.TextSettings.font.AutoConvert then AToStateStyle.TextSettings.font.AutoConvert := TextSettings.font.AutoConvert;
 
     end;
 
@@ -4707,7 +5033,6 @@ procedure TALBaseEdit.TextSettingsChanged(Sender: TObject);
     APrevStateStyle.TextSettings.font.Slant := TextSettings.font.Slant;
     APrevStateStyle.TextSettings.font.Stretch := TextSettings.font.Stretch;
     APrevStateStyle.TextSettings.font.Color := TextSettings.font.Color;
-    APrevStateStyle.TextSettings.font.AutoConvert := TextSettings.font.AutoConvert;
 
   end;
   {$ENDIF}
@@ -4801,7 +5126,6 @@ procedure TALBaseEdit.LabelTextSettingsChanged(Sender: TObject);
       if APrevStateStyle.LabelTextSettings.font.Slant = AToStateStyle.LabelTextSettings.font.Slant then AToStateStyle.LabelTextSettings.font.Slant := LabelTextSettings.font.Slant;
       if APrevStateStyle.LabelTextSettings.font.Stretch = AToStateStyle.LabelTextSettings.font.Stretch then AToStateStyle.LabelTextSettings.font.Stretch := LabelTextSettings.font.Stretch;
       if APrevStateStyle.LabelTextSettings.font.Color = AToStateStyle.LabelTextSettings.font.Color then AToStateStyle.LabelTextSettings.font.Color := LabelTextSettings.font.Color;
-      if APrevStateStyle.LabelTextSettings.font.AutoConvert = AToStateStyle.LabelTextSettings.font.AutoConvert then AToStateStyle.LabelTextSettings.font.AutoConvert := LabelTextSettings.font.AutoConvert;
 
     end;
 
@@ -4811,7 +5135,6 @@ procedure TALBaseEdit.LabelTextSettingsChanged(Sender: TObject);
     APrevStateStyle.LabelTextSettings.font.Slant := LabelTextSettings.font.Slant;
     APrevStateStyle.LabelTextSettings.font.Stretch := LabelTextSettings.font.Stretch;
     APrevStateStyle.LabelTextSettings.font.Color := LabelTextSettings.font.Color;
-    APrevStateStyle.LabelTextSettings.font.AutoConvert := LabelTextSettings.font.AutoConvert;
 
   end;
   {$ENDIF}
@@ -4855,7 +5178,6 @@ procedure TALBaseEdit.SupportingTextSettingsChanged(Sender: TObject);
       if APrevStateStyle.SupportingTextSettings.font.Slant = AToStateStyle.SupportingTextSettings.font.Slant then AToStateStyle.SupportingTextSettings.font.Slant := SupportingTextSettings.font.Slant;
       if APrevStateStyle.SupportingTextSettings.font.Stretch = AToStateStyle.SupportingTextSettings.font.Stretch then AToStateStyle.SupportingTextSettings.font.Stretch := SupportingTextSettings.font.Stretch;
       if APrevStateStyle.SupportingTextSettings.font.Color = AToStateStyle.SupportingTextSettings.font.Color then AToStateStyle.SupportingTextSettings.font.Color := SupportingTextSettings.font.Color;
-      if APrevStateStyle.SupportingTextSettings.font.AutoConvert = AToStateStyle.SupportingTextSettings.font.AutoConvert then AToStateStyle.SupportingTextSettings.font.AutoConvert := SupportingTextSettings.font.AutoConvert;
 
     end;
 
@@ -4865,7 +5187,6 @@ procedure TALBaseEdit.SupportingTextSettingsChanged(Sender: TObject);
     APrevStateStyle.SupportingTextSettings.font.Slant := SupportingTextSettings.font.Slant;
     APrevStateStyle.SupportingTextSettings.font.Stretch := SupportingTextSettings.font.Stretch;
     APrevStateStyle.SupportingTextSettings.font.Color := SupportingTextSettings.font.Color;
-    APrevStateStyle.SupportingTextSettings.font.AutoConvert := SupportingTextSettings.font.AutoConvert;
 
   end;
   {$ENDIF}
@@ -5133,26 +5454,6 @@ begin
   else EditControl.onReturnKey := nil;
 end;
 
-{*************************************************}
-procedure TALBaseEdit.OnEnterImpl(Sender: TObject);
-begin
-  {$IF defined(DEBUG)}
-  if (csLoading in componentState) then raise Exception.Create('Error 7438D305-07BC-4CD9-80E3-4E0FCAA8D446');
-  {$ENDIF}
-  if assigned(fOnEnter) then
-    fOnEnter(self);
-end;
-
-{************************************************}
-procedure TALBaseEdit.OnExitImpl(Sender: TObject);
-begin
-  {$IF defined(DEBUG)}
-  if (csLoading in componentState) then raise Exception.Create('Error B36DA0AF-D894-466B-85ED-BD1D7A85627D');
-  {$ENDIF}
-  if assigned(fOnExit) then
-    fOnExit(self);
-end;
-
 {***********************************}
 procedure TALBaseEdit.EnabledChanged;
 begin
@@ -5165,9 +5466,8 @@ end;
 {***********************************}
 procedure TALBaseEdit.PaddingChanged;
 begin
-  Inherited;
   clearBufDrawable;
-  AdjustSize;
+  Inherited;
 end;
 
 {***************************************************}
@@ -5189,13 +5489,6 @@ procedure TALBaseEdit.FillChanged(Sender: TObject);
 begin
   inherited;
   UpdateEditControlStyle;
-end;
-
-{******************************}
-procedure TALBaseEdit.DoResized;
-begin
-  inherited;
-  AdjustSize;
 end;
 
 {************************************************}
@@ -5263,13 +5556,18 @@ begin
     //--
     //LOptions.FillColor: TAlphaColor; // default = TAlphaColors.null
     //LOptions.FillGradientStyle: TGradientStyle; // Default = TGradientStyle.Linear;
+    //LOptions.FillGradientAngle: Single; // Default = 180;
     //LOptions.FillGradientColors: TArray<TAlphaColor>; // Default = [];
     //LOptions.FillGradientOffsets: TArray<Single>; // Default = [];
-    //LOptions.FillGradientAngle: Single; // Default = 180;
     //LOptions.FillResourceName: String; // default = ''
-    //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
+    //LOptions.FillMaskResourceName: String; // default = ''
+    //LOptions.FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     //LOptions.FillBackgroundMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageMargins: TRectF; // default = TRectF.Empty
+    //LOptions.FillImageNoRadius: Boolean; // default = False
+    //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
+    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    //LOptions.FillBlurRadius: single; // default = 0
     //--
     //LOptions.StateLayerOpacity: Single; // Default = 0
     //LOptions.StateLayerColor: TAlphaColor; // Default = TAlphaColors.null
@@ -5388,13 +5686,18 @@ begin
     //--
     //LOptions.FillColor: TAlphaColor; // default = TAlphaColors.null
     //LOptions.FillGradientStyle: TGradientStyle; // Default = TGradientStyle.Linear;
+    //LOptions.FillGradientAngle: Single; // Default = 180;
     //LOptions.FillGradientColors: TArray<TAlphaColor>; // Default = [];
     //LOptions.FillGradientOffsets: TArray<Single>; // Default = [];
-    //LOptions.FillGradientAngle: Single; // Default = 180;
     //LOptions.FillResourceName: String; // default = ''
-    //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
+    //LOptions.FillMaskResourceName: String; // default = ''
+    //LOptions.FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     //LOptions.FillBackgroundMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageMargins: TRectF; // default = TRectF.Empty
+    //LOptions.FillImageNoRadius: Boolean; // default = False
+    //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
+    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    //LOptions.FillBlurRadius: single; // default = 0
     //--
     //LOptions.StateLayerOpacity: Single; // Default = 0
     //LOptions.StateLayerColor: TAlphaColor; // Default = TAlphaColors.null
@@ -5513,13 +5816,18 @@ begin
     //--
     //LOptions.FillColor: TAlphaColor; // default = TAlphaColors.null
     //LOptions.FillGradientStyle: TGradientStyle; // Default = TGradientStyle.Linear;
+    //LOptions.FillGradientAngle: Single; // Default = 180;
     //LOptions.FillGradientColors: TArray<TAlphaColor>; // Default = [];
     //LOptions.FillGradientOffsets: TArray<Single>; // Default = [];
-    //LOptions.FillGradientAngle: Single; // Default = 180;
     //LOptions.FillResourceName: String; // default = ''
-    //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
+    //LOptions.FillMaskResourceName: String; // default = ''
+    //LOptions.FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     //LOptions.FillBackgroundMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageMargins: TRectF; // default = TRectF.Empty
+    //LOptions.FillImageNoRadius: Boolean; // default = False
+    //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
+    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    //LOptions.FillBlurRadius: single; // default = 0
     //--
     //LOptions.StateLayerOpacity: Single; // Default = 0
     //LOptions.StateLayerColor: TAlphaColor; // Default = TAlphaColors.null
@@ -5804,7 +6112,7 @@ begin
 end;
 
 {***********************************************}
-procedure TALBaseEdit.clearBufPromptTextDrawable;
+procedure TALBaseEdit.ClearBufPromptTextDrawable;
 begin
   ALFreeAndNilDrawable(fBufPromptTextDrawable);
   if FStateStyles <> nil then
@@ -5812,7 +6120,7 @@ begin
 end;
 
 {**********************************************}
-procedure TALBaseEdit.clearBufLabelTextDrawable;
+procedure TALBaseEdit.ClearBufLabelTextDrawable;
 begin
   ALFreeAndNilDrawable(fBufLabelTextDrawable);
   if FStateStyles <> nil then
@@ -5820,7 +6128,7 @@ begin
 end;
 
 {***************************************************}
-procedure TALBaseEdit.clearBufSupportingTextDrawable;
+procedure TALBaseEdit.ClearBufSupportingTextDrawable;
 begin
   if (FSupportingTextMarginBottomUpdated) and
      (not ALIsDrawableNull(fBufSupportingTextDrawable)) and
@@ -5832,6 +6140,53 @@ begin
   if FStateStyles <> nil then
     FStateStyles.clearBufSupportingTextDrawable;
 end;
+
+{*****************************}
+{$IF NOT DEFINED(ALSkiaCanvas)}
+function TALBaseEdit.GetRenderTargetRect(const ARect: TrectF): TRectF;
+begin
+  if StateStyles.IsTransitionAnimationRunning then begin
+    Result := ARect;
+    if StateStyles.TransitionFrom <> nil then begin
+      var LFromSurfaceRect := ALGetShapeSurfaceRect(
+                                ARect, // const ARect: TRectF;
+                                _TALBaseStateStyleAccessProtected(StateStyles.TransitionFrom).Fill, // const AFill: TALBrush;
+                                nil, // const AFillResourceStream: TStream;
+                                _TALBaseStateStyleAccessProtected(StateStyles.TransitionFrom).StateLayer, // const AStateLayer: TALStateLayer;
+                                _TALBaseStateStyleAccessProtected(StateStyles.TransitionFrom).Shadow); // const AShadow: TALShadow): TRectF;
+      Result := TRectF.Union(Result, LFromSurfaceRect); // add the extra space needed to draw the shadow/statelayer
+    end;
+    if StateStyles.TransitionTo <> nil then begin
+      var LToSurfaceRect := ALGetShapeSurfaceRect(
+                              ARect, // const ARect: TRectF;
+                              _TALBaseStateStyleAccessProtected(StateStyles.TransitionTo).Fill, // const AFill: TALBrush;
+                              nil, // const AFillResourceStream: TStream;
+                              _TALBaseStateStyleAccessProtected(StateStyles.TransitionTo).StateLayer, // const AStateLayer: TALStateLayer;
+                              _TALBaseStateStyleAccessProtected(StateStyles.TransitionTo).Shadow); // const AShadow: TALShadow): TRectF;
+      Result := TRectF.Union(Result, LToSurfaceRect); // add the extra space needed to draw the shadow/statelayer
+    end;
+  end
+  else begin
+    var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
+    if LStateStyle <> nil then begin
+      Result := ALGetShapeSurfaceRect(
+                  ARect, // const ARect: TRectF;
+                  LStateStyle.Fill, // const AFill: TALBrush;
+                  nil, // const AFillResourceStream: TStream;
+                  LStateStyle.StateLayer, // const AStateLayer: TALStateLayer;
+                  LStateStyle.Shadow); // const AShadow: TALShadow): TRectF;
+    end
+    else begin
+      Result := ALGetShapeSurfaceRect(
+                  ARect, // const ARect: TRectF;
+                  Fill, // const AFill: TALBrush;
+                  nil, // const AFillResourceStream: TStream;
+                  nil, // const AStateLayer: TALStateLayer;
+                  Shadow); // const AShadow: TALShadow): TRectF;
+    end;
+  end;
+end;
+{$ENDIF}
 
 {**************************}
 procedure TALBaseEdit.Paint;
@@ -5884,22 +6239,19 @@ begin
                                                   true); // Const ASaveState: Boolean);
       try
 
-        ALDrawRectangle(
-          TSkCanvasCustom(Canvas).Canvas.Handle, // const ACanvas: TALCanvas;
-          1, // const AScale: Single;
-          IsPixelAlignmentEnabled, // const AAlignToPixel: Boolean;
-          LocalRect, // const Rect: TrectF;
-          AbsoluteOpacity, // const AOpacity: Single;
-          LCurrentAdjustedStateStyle.Fill, // const Fill: TALBrush;
-          LCurrentAdjustedStateStyle.StateLayer, // const StateLayer: TALStateLayer;
-          LCurrentAdjustedStateStyle.TextSettings.Font.Color, // const AStateLayerContentColor: TAlphaColor;
-          True, // const ADrawStateLayerOnTop: Boolean;
-          LCurrentAdjustedStateStyle.Stroke, // const Stroke: TALStrokeBrush;
-          LCurrentAdjustedStateStyle.Shadow, // const Shadow: TALShadow
-          Sides, // const Sides: TSides;
-          Corners, // const Corners: TCorners;
-          XRadius, // const XRadius: Single = 0;
-          YRadius); // const YRadius: Single = 0);
+        TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
+          .SetAlignToPixel(IsPixelAlignmentEnabled)
+          .SetDstRect(LocalRect)
+          .SetOpacity(AbsoluteOpacity)
+          .SetFill(LCurrentAdjustedStateStyle.Fill)
+          .SetStateLayer(LCurrentAdjustedStateStyle.StateLayer, LCurrentAdjustedStateStyle.TextSettings.Font.Color)
+          .SetStroke(LCurrentAdjustedStateStyle.Stroke)
+          .SetShadow(LCurrentAdjustedStateStyle.Shadow)
+          .SetSides(Sides)
+          .SetCorners(Corners)
+          .SetXRadius(XRadius)
+          .SetYRadius(YRadius)
+          .Draw;
 
       finally
         if LCanvasSaveState <> nil then
@@ -5908,89 +6260,66 @@ begin
 
       {$ELSE}
 
-      if StateStyles.IsTransitionAnimationRunning then begin
+      var LRect := LocalRect;
+      InitRenderTargets(LRect);
+      if ALCanvasBeginScene(RenderTargetCanvas) then
+      try
 
-        var LRect := LocalRect;
-        var LBufSurface: TALSurface;
-        var LBufCanvas: TALCanvas;
-        var LBufDrawable: TALDrawable;
-        StateStyles.GetTransitionBufSurface(
-          LRect, // var ARect: TrectF;
-          ALGetScreenScale, // const AScale: Single;
-          LBufSurface, // out ABufSurface: TALSurface;
-          LBufCanvas, // out ABufCanvas: TALCanvas;
-          LBufDrawable); // out ABufDrawable: TALDrawable);
+        ALClearCanvas(RenderTargetCanvas, TAlphaColors.Null);
 
-        if ALCanvasBeginScene(LBufCanvas) then
-        try
+        TALDrawRectangleHelper.Create(RenderTargetCanvas)
+          .SetScale(ALGetScreenScale)
+          .SetAlignToPixel(IsPixelAlignmentEnabled)
+          .SetDstRect(LocalRect)
+          .SetFill(LCurrentAdjustedStateStyle.Fill)
+          .SetStateLayer(LCurrentAdjustedStateStyle.StateLayer, LCurrentAdjustedStateStyle.TextSettings.Font.Color)
+          .SetStroke(LCurrentAdjustedStateStyle.Stroke)
+          .SetShadow(LCurrentAdjustedStateStyle.Shadow)
+          .SetSides(Sides)
+          .SetCorners(Corners)
+          .SetXRadius(XRadius)
+          .SetYRadius(YRadius)
+          .Draw;
 
-          ALClearCanvas(LBufCanvas, TAlphaColors.Null);
+      finally
+        ALCanvasEndScene(RenderTargetCanvas)
+      end;
 
-          ALDrawRectangle(
-            LBufCanvas, // const ACanvas: TALCanvas;
-            ALGetScreenScale, // const AScale: Single;
-            IsPixelAlignmentEnabled, // const AAlignToPixel: Boolean;
-            LocalRect, // const Rect: TrectF;
-            1, // const AOpacity: Single;
-            LCurrentAdjustedStateStyle.Fill, // const Fill: TALBrush;
-            LCurrentAdjustedStateStyle.StateLayer, // const StateLayer: TALStateLayer;
-            LCurrentAdjustedStateStyle.TextSettings.Font.Color, // const AStateLayerContentColor: TAlphaColor;
-            True, // const ADrawStateLayerOnTop: Boolean;
-            LCurrentAdjustedStateStyle.Stroke, // const Stroke: TALStrokeBrush;
-            LCurrentAdjustedStateStyle.Shadow, // const Shadow: TALShadow
-            Sides, // const Sides: TSides;
-            Corners, // const Corners: TCorners;
-            XRadius, // const XRadius: Single = 0;
-            YRadius); // const YRadius: Single = 0);
+      ALUpdateDrawableFromSurface(RenderTargetSurface, RenderTargetDrawable);
 
-        finally
-          ALCanvasEndScene(LBufCanvas)
-        end;
+      // The Shadow or Statelayer are not included in the dimensions of the LRect rectangle.
+      // However, the LRect rectangle is offset by the dimensions of the shadow/Statelayer.
+      LRect.Offset(-2*LRect.Left, -2*LRect.Top);
 
-        ALUpdateDrawableFromSurface(LBufSurface, LBufDrawable);
+      // LRect must include the LScale
+      LRect.Top := LRect.Top * LCurrentAdjustedStateStyle.Scale;
+      LRect.right := LRect.right * LCurrentAdjustedStateStyle.Scale;
+      LRect.left := LRect.left * LCurrentAdjustedStateStyle.Scale;
+      LRect.bottom := LRect.bottom * LCurrentAdjustedStateStyle.Scale;
 
-        // The Shadow or Statelayer are not included in the dimensions of the LRect rectangle.
-        // However, the LRect rectangle is offset by the dimensions of the shadow/Statelayer.
-        LRect.Offset(-2*LRect.Left, -2*LRect.Top);
+      // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect
+      // (due to autosizing with different font sizes), we must center LStateStyle.BufDrawableRect
+      // within the main BufDrawableRect to ensure that all changes are visually centered.
+      var LMainDrawableRect := BufDrawableRect;
+      LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
+      var LCenteredRect := LRect.CenterAt(LMainDrawableRect);
+      LRect.Offset(LCenteredRect.Left, LCenteredRect.top);
 
-        // LRect must include the LScale
-        LRect.Top := LRect.Top * LCurrentAdjustedStateStyle.Scale;
-        LRect.right := LRect.right * LCurrentAdjustedStateStyle.Scale;
-        LRect.left := LRect.left * LCurrentAdjustedStateStyle.Scale;
-        LRect.bottom := LRect.bottom * LCurrentAdjustedStateStyle.Scale;
-
-        // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect
-        // (due to autosizing with different font sizes), we must center LStateStyle.BufDrawableRect
-        // within the main BufDrawableRect to ensure that all changes are visually centered.
-        var LMainDrawableRect := BufDrawableRect;
-        LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
-        var LCenteredRect := LRect.CenterAt(LMainDrawableRect);
-        LRect.Offset(LCenteredRect.Left, LCenteredRect.top);
-
-        // We cannot use the matrix because, if we do, ALAlignToPixelRound in ALDrawDrawable
-        // will be ineffective since the matrix will no longer be a simple translation matrix.
-        // In such a case, TCustomCanvasGpu(ACanvas).DrawTexture may produce border artifacts
-        // if the texture is not perfectly pixel-aligned.
-        var LDstRect := TRectF.Create(0, 0, ALGetDrawableWidth(LBufDrawable), ALGetDrawableHeight(LBufDrawable));
-        LDstRect.Width := (LDstRect.Width / ALGetScreenScale) * LCurrentAdjustedStateStyle.Scale;
-        LDstRect.height := (LDstRect.height / ALGetScreenScale) * LCurrentAdjustedStateStyle.Scale;
-        LDstRect.SetLocation(
-          LRect.Left,
-          LRect.Top);
-        ALDrawDrawable(
-          Canvas, // const ACanvas: Tcanvas;
-          LBufDrawable, // const ADrawable: TALDrawable;
-          LDstRect, // const ADstRect: TrectF; // IN Virtual pixels !
-          AbsoluteOpacity); // const AOpacity: Single)
-
-      end
-
-      {$IF defined(DEBUG)}
-      else if not doublebuffered then begin
-        ALLog('TALBaseEdit.Paint', 'Controls that are not double-buffered only work when SKIA is enabled', TALLogType.ERROR);
-        exit;
-      end
-      {$ENDIF};
+      // We cannot use the matrix because, if we do, ALAlignToPixelRound in ALDrawDrawable
+      // will be ineffective since the matrix will no longer be a simple translation matrix.
+      // In such a case, TCustomCanvasGpu(ACanvas).DrawTexture may produce border artifacts
+      // if the texture is not perfectly pixel-aligned.
+      var LDstRect := TRectF.Create(0, 0, ALGetDrawableWidth(RenderTargetDrawable), ALGetDrawableHeight(RenderTargetDrawable));
+      LDstRect.Width := (LDstRect.Width / ALGetScreenScale) * LCurrentAdjustedStateStyle.Scale;
+      LDstRect.height := (LDstRect.height / ALGetScreenScale) * LCurrentAdjustedStateStyle.Scale;
+      LDstRect.SetLocation(
+        LRect.Left,
+        LRect.Top);
+      ALDrawDrawable(
+        Canvas, // const ACanvas: Tcanvas;
+        RenderTargetDrawable, // const ADrawable: TALDrawable;
+        LDstRect, // const ADstRect: TrectF; // IN Virtual pixels !
+        AbsoluteOpacity); // const AOpacity: Single)
 
       {$ENDIF}
 
@@ -6198,6 +6527,18 @@ begin
   EditControl.RemoveNativeView;
 end;
 
+{******************************************************************************}
+Procedure TALBaseEdit.SetSelection(const AStart: integer; const AStop: Integer);
+begin
+  EditControl.SetSelection(AStart, AStop);
+end;
+
+{********************************************************}
+Procedure TALBaseEdit.SetSelection(const AIndex: integer);
+begin
+  EditControl.SetSelection(AIndex);
+end;
+
 {*****************************************}
 function TALBaseEdit.getLineCount: integer;
 begin
@@ -6217,41 +6558,10 @@ begin
   FAutoSize := True;
 end;
 
-{************************************}
-function TALEdit.GetAutoSize: Boolean;
-begin
-  result := FAutoSize;
-end;
-
 {**************************************************}
 function TALEdit.HasUnconstrainedAutosizeX: Boolean;
 begin
   result := False;
-end;
-
-{**************************************************}
-function TALEdit.HasUnconstrainedAutosizeY: Boolean;
-begin
-  result := (GetAutoSize) and
-            (not (Align in [TAlignLayout.Client,
-                            TAlignLayout.Contents,
-                            TAlignLayout.Left,
-                            TAlignLayout.Right,
-                            TAlignLayout.MostLeft,
-                            TAlignLayout.MostRight,
-                            TAlignLayout.Vertical,
-                            TAlignLayout.HorzCenter]))
-end;
-
-{**************************************************}
-procedure TALEdit.SetAutoSize(const Value: Boolean);
-begin
-  if FAutoSize <> Value then
-  begin
-    FAutoSize := Value;
-    AdjustSize;
-    repaint;
-  end;
 end;
 
 {***************************}
@@ -6259,8 +6569,21 @@ procedure TALEdit.AdjustSize;
 begin
   if (not (csLoading in ComponentState)) and // loaded will call again AdjustSize
      (not (csDestroying in ComponentState)) and // if csDestroying do not do autosize
+     (scene <> nil) and // SetNewScene will call again AdjustSize
      (TNonReentrantHelper.EnterSection(FIsAdjustingSize)) then begin // non-reantrant
     try
+
+      if isupdating then begin
+        FAdjustSizeOnEndUpdate := True;
+        Exit;
+      end
+      else
+        FAdjustSizeOnEndUpdate := False;
+
+      {$IF defined(debug)}
+      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeX)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeY));
+      {$ENDIF}
+
       Var LInlinedLabelText := (LabelText <> '') and (LabelTextSettings.Layout = TLabelTextLayout.Inline);
       if LInlinedLabelText then MakeBufLabelTextDrawable;
 
@@ -6278,14 +6601,14 @@ begin
         if IsPixelAlignmentEnabled then LLineHeight := ALAlignDimensionToPixelRound(LLineHeight, ALGetScreenScale, TEpsilon.Position);
 
         If LInlinedLabelText then begin
-          SetBounds(
+          SetFixedSizeBounds(
             Position.X,
             Position.Y,
             Width,
             LLineHeight + LStrokeSize.Top + LStrokeSize.bottom + padding.Top + padding.Bottom + BufLabelTextDrawableRect.Height + LabelTextSettings.Margins.Top + LabelTextSettings.Margins.bottom);
         end
         else begin
-          SetBounds(
+          SetFixedSizeBounds(
             Position.X,
             Position.Y,
             Width,

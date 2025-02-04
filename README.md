@@ -23,6 +23,30 @@ visibility and growth.
 Example of an App Built with Alcinoe
 ------------------------------------
 
+#### Alcinoe Firemonkey Controls Demo ####
+
+The Alcinoe FireMonkey Controls Demo highlights the power and 
+flexibility of Alcinoe's UI components. It demonstrates how to 
+build high-performance, visually stunning, and responsive 
+FireMonkey applications with ease, showcasing advanced 
+features and custom styling capabilities.
+
+<p align="left">
+  <a href="https://play.google.com/store/apps/details?id=io.magicfoundation.alcinoe.alfmxcontrolsdemo"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxcontrolsdemo.png?raw=true" alt="Alcinoe Firemonkey Controls Demo" /></a>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" width="25" />
+  <a href="https://play.google.com/store/apps/details?id=io.magicfoundation.alcinoe.alfmxcontrolsdemo"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxcontrolsdemogoogleplay.png?raw=true" alt="Alcinoe Firemonkey Controls Demo" /></a>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" width="25" />
+  <a href="https://apps.apple.com/app/alcinoe-firemonkey-controls/id6738398604"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxcontrolsdemoappstore.png?raw=true" alt="Alcinoe Firemonkey Controls Demo" /></a>
+</p>
+  
+#### KisKis ####
+
+KisKis is a dating app crafted in Delphi using the Alcinoe framework, 
+offering a sleek, modern, and responsive platform for connecting people. 
+Leveraging Alcinoe's advanced UI controls and optimized performance 
+capabilities, KisKis delivers an engaging and seamless user experience, 
+making meaningful connections more accessible and enjoyable.
+
 <a href="https://www.youtube.com/watch?v=IJzEuZTSXDI&vq=hd2160">
   <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/youtubekiskis.jpg?raw=true"/>
 </a>
@@ -48,7 +72,6 @@ forced to apply patches to the original Delphi source files:
 * [Allow TTexture to Define a GL_TEXTURE_EXTERNAL_OES Target](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1550)
 * [Make CanvasHelper of TCanvasGpu public](https://quality.embarcadero.com/browse/RSP-18797)
 * [Allow TTexture to Define a Material (GLSL Shader) to Use](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1549)
-* [dorealign implemented badly](https://quality.embarcadero.com/browse/RSP-15768)
 * [On iOS we need to pass options: PNSDictionary with the message TApplicationEvent.FinishedLaunching](https://quality.embarcadero.com/browse/RSP-40351)
 * [AVPlayerItem miss the function addOutput](https://quality.embarcadero.com/browse/RSP-16853)
 * [CLVisit is missing from the implementation of CLLocationManager](https://quality.embarcadero.com/browse/RSP-18621)
@@ -78,7 +101,9 @@ forced to apply patches to the original Delphi source files:
 * [Missing Method Declarations in UITextView and UITextField Interfaces in iOSapi.UIKit.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1941)
 * [Incorrect External Declarations in System.Skia.API for Android Linking in Athens 12.2](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1997)
 * [Add Additional Notification Icon Sizes for iOS 16+](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2171)
-
+* [Update TAlignLayout to Include New Alignment Options for Centering Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342)
+* [Enhance TCustomForm.DoAddObject to Properly Handle FUpdating State for Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2388)
+* [Add the CAFrameRateRange record and preferredFramesPerSecond/preferredFrameRateRange to CADisplayLink](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2424)
 
 Install Alcinoe
 ---------------
@@ -1008,3 +1033,50 @@ exclusively in your code, even when handling UTF-8 content.
 Always ensure that **AnsiString** is paired with 
 `SetMultiByteConversionCodePage(CP_UTF8)` to prevent 
 undesired conversions. 
+
+History
+=======
+
+#### 12/15/2024 #### 
+
+- **Default Fill Color Change**  
+  The default fill color of `TALBrush` has been updated to **white** (previously `$FFE0E0E0`).  
+  This change affects the default fill color of components such as `TALRectangle` and `TALCircle`.  
+
+- **Removal of `TALFont.AutoConvert` Property**  
+  The `AutoConvert` property has been removed from `TALFont`.  
+  Its behavior is now always **enabled** (equivalent to `AutoConvert = True`).
+  
+#### 12/20/2024 ####
+
+- Added `FillMaskResourceName`, `FillMaskBitmap`, `FillImageNoRadius`, `FillCropCenter`, 
+  and `FillBlurRadius` properties to `TALMultiLineTextOptions`.  
+- Introduced global variables `ALBrokenImageResourceName`, `ALBrokenImageWidth`, and 
+  `ALBrokenImageHeight` to define the image shown when downloading an image in `TALImage` fails.  
+- Added the `TALPosition` component, a lightweight version of `TPosition`.  
+- Removed `ALGetResourceDirectory`.  
+- Introduced the `TALBitmap` type, along with the `ALNullBitmap` constant and the 
+  `ALIsBitmapNull` and `ALFreeAndNilBitmap` functions.  
+- Renamed the following functions:  
+  - `ALCreateBitmapFromSkPixmap`, `ALCreateBitmapFromSkSurface`, `ALCreateBitmapFromSkImage` 
+     to `ALCreateTBitmapFromSkPixmap`, `ALCreateTBitmapFromSkSurface`, `ALCreateTBitmapFromSkImage`.  
+  - `ALUpdateBitmapFromSkPixmap`, `ALUpdateBitmapFromSkSurface`, `ALUpdateBitmapFromSkImage` 
+     to `ALUpdateTBitmapFromSkPixmap`, `ALUpdateTBitmapFromSkSurface`, `ALUpdateTBitmapFromSkImage`.  
+  - `ALCreateBitmapFromCGContextRef`, `ALUpdateBitmapFromCGContextRef` to 
+    `ALCreateTBitmapFromCGContextRef`, `ALUpdateTBitmapFromCGContextRef`.  
+  - `ALCreateTextureFromBitmapSurface`, `ALCreateTextureFromBitmap`, `ALUpdateTextureFromBitmapSurface`, 
+    `ALUpdateTextureFromBitmap` to `ALCreateTextureFromTBitmapSurface`, `ALCreateTextureFromTBitmap`, 
+    `ALUpdateTextureFromTBitmapSurface`, `ALUpdateTextureFromTBitmap`.  
+- Corrected typo in `ALGetImageDimensions`.  
+- Added `ALGetExifOrientationInfo` to retrieve ExifOrientationInfo from a stream as 
+  well as from a file name.  
+- Added `AFillResourceStream` parameter to `ALGetShapeSurfaceRect`.  
+- Removed all auto-generated `ALLoadFromxxx` functions from `alcinoe.FMX.Graphics`. 
+  Use `ALCreatexxxFromResource` functions instead.  
+- Replaced the `ALDrawRectangle` function with the `TALDrawRectangleHelper` record.  
+- Removed the `ALDrawCircle` function; use `ALDrawRectangle` with radius instead.  
+- Updated `TALImage` to support downloading images from the Internet. Added 
+  `MaskResourceName`, `MaskBitmap`, `BackgroundColor`, `LoadingColor`, `BlurRadius`, 
+  `Corners`, `CropCenter`, `Shadow`, `Sides`, `Stroke`, `XRadius`, and `YRadius` properties.  
+- Added the `TALEllipse` component.  
+- Introduced the `AlIsHttpOrHttpsUrl` function.
