@@ -30,16 +30,16 @@ type
     MostLeft,
     MostRight,
     Client,
-    Contents,
+    //Contents,       // Removed from TAlignLayout
     Center,
     VertCenter,
     HorzCenter,
     Horizontal,
     Vertical,
-    Scale,
-    Fit,
-    FitLeft,
-    FitRight,
+    //Scale,          // Removed from TAlignLayout
+    //Fit,            // Removed from TAlignLayout
+    //FitLeft,        // Removed from TAlignLayout
+    //FitRight,       // Removed from TAlignLayout
     TopCenter,        // Added from TAlignLayout - Works like TAlignLayout.Top, then centers the control horizontally
     TopLeft,          // Added from TAlignLayout - Works like TAlignLayout.Top, then aligns the control to the left.
     TopRight,         // Added from TAlignLayout - Works like TAlignLayout.Top, then aligns the control to the right.
@@ -92,6 +92,7 @@ type
     procedure MarginsChangedHandler(Sender: TObject);
     function IsScaledStored: Boolean;
   protected
+    FTextUpdating: Boolean; // 1 byte
     FAutoSize: Boolean; // 1 byte
     FIsAdjustingSize: Boolean; // 1 byte
     FAdjustSizeOnEndUpdate: Boolean; // 1 byte
@@ -134,10 +135,13 @@ type
     procedure DoResized; override;
     procedure DoRealign; override;
     procedure AdjustSize; virtual;
+    procedure BeginTextUpdate; virtual;
+    procedure EndTextUpdate; virtual;
     procedure SetFixedSizeBounds(X, Y, AWidth, AHeight: Single); Virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure EndUpdate; override;
     procedure SetNewScene(AScene: IScene); override;
     function IsVisibleWithinFormBounds: Boolean;
     property Form: TCommonCustomForm read FForm;
@@ -276,6 +280,7 @@ begin
   FIsPixelAlignmentEnabled := True;
   FAlign := TALAlignLayout.None;
   FIsSetBoundsLocked := False;
+  FTextUpdating := False;
   FAutoSize := False;
   FIsAdjustingSize := False;
   FAdjustSizeOnEndUpdate := False;
@@ -286,6 +291,57 @@ destructor TALControl.Destroy;
 begin
   ClearBufDrawable;
   inherited;
+end;
+
+{*****************************}
+procedure TALControl.EndUpdate;
+begin
+  if IsUpdating then
+  begin
+    if not FTextUpdating then begin
+      BeginTextUpdate;
+      Inherited;
+      EndTextUpdate;
+    end
+    else
+      Inherited;
+  end;
+end;
+
+{*************************************************}
+// Unfortunately, the way BeginUpdate/EndUpdate and
+// Realign are implemented is not very efficient for TALText.
+// When calling EndUpdate, it first propagates to the most
+// deeply nested children in this hierarchy:
+//   Control1
+//     Control2
+//       AlText1
+// This means when Control1.EndUpdate is called,
+// it executes in the following order:
+//       AlText1.EndUpdate => AdjustSize and Realign
+//     Control2.EndUpdate => Realign and potentially calls AlText1.AdjustSize again
+//   Control1.EndUpdate => Realign and possibly triggers AlText1.AdjustSize once more
+// This poses a problem since the BufDrawable will be
+// recalculated multiple times.
+// To mitigate this, we can use:
+//   BeginTextUpdate;
+//   EndUpdate;
+//   EndTextUpdate;
+procedure TALControl.BeginTextUpdate;
+begin
+  FTextUpdating := True;
+  for var I := 0 to ControlsCount - 1 do
+    if Controls[i] is TALControl then
+      TALControl(Controls[i]).BeginTextUpdate;
+end;
+
+{*********************************}
+procedure TALControl.EndTextUpdate;
+begin
+  FTextUpdating := False;
+  for var I := 0 to ControlsCount - 1 do
+    if Controls[i] is TALControl then
+      TALControl(Controls[i]).EndTextUpdate;
 end;
 
 {**************************}
@@ -337,16 +393,16 @@ begin
       TALAlignLayout.MostLeft: LLegacyAlign := TAlignLayout.MostLeft;
       TALAlignLayout.MostRight: LLegacyAlign := TAlignLayout.MostRight;
       TALAlignLayout.Client: LLegacyAlign := TAlignLayout.Client;
-      TALAlignLayout.Contents: LLegacyAlign := TAlignLayout.Contents;
+      //TALAlignLayout.Contents: LLegacyAlign := TAlignLayout.Contents;
       TALAlignLayout.Center: LLegacyAlign := TAlignLayout.Center;
       TALAlignLayout.VertCenter: LLegacyAlign := TAlignLayout.VertCenter;
       TALAlignLayout.HorzCenter: LLegacyAlign := TAlignLayout.HorzCenter;
       TALAlignLayout.Horizontal: LLegacyAlign := TAlignLayout.Horizontal;
       TALAlignLayout.Vertical: LLegacyAlign := TAlignLayout.Vertical;
-      TALAlignLayout.Scale: LLegacyAlign := TAlignLayout.Scale;
-      TALAlignLayout.Fit: LLegacyAlign := TAlignLayout.Fit;
-      TALAlignLayout.FitLeft: LLegacyAlign := TAlignLayout.FitLeft;
-      TALAlignLayout.FitRight: LLegacyAlign := TAlignLayout.FitRight;
+      //TALAlignLayout.Scale: LLegacyAlign := TAlignLayout.Scale;
+      //TALAlignLayout.Fit: LLegacyAlign := TAlignLayout.Fit;
+      //TALAlignLayout.FitLeft: LLegacyAlign := TAlignLayout.FitLeft;
+      //TALAlignLayout.FitRight: LLegacyAlign := TAlignLayout.FitRight;
       TALAlignLayout.TopCenter: LLegacyAlign := TAlignLayout.Top;
       TALAlignLayout.TopLeft: LLegacyAlign := TAlignLayout.Top;
       TALAlignLayout.TopRight: LLegacyAlign := TAlignLayout.Top;
@@ -389,7 +445,7 @@ end;
 procedure TALControl.DoResized;
 begin
   {$IF defined(debug)}
-  //ALLog(ClassName + '.DoResized', 'Name: ' + Name);
+  //ALLog(ClassName+'.DoResized', 'Name: ' + Name);
   {$ENDIF}
   inherited;
   AdjustSize;
@@ -399,7 +455,7 @@ end;
 procedure TALControl.DoRealign;
 begin
   {$IF defined(debug)}
-  //ALLog(ClassName + '.DoRealign', 'Name: ' + Name);
+  //ALLog(ClassName+'.DoRealign', 'Name: ' + Name);
   {$ENDIF}
 
   {$IFNDEF ALCompilerVersionSupported122}
@@ -506,7 +562,7 @@ begin
       end;
 
       {$IF defined(debug)}
-      //ALLog(ClassName + '.SetFixedSizeBounds', 'Name: ' + Name + ' | X : '+ALFloatToStrW(X, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.X, ALDefaultFormatSettingsW)+') | Y : '+ALFloatToStrW(Y, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.Y, ALDefaultFormatSettingsW)+') | AWidth : '+ALFloatToStrW(AWidth, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Width, ALDefaultFormatSettingsW)+') | AHeight : '+ALFloatToStrW(AHeight, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Height, ALDefaultFormatSettingsW)+')');
+      //ALLog(ClassName+'.SetFixedSizeBounds', 'Name: ' + Name + ' | X : '+ALFloatToStrW(X, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.X, ALDefaultFormatSettingsW)+') | Y : '+ALFloatToStrW(Y, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.Y, ALDefaultFormatSettingsW)+') | AWidth : '+ALFloatToStrW(AWidth, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Width, ALDefaultFormatSettingsW)+') | AHeight : '+ALFloatToStrW(AHeight, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Height, ALDefaultFormatSettingsW)+')');
       {$ENDIF}
 
       inherited SetBounds(X, Y, AWidth, AHeight);
@@ -609,7 +665,7 @@ begin
   //var LMoved := not (SameValue(X, Position.X, TEpsilon.Position) and SameValue(Y, Position.Y, TEpsilon.Position));
   //var LSizeChanged := not (SameValue(AWidth, Width, TEpsilon.Position) and SameValue(AHeight, Height, TEpsilon.Position));
   //if LMoved or LSizeChanged then
-  //  ALLog(ClassName + '.SetBounds', 'Name: ' + Name + ' | X : '+ALFloatToStrW(X, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.X, ALDefaultFormatSettingsW)+') | Y : '+ALFloatToStrW(Y, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.Y, ALDefaultFormatSettingsW)+') | AWidth : '+ALFloatToStrW(AWidth, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Width, ALDefaultFormatSettingsW)+') | AHeight : '+ALFloatToStrW(AHeight, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Height, ALDefaultFormatSettingsW)+')');
+  //  ALLog(ClassName+'.SetBounds', 'Name: ' + Name + ' | X : '+ALFloatToStrW(X, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.X, ALDefaultFormatSettingsW)+') | Y : '+ALFloatToStrW(Y, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Position.Y, ALDefaultFormatSettingsW)+') | AWidth : '+ALFloatToStrW(AWidth, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Width, ALDefaultFormatSettingsW)+') | AHeight : '+ALFloatToStrW(AHeight, ALDefaultFormatSettingsW)+'('+ALFloatToStrW(Height, ALDefaultFormatSettingsW)+')');
   {$ENDIF}
 
   inherited;
@@ -634,7 +690,7 @@ begin
         FAdjustSizeOnEndUpdate := False;
 
       {$IF defined(debug)}
-      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeX)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeY));
+      //ALLog(ClassName+'.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeX)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeY));
       {$ENDIF}
 
       var LSize := TSizeF.Create(0,0);
@@ -763,12 +819,12 @@ begin
           end;
 
           //--
-          TALAlignLayout.Client,
-          TALAlignLayout.Contents,
-          TALAlignLayout.Scale,
-          TALAlignLayout.Fit,
-          TALAlignLayout.FitLeft,
-          TALAlignLayout.FitRight: Begin
+          //TALAlignLayout.Contents,
+          //TALAlignLayout.Scale,
+          //TALAlignLayout.Fit,
+          //TALAlignLayout.FitLeft,
+          //TALAlignLayout.FitRight,
+          TALAlignLayout.Client: Begin
             if LALChildControl <> nil then begin
               if LALChildControl.HasUnconstrainedAutosizeX then LSize.Width := Max(LSize.Width, LChildControl.Position.X + LChildControl.width + LChildControl.Margins.right + padding.right)
               else LSize.Width := Max(LSize.Width, Width);
@@ -879,12 +935,12 @@ begin
         TALAlignLayout.HorzCenter:
           Size.Width := ALAlignDimensionToPixelRound(Size.Width, ALGetScreenScale, TEpsilon.Position);
         //--
-        TALAlignLayout.Client,
-        TALAlignLayout.Contents,
-        TALAlignLayout.Scale,
-        TALAlignLayout.Fit,
-        TALAlignLayout.FitLeft,
-        TALAlignLayout.FitRight:;
+        //TALAlignLayout.Contents,
+        //TALAlignLayout.Scale,
+        //TALAlignLayout.Fit,
+        //TALAlignLayout.FitLeft,
+        //TALAlignLayout.FitRight
+        TALAlignLayout.Client:;
         //--
         else
           Raise Exception.Create('Error AC54DF90-F880-4BD5-8474-E62BD8D099FB')
@@ -955,7 +1011,7 @@ begin
   Result := GetAutoSize;
   if Result then begin
     result := not (Align in [TALAlignLayout.Client,
-                             TALAlignLayout.Contents,
+                             //TALAlignLayout.Contents,
                              TALAlignLayout.Top,
                              TALAlignLayout.Bottom,
                              TALAlignLayout.MostTop,
@@ -973,7 +1029,7 @@ begin
   Result := GetAutoSize;
   if Result then begin
     result := not (Align in [TALAlignLayout.Client,
-                             TALAlignLayout.Contents,
+                             //TALAlignLayout.Contents,
                              TALAlignLayout.Left,
                              TALAlignLayout.Right,
                              TALAlignLayout.MostLeft,
@@ -1180,11 +1236,11 @@ begin
      (abs(FControlAbsolutePosAtMouseDown.y - LControlAbsolutePos.y) > TALScrollEngine.DefaultTouchSlop) then begin
     {$IF defined(debug)}
     if (not FMouseDownAtLowVelocity) then
-      ALLog('MouseClick', 'Skipped | Mouse Down was not made at Low Velocity')
+      ALLog(Classname+'.MouseClick', 'Skipped | Mouse Down was not made at Low Velocity')
     else if (abs(FControlAbsolutePosAtMouseDown.x - LControlAbsolutePos.x) > TALScrollEngine.DefaultTouchSlop) then
-      ALLog('MouseClick', 'Skipped | Control moved by '+ALFormatFloatW('0.##', abs(FControlAbsolutePosAtMouseDown.x - LControlAbsolutePos.x), ALDefaultFormatSettingsW) + ' horizontally')
+      ALLog(Classname+'.MouseClick', 'Skipped | Control moved by '+ALFormatFloatW('0.##', abs(FControlAbsolutePosAtMouseDown.x - LControlAbsolutePos.x), ALDefaultFormatSettingsW) + ' horizontally')
     else if (abs(FControlAbsolutePosAtMouseDown.y - LControlAbsolutePos.y) > TALScrollEngine.DefaultTouchSlop) then
-      ALLog('MouseClick', 'Skipped | Control moved by '+ALFormatFloatW('0.##', abs(FControlAbsolutePosAtMouseDown.y - LControlAbsolutePos.y), ALDefaultFormatSettingsW) + ' vertically')
+      ALLog(Classname+'.MouseClick', 'Skipped | Control moved by '+ALFormatFloatW('0.##', abs(FControlAbsolutePosAtMouseDown.y - LControlAbsolutePos.y), ALDefaultFormatSettingsW) + ' vertically')
     else
       raise Exception.Create('Error 79BF6F83-8725-476D-A283-507BE9CC671C');
     {$ENDIF}
@@ -1421,7 +1477,7 @@ end;
 procedure TALContent.ContentChanged;
 begin
   {$IF defined(debug)}
-  //ALLog(ClassName + '.ContentChanged', 'Name: ' + Name);
+  //ALLog(ClassName+'.ContentChanged', 'Name: ' + Name);
   {$ENDIF}
 end;
 

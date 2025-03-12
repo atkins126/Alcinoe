@@ -392,7 +392,6 @@ uses
   Alcinoe.WinApi.Common,
   Alcinoe.MySql.Wrapper,
   Alcinoe.Sqlite3.Wrapper,
-  Alcinoe.AVLBinaryTree,
   Alcinoe.Common,
   Alcinoe.XMLDoc,
   Alcinoe.StringList,
@@ -685,7 +684,7 @@ begin
     LMySqlBenchmarkThread.Start;
     {$ELSE}
     aMySqlBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -757,7 +756,7 @@ begin
     LMySqlBenchmarkThread.Start;
     {$ELSE}
     aMySqlBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -1191,7 +1190,7 @@ begin
     LSphinxBenchmarkThread.Start;
     {$ELSE}
     aSphinxBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -1263,7 +1262,7 @@ begin
     LSphinxBenchmarkThread.Start;
     {$ELSE}
     aSphinxBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -1356,7 +1355,7 @@ begin
     LSqlite3BenchmarkThread.Start;
     {$ELSE}
     aSqlite3BenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -1449,7 +1448,7 @@ begin
     LSqlite3BenchmarkThread.Start;
     {$ELSE}
     aSqlite3BenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -2235,7 +2234,7 @@ begin
     LMemcachedBenchmarkThread.Start;
     {$ELSE}
     aMemcachedBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
   end;
 
 end;
@@ -2294,7 +2293,7 @@ begin
     LMemcachedBenchmarkThread.Start;
     {$ELSE}
     aMemcachedBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
   end;
 
 end;
@@ -2353,7 +2352,7 @@ begin
     LMemcachedBenchmarkThread.Start;
     {$ELSE}
     aMemcachedBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
   end;
 
 end;
@@ -2412,7 +2411,7 @@ begin
     LMemcachedBenchmarkThread.Start;
     {$ELSE}
     aMemcachedBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
   end;
 
 end;
@@ -3027,7 +3026,7 @@ begin
     LMongoDBBenchmarkThread.Start;
     {$ELSE}
     aMongoDBBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -3094,7 +3093,7 @@ begin
     LMongoDBBenchmarkThread.Start;
     {$ELSE}
     aMongoDBBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -3161,7 +3160,7 @@ begin
     LMongoDBBenchmarkThread.Start;
     {$ELSE}
     aMongoDBBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 
@@ -3228,7 +3227,7 @@ begin
     LMongoDBBenchmarkThread.Start;
     {$ELSE}
     aMongoDBBenchmarkThread.Resume;
-    {$IFEND}
+    {$ENDIF}
 
   end;
 

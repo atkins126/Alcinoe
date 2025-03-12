@@ -37,7 +37,7 @@ interface
 
 {$IFNDEF ALCompilerVersionSupported122}
   {$MESSAGE WARN 'Check if https://github.com/project-jedi/jcl.git jcl\source\common\JclExprEval.pas was not updated from References\jcl\source\common\JclExprEval.pas and adjust the IFDEF'}
-{$IFEND}
+{$ENDIF}
 
 uses
   System.SysUtils,
@@ -100,7 +100,7 @@ type
 
   TALExprHashContext = class(TALExprContext)
   private
-    FHashMap: TALAVLStringListA;
+    FHashMap: TALHashedStringListA;
   public
     constructor Create(ACaseSensitive: Boolean = False);
     destructor Destroy; override;
@@ -959,7 +959,7 @@ end;
 constructor TALExprHashContext.Create(ACaseSensitive: Boolean);
 begin
   inherited Create;
-  FHashMap := TALAVLStringListA.Create(true);
+  FHashMap := TALHashedStringListA.Create(true);
   FHashMap.CaseSensitive := ACaseSensitive;
 end;
 
@@ -2831,7 +2831,7 @@ begin
     for I := 0 to FCodeList.Count - 1 do
       TALExprVirtMachOp(FCodeList[I]).Execute; }
     I := FCodeList.Count;
-    pop := @FCodeList.List{$IF CompilerVersion < 23}{Delphi XE2}^{$IFEND}[0];
+    pop := @FCodeList.List{$IF CompilerVersion < 23}{Delphi XE2}^{$ENDIF}[0];
     while I > 0 do
     begin
       pop^.Execute;

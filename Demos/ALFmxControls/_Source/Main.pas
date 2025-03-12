@@ -503,7 +503,9 @@ procedure TMainForm.FormCreate(Sender: TObject);
 begin
   ALLog('TMainForm.FormCreate', 'begin');
   TALErrorReporting.Instance;
-  //ALVertScrollBox1.ScrollEngine.TouchTracking := [ttVertical];
+  {$IF defined(MSWindows)}
+  ALVertScrollBox1.ScrollEngine.TouchTracking := [ttVertical];
+  {$ENDIF}
   //special case for windows
   if not ALVertScrollBox1.HasTouchScreen then begin
     ALVertScrollBox1.VScrollBar.Width := 8;
@@ -673,11 +675,7 @@ begin
   fline.LineType := TLineType.Diagonal;
   fline.HitTest := False;
 
-  ALLog('TMainForm.FormCreate', 'EndUpdate begin');
-  ALLockTexts(ALVertScrollBox1);
   EndUpdate;
-  ALUnLockTexts(ALVertScrollBox1);
-  ALLog('TMainForm.FormCreate', 'EndUpdate end');
 
   ALTabControl1Resized(nil);
   ALVertScrollBox1Resized(nil);
@@ -1011,6 +1009,9 @@ begin
   var LScrollBoxDemoForm := TScrollBoxDemoForm.Create(nil);
   var LVertScrollBox := TalVertScrollBox.Create(LScrollBoxDemoForm);
   LVertScrollBox.Parent := LScrollBoxDemoForm;
+  {$IF defined(MSWindows)}
+  LVertScrollBox.ScrollEngine.TouchTracking := [ttVertical];
+  {$ENDIF}
   LVertScrollBox.BeginUpdate;
   LVertScrollBox.Align := TALalignLayout.Client;
   LVertScrollBox.ScrollEngine.MinEdgeSpringbackEnabled := False;
@@ -1410,7 +1411,7 @@ end;
 {*****************************************}
 procedure TALTextStopWatch.MakeBufDrawable;
 begin
-  if ALIsDrawableNull(BufDrawable) then begin
+  if ALIsDrawableNull(FBufDrawable) then begin
     var LStopWatch := TstopWatch.StartNew;
     inherited MakeBufDrawable;
     LStopWatch.stop;
@@ -1423,7 +1424,7 @@ end;
 procedure TALTextStopWatch.Paint;
 begin
   canvas.ClearRect(TrectF.Create(0,0,0,0)); // it's just to flush what is inside the canvas
-  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(BufDrawable);
+  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(FBufDrawable);
   var LStopWatch := TstopWatch.StartNew;
   inherited paint;
   LStopWatch.stop;
@@ -1454,7 +1455,7 @@ end;
 {**********************************************}
 procedure TALRectangleStopWatch.MakeBufDrawable;
 begin
-  if ALIsDrawableNull(BufDrawable) then begin
+  if ALIsDrawableNull(FBufDrawable) then begin
     var LStopWatch := TstopWatch.StartNew;
     inherited MakeBufDrawable;
     LStopWatch.stop;
@@ -1467,7 +1468,7 @@ end;
 procedure TALRectangleStopWatch.Paint;
 begin
   canvas.ClearRect(TrectF.Create(0,0,0,0)); // it's just to flush what is inside the canvas
-  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(BufDrawable);
+  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(FBufDrawable);
   var LStopWatch := TstopWatch.StartNew;
   inherited paint;
   LStopWatch.stop;
@@ -1488,7 +1489,7 @@ end;
 {*****************************************}
 procedure TALLineStopWatch.MakeBufDrawable;
 begin
-  if ALIsDrawableNull(BufDrawable) then begin
+  if ALIsDrawableNull(FBufDrawable) then begin
     var LStopWatch := TstopWatch.StartNew;
     inherited MakeBufDrawable;
     LStopWatch.stop;
@@ -1501,7 +1502,7 @@ end;
 procedure TALLineStopWatch.Paint;
 begin
   canvas.ClearRect(TrectF.Create(0,0,0,0)); // it's just to flush what is inside the canvas
-  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(BufDrawable);
+  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(FBufDrawable);
   var LStopWatch := TstopWatch.StartNew;
   inherited paint;
   LStopWatch.stop;
@@ -1512,7 +1513,7 @@ end;
 {*******************************************}
 procedure TALCircleStopWatch.MakeBufDrawable;
 begin
-  if ALIsDrawableNull(BufDrawable) then begin
+  if ALIsDrawableNull(FBufDrawable) then begin
     var LStopWatch := TstopWatch.StartNew;
     inherited MakeBufDrawable;
     LStopWatch.stop;
@@ -1525,7 +1526,7 @@ end;
 procedure TALCircleStopWatch.Paint;
 begin
   canvas.ClearRect(TrectF.Create(0,0,0,0)); // it's just to flush what is inside the canvas
-  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(BufDrawable);
+  var LRemoveMakeBufDrawableMs := ALIsDrawableNull(FBufDrawable);
   var LStopWatch := TstopWatch.StartNew;
   inherited paint;
   LStopWatch.stop;

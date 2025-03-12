@@ -227,7 +227,7 @@ type
     FHasTouchScreen: Boolean;
     FShowScrollBars: Boolean;
     FAutoHide: Boolean;
-    FMouseEvents: Boolean;
+    FHandleMouseEvents: Boolean;
     FOnViewportPositionChange: TViewportPositionChangeEvent;
     fOnAniStart: TnotifyEvent;
     fOnAniStop: TnotifyEvent;
@@ -754,7 +754,7 @@ begin
   FShowScrollBars := True;
   fdisableScrollChange := False;
   FDisableMouseWheel := False;
-  FMouseEvents := False;
+  FHandleMouseEvents := False;
   FOnViewportPositionChange := nil;
   fOnAniStart := nil;
   fOnAniStop := nil;
@@ -990,7 +990,7 @@ begin
     {$ENDIF}
     if fScrollEngine.down then begin
       fScrollEngine.Down := false;
-      FMouseEvents := False;
+      FHandleMouseEvents := False;
     end;
   end;
 end;
@@ -1004,9 +1004,14 @@ begin
   //  'Position:' + ALFormatFloatW('0.##', x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', y, ALDefaultFormatSettingsW));
   {$ENDIF}
   if (Button = TMouseButton.mbLeft) then begin
-    FMouseEvents := true;
+    FHandleMouseEvents := true;
     fMouseDownPos := TpointF.Create(X,Y);
+    {$IF defined(ANDROID) or defined(IOS)}
+    if form <> nil then
+      ScrollEngine.MouseDown(form.Handle);
+    {$ELSE}
     ScrollEngine.MouseDown(X, Y);
+    {$ENDIF}
   end;
 end;
 
@@ -1018,7 +1023,7 @@ begin
   //  ClassName + '.InternalMouseMove',
   //  'Position:' + ALFormatFloatW('0.##', x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', y, ALDefaultFormatSettingsW));
   {$ENDIF}
-  if FMouseEvents then begin
+  if FHandleMouseEvents then begin
     if (not fScrollCapturedByMe) and
        (((ttHorizontal in fScrollEngine.TouchTracking) and
          (abs(fMouseDownPos.x - x) > abs(fMouseDownPos.y - y)) and
@@ -1034,7 +1039,12 @@ begin
       fScrollCapturedByMe := True;
       TMessageManager.DefaultManager.SendMessage(self, TALScrollCapturedMessage.Create(True));
     end;
+    {$IF defined(ANDROID) or defined(IOS)}
+    if form <> nil then
+      ScrollEngine.MouseMove(form.Handle);
+    {$ELSE}
     ScrollEngine.MouseMove(X, Y);
+    {$ENDIF}
   end;
 end;
 
@@ -1046,10 +1056,15 @@ begin
   //  ClassName + '.InternalMouseUp',
   //  'Position:' + ALFormatFloatW('0.##', x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', y, ALDefaultFormatSettingsW));
   {$ENDIF}
-  if FMouseEvents and (Button = TMouseButton.mbLeft) then begin
+  if FHandleMouseEvents and (Button = TMouseButton.mbLeft) then begin
     FScrollCapturedByMe := False;
+    {$IF defined(ANDROID) or defined(IOS)}
+    if form <> nil then
+      ScrollEngine.MouseUp(form.Handle);
+    {$ELSE}
     ScrollEngine.MouseUp(X, Y);
-    FMouseEvents := False;
+    {$ENDIF}
+    FHandleMouseEvents := False;
   end;
 end;
 
@@ -1059,10 +1074,10 @@ begin
   {$IFDEF DEBUG}
   //ALLog(ClassName + '.InternalMouseLeave');
   {$ENDIF}
-  if FMouseEvents then begin
+  if FHandleMouseEvents then begin
     FScrollCapturedByMe := False;
     ScrollEngine.MouseLeave;
-    FMouseEvents := False;
+    FHandleMouseEvents := False;
   end;
 end;
 
@@ -1076,6 +1091,8 @@ end;
 {***********************************************************************}
 procedure TALCustomScrollBox.MouseMove(Shift: TShiftState; X, Y: Single);
 begin
+  // Inherited at the end because of
+  // https://github.com/MagicFoundation/Alcinoe/issues/381
   InternalMouseMove(Shift, X, Y);
   inherited;
 end;

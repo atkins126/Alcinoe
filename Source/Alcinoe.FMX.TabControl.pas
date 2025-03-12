@@ -130,7 +130,7 @@ type
     TFindKind = (Next, Back, First, Last, Current);
   private
     FTabCount: integer;
-    FMouseEvents: Boolean;
+    FHandleMouseEvents: Boolean;
     FchildreenChanging: boolean;
     FTabIndex: Integer;
     FRealigningTabs: Boolean;
@@ -393,9 +393,8 @@ type
     procedure DoChanged; override;
   public
     constructor Create(const ATabControl: TALTabControl); reintroduce;
-    procedure MouseDown(X, Y: Single); override;
-    procedure MouseUp(X, Y: Single); override;
-    procedure MouseLeave; override;
+    procedure DoMouseDown; override;
+    procedure DoMouseUp; override;
     property TabControl: TALTabControl read FTabControl;
   end;
 
@@ -435,10 +434,10 @@ begin
      (not (csDestroying in FTabControl.ComponentState)) then FTabControl.fOnAniStop(FTabControl);
 end;
 
-{**********************************************************}
-procedure TALTabControlScrollEngine.MouseDown(X, Y: Single);
+{**********************************************}
+procedure TALTabControlScrollEngine.DoMouseDown;
 begin
-  inherited MouseDown(X, Y);
+  inherited;
   if down then FTabControl.FAniTransition.StopAtCurrent;
 end;
 
@@ -479,19 +478,11 @@ begin
 
 end;
 
-{********************************************************}
-procedure TALTabControlScrollEngine.MouseUp(X, Y: Single);
+{********************************************}
+procedure TALTabControlScrollEngine.DoMouseUp;
 begin
   var LWasDown := Down;
-  inherited MouseUp(X, Y);
-  if LWasDown then LaunchAniTransition;
-end;
-
-{*********************************************}
-procedure TALTabControlScrollEngine.MouseLeave;
-begin
-  var LWasDown := Down;
-  inherited MouseLeave;
+  inherited;
   if LWasDown then LaunchAniTransition;
 end;
 
@@ -508,7 +499,7 @@ begin
   fOnAniProcess := nil;
   //-----
   FTabCount := 0;
-  FMouseEvents := False;
+  FHandleMouseEvents := False;
   FOnChange := nil;
   ClipChildren := true;
   FTabIndex := -1;
@@ -753,7 +744,7 @@ begin
     {$ENDIF}
     if fScrollEngine.down then begin
       fScrollEngine.Down := false; // instead of down := false to reposition the tabitem
-      FMouseEvents := False;
+      FHandleMouseEvents := False;
       // If I try with fScrollEngine.launchanimation I have a flickr because the
       // anim stop and restart at a different speed
       if not FAniTransition.Running then RealignTabs;
@@ -771,9 +762,14 @@ begin
   {$ENDIF}
   if not AnimationEnabled then exit;
   if (Button = TMouseButton.mbLeft) then begin
-    FMouseEvents := true;
+    FHandleMouseEvents := true;
     fMouseDownPos := TPointF.Create(X,Y);
+    {$IF defined(ANDROID) or defined(IOS)}
+    if form <> nil then
+      ScrollEngine.MouseDown(form.Handle);
+    {$ELSE}
     ScrollEngine.MouseDown(X, Y);
+    {$ENDIF}
   end;
 end;
 
@@ -786,7 +782,7 @@ begin
   //  'Position:' + ALFormatFloatW('0.##', x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', y, ALDefaultFormatSettingsW));
   {$ENDIF}
   if not AnimationEnabled then exit;
-  if FMouseEvents then begin
+  if FHandleMouseEvents then begin
     if (not fScrollCapturedByMe) and
        (abs(fMouseDownPos.x - x) > abs(fMouseDownPos.y - y)) and
        (abs(fMouseDownPos.x - x) > TALScrollEngine.DefaultTouchSlop) then begin
@@ -798,7 +794,12 @@ begin
       fScrollCapturedByMe := True;
       TMessageManager.DefaultManager.SendMessage(self, TALScrollCapturedMessage.Create(true));
     end;
+    {$IF defined(ANDROID) or defined(IOS)}
+    if form <> nil then
+      ScrollEngine.MouseMove(form.Handle);
+    {$ELSE}
     ScrollEngine.MouseMove(X, Y);
+    {$ENDIF}
   end;
 end;
 
@@ -811,10 +812,15 @@ begin
   //  'Position:' + ALFormatFloatW('0.##', x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', y, ALDefaultFormatSettingsW));
   {$ENDIF}
   if not AnimationEnabled then exit;
-  if FMouseEvents and (Button = TMouseButton.mbLeft) then begin
+  if FHandleMouseEvents and (Button = TMouseButton.mbLeft) then begin
     FScrollCapturedByMe := False;
+    {$IF defined(ANDROID) or defined(IOS)}
+    if form <> nil then
+      ScrollEngine.MouseUp(form.Handle);
+    {$ELSE}
     ScrollEngine.MouseUp(X, Y);
-    FMouseEvents := False;
+    {$ENDIF}
+    FHandleMouseEvents := False;
   end;
 end;
 
@@ -825,10 +831,10 @@ begin
   //ALLog('TALTabControl.internalMouseLeave');
   {$ENDIF}
   if not AnimationEnabled then exit;
-  if FMouseEvents then begin
+  if FHandleMouseEvents then begin
     FScrollCapturedByMe := False;
     ScrollEngine.MouseLeave;
-    FMouseEvents := False;
+    FHandleMouseEvents := False;
   end;
 end;
 
@@ -842,6 +848,8 @@ end;
 {******************************************************************}
 procedure TALTabControl.MouseMove(Shift: TShiftState; X, Y: Single);
 begin
+  // Inherited at the end because of
+  // https://github.com/MagicFoundation/Alcinoe/issues/381
   internalMouseMove(Shift, X, Y);
   inherited;
 end;

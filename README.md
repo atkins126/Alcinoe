@@ -59,6 +59,7 @@ Please request the resolution of these quality reports. Due
 to the unresolved issues from Embarcadero, we have been 
 forced to apply patches to the original Delphi source files:
 
+* [Enhance MouseEvent Handling by Providing Access to MotionEvent (Android) and UIEvent (iOS)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3002)
 * [Project option to define where to look/create the LaunchScreen.TemplateiOS directory](https://quality.embarcadero.com/browse/RSP-33503)
 * [Support for the new Android Splash Screen standard](https://quality.embarcadero.com/browse/RSP-39331)
 * [Their is no propagation of mouse event under Firemonkey](https://quality.embarcadero.com/browse/RSP-24397)
@@ -80,7 +81,7 @@ forced to apply patches to the original Delphi source files:
 * [TVirtualKeyboardAndroid.GetVirtualKeyboardState not accurate](https://quality.embarcadero.com/browse/RSP-24737)
 * [Add NSPersonNameComponents in iOSapi.Foundation.pas](https://quality.embarcadero.com/browse/RSP-28096)
 * [Comparison of 2 interfaces result in bad behavior in TCommonCustomForm.SetHovered and similar](https://quality.embarcadero.com/browse/RSP-36612)
-* [In android, TFormRender must use JChoreographer_FrameCallback not JRunnable](https://quality.embarcadero.com/browse/RSP-38660)
+* [Improve Rendering Timing by Using Choreographer Instead of Runnable](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2865)
 * [Need JNotificationClass.AUDIO_ATTRIBUTES_DEFAULT and JNotificationChannel.setSound](https://quality.embarcadero.com/browse/RSP-39511)
 * [iOS/OSX: Declaration for CLRegion.initCircularRegionWithCenter is incorrect](https://quality.embarcadero.com/browse/RSP-15717)
 * [Missing Declaration of maximumFramesPerSecond Function in UIScreen Interface](https://quality.embarcadero.com/browse/RSP-43458)
@@ -104,6 +105,9 @@ forced to apply patches to the original Delphi source files:
 * [Update TAlignLayout to Include New Alignment Options for Centering Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342)
 * [Enhance TCustomForm.DoAddObject to Properly Handle FUpdating State for Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2388)
 * [Add the CAFrameRateRange record and preferredFramesPerSecond/preferredFrameRateRange to CADisplayLink](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2424)
+* [Add getEventTimeNanos and getHistoricalEventTimeNanos to JMotionEvent](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2992)
+* [Incorrect indentation of end; in TScreen.IndexFormOfObject](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2902)
+
 
 Install Alcinoe
 ---------------
@@ -486,6 +490,36 @@ DeployMan / DeployProjNormalizer / DProjNormalizer
 <br/>
 
 
+Alcinoe Code Profiler
+=====================
+
+### Effortlessly Profile Your Delphi Code on Windows, macOS, iOS, and Android
+
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/codeprofiler.png?raw=true"/>
+
+Alcinoe Code Profiler is a powerful source code instrumentation 
+profiler for Delphi, designed to help developers identify 
+performance bottlenecks and optimize their applications across 
+multiple platforms, including Windows, macOS, iOS, and Android.  
+
+By automatically injecting performance markers into your Delphi 
+source code, Alcinoe Code Profiler logs execution times for each 
+procedure call. These logs can then be analyzed using the provided 
+graphical interface, enabling you to pinpoint inefficiencies 
+and enhance application performance with precision.  
+
+### **With Alcinoe Code Profiler, you can:**  
+
+✅ **Detect performance bottlenecks** with minimal effort<br/>
+✅ **Optimize critical code paths** for better efficiency<br/>
+✅ **Profile applications seamlessly** across all major platforms<br/>
+✅ **Visualize execution data** in an intuitive analysis tool<br/>
+
+Learn more at [Tools/CodeProfiler](https://github.com/MagicFoundation/Alcinoe/tree/master/Tools/CodeProfiler)
+<br/>
+<br/>
+
+
 Interpolated Animation
 ======================
 
@@ -518,8 +552,8 @@ Learn more at
 [Demos/ALAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALAnimation)
 <br/>
 <br/>
-  
-  
+
+
 SpringForce Animation
 =====================
 
@@ -1037,15 +1071,11 @@ undesired conversions.
 History
 =======
 
-#### 12/15/2024 #### 
+#### 02/02/2025 ####
 
-- **Default Fill Color Change**  
-  The default fill color of `TALBrush` has been updated to **white** (previously `$FFE0E0E0`).  
-  This change affects the default fill color of components such as `TALRectangle` and `TALCircle`.  
-
-- **Removal of `TALFont.AutoConvert` Property**  
-  The `AutoConvert` property has been removed from `TALFont`.  
-  Its behavior is now always **enabled** (equivalent to `AutoConvert = True`).
+- Replace **RotationCenter** with **Pivot** ([RSS-2824](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2824)).
+- The **Scale** property of controls now only affects their visual size (zoom in/out) and 
+  no longer impacts their alignment within the parent layout ([RSS-2823](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2823)).
   
 #### 12/20/2024 ####
 
@@ -1080,3 +1110,13 @@ History
   `Corners`, `CropCenter`, `Shadow`, `Sides`, `Stroke`, `XRadius`, and `YRadius` properties.  
 - Added the `TALEllipse` component.  
 - Introduced the `AlIsHttpOrHttpsUrl` function.
+
+#### 12/15/2024 #### 
+
+- **Default Fill Color Change**  
+  The default fill color of `TALBrush` has been updated to **white** (previously `$FFE0E0E0`).  
+  This change affects the default fill color of components such as `TALRectangle` and `TALCircle`.  
+
+- **Removal of `TALFont.AutoConvert` Property**  
+  The `AutoConvert` property has been removed from `TALFont`.  
+  Its behavior is now always **enabled** (equivalent to `AutoConvert = True`).

@@ -29,6 +29,7 @@ uses
   FMX.StdCtrls,
   FMX.actnlist,
   FMX.ImgList,
+  Alcinoe.FMX.CacheEngines,
   Alcinoe.FMX.BreakText,
   Alcinoe.FMX.Ani,
   Alcinoe.FMX.Graphics,
@@ -260,17 +261,18 @@ type
     FRowCount: Integer;
     FResourceName: String;
     FFrameIndex: TSmallPoint;
-    FBufDrawable: TALDrawable;
-    FBufDrawableRect: TRectF;
+    FCacheIndex: Integer; // 4 bytes
+    FCacheEngine: TALBufDrawableCacheEngine; // 8 bytes
     procedure SetResourceName(const Value: String);
     procedure DoTimerProcess(sender: Tobject);
     function IsResourceNameStored: Boolean;
     function IsIntervalStored: Boolean;
   protected
+    FBufDrawable: TALDrawable;
+    FBufDrawableRect: TRectF;
+    function GetCacheSubIndex: Integer; virtual;
     function GetDoubleBuffered: boolean; override;
     procedure Paint; override;
-    property BufDrawable: TALDrawable read FBufDrawable;
-    property BufDrawableRect: TRectF read FBufDrawableRect;
     function GetDefaultSize: TSizeF; override;
     procedure DoResized; override;
   public
@@ -278,6 +280,13 @@ type
     destructor Destroy; override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
+    // CacheIndex and CacheEngine are primarily used in TALDynamicListBox to
+    // prevent duplicate drawables across multiple identical controls.
+    // CacheIndex specifies the slot in the cache engine where an existing
+    // drawable can be retrieved.
+    property CacheIndex: Integer read FCacheIndex write FCacheIndex;
+    // CacheEngine is not owned by the current control.
+    property CacheEngine: TALBufDrawableCacheEngine read FCacheEngine write FCacheEngine;
   published
     //property Action;
     property Align;
@@ -465,7 +474,10 @@ type
       end;
       // ------------------
       // TDefaultStateStyle
-      TDefaultStateStyle = class(TBaseStateStyle);
+      TDefaultStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
+      end;
       // -------------------
       // TDisabledStateStyle
       TDisabledStateStyle = class(TBaseStateStyle)
@@ -475,6 +487,7 @@ type
         function IsOpacityStored: Boolean;
       protected
         function GetInherit: Boolean; override;
+        function GetCacheSubIndex: Integer; override;
       public
         constructor Create(const AParent: TObject); override;
         procedure Assign(Source: TPersistent); override;
@@ -485,18 +498,24 @@ type
       // ------------------
       // THoveredStateStyle
       THoveredStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
       published
         property StateLayer;
       end;
       // ------------------
       // TPressedStateStyle
       TPressedStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
       published
         property StateLayer;
       end;
       // ------------------
       // TFocusedStateStyle
       TFocusedStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
       published
         property StateLayer;
       end;
@@ -574,6 +593,8 @@ type
     FDoubleBuffered: boolean;
     FXRadius: Single;
     FYRadius: Single;
+    FCacheIndex: Integer; // 4 bytes
+    FCacheEngine: TALBufDrawableCacheEngine; // 8 bytes
     {$IF NOT DEFINED(ALSkiaCanvas)}
     FRenderTargetSurface: TALSurface; // 8 bytes
     FRenderTargetCanvas: TALCanvas; // 8 bytes
@@ -587,6 +608,7 @@ type
   protected
     function CreateCheckMark: TCheckMarkBrush; virtual;
     function CreateStateStyles: TStateStyles; virtual;
+    function GetCacheSubIndex: Integer; virtual;
     function GetDoubleBuffered: boolean; override;
     procedure SetDoubleBuffered(const AValue: Boolean); override;
     function GetDefaultXRadius: Single; virtual;
@@ -632,6 +654,13 @@ type
     Property RenderTargetDrawable: TALDrawable read fRenderTargetDrawable;
     {$ENDIF}
     procedure Paint; override;
+    // CacheIndex and CacheEngine are primarily used in TALDynamicListBox to
+    // prevent duplicate drawables across multiple identical controls.
+    // CacheIndex specifies the slot in the cache engine where an existing
+    // drawable can be retrieved.
+    property CacheIndex: Integer read FCacheIndex write FCacheIndex;
+    // CacheEngine is not owned by the current control.
+    property CacheEngine: TALBufDrawableCacheEngine read FCacheEngine write FCacheEngine;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -667,6 +696,9 @@ type
     procedure SetStateStyles(const AValue: TStateStyles);
   protected
     function CreateStateStyles: TALBaseCheckBox.TStateStyles; override;
+  public
+    property CacheEngine;
+    property CacheIndex;
   published
     //property Action;
     property Align;
@@ -894,7 +926,10 @@ type
           end;
           // ------------------
           // TDefaultStateStyle
-          TDefaultStateStyle = class(TBaseStateStyle);
+          TDefaultStateStyle = class(TBaseStateStyle)
+          protected
+            function GetCacheSubIndex: Integer; override;
+          end;
           // -------------------
           // TDisabledStateStyle
           TDisabledStateStyle = class(TBaseStateStyle)
@@ -904,6 +939,7 @@ type
             function IsOpacityStored: Boolean;
           protected
             function GetInherit: Boolean; override;
+            function GetCacheSubIndex: Integer; override;
           public
             constructor Create(const AParent: TObject); override;
             procedure Assign(Source: TPersistent); override;
@@ -914,18 +950,24 @@ type
           // ------------------
           // THoveredStateStyle
           THoveredStateStyle = class(TBaseStateStyle)
+          protected
+            function GetCacheSubIndex: Integer; override;
           published
             property StateLayer;
           end;
           // ------------------
           // TPressedStateStyle
           TPressedStateStyle = class(TBaseStateStyle)
+          protected
+            function GetCacheSubIndex: Integer; override;
           published
             property StateLayer;
           end;
           // ------------------
           // TFocusedStateStyle
           TFocusedStateStyle = class(TBaseStateStyle)
+          protected
+            function GetCacheSubIndex: Integer; override;
           published
             property StateLayer;
           end;
@@ -1002,6 +1044,8 @@ type
         FDoubleBuffered: boolean;
         FXRadius: Single;
         FYRadius: Single;
+        FCacheIndex: Integer; // 4 bytes
+        FCacheEngine: TALBufDrawableCacheEngine; // 8 bytes
         {$IF NOT DEFINED(ALSkiaCanvas)}
         FRenderTargetSurface: TALSurface; // 8 bytes
         FRenderTargetCanvas: TALCanvas; // 8 bytes
@@ -1015,6 +1059,7 @@ type
         function CreateStroke: TALStrokeBrush; override;
         function CreateStateStyles: TStateStyles; virtual;
         function GetDefaultSize: TSizeF; override;
+        function GetCacheSubIndex: Integer; virtual;
         function GetDoubleBuffered: boolean; override;
         procedure SetDoubleBuffered(const AValue: Boolean); override;
         function GetDefaultXRadius: Single; virtual;
@@ -1050,6 +1095,8 @@ type
         {$ENDIF}
         procedure Paint; override;
         property Checked: Boolean read GetChecked write SetChecked default False;
+        property CacheIndex: Integer read FCacheIndex write FCacheIndex;
+        property CacheEngine: TALBufDrawableCacheEngine read FCacheEngine write FCacheEngine;
       public
         constructor Create(AOwner: TComponent); override;
         destructor Destroy; override;
@@ -1336,6 +1383,10 @@ type
     procedure ScrollCapturedByOtherHandler(const Sender: TObject; const M: TMessage);
     procedure SetTransition(const Value: TALStateTransition);
     procedure TransitionChanged(ASender: TObject);
+    function GetCacheIndex: integer;
+    procedure SetCacheIndex(const AValue: Integer);
+    function GetCacheEngine: TALBufDrawableCacheEngine;
+    procedure SetCacheEngine(const AValue: TALBufDrawableCacheEngine);
     function GetMinThumbPos: Single;
     function GetMaxThumbPos: Single;
     procedure AlignThumb;
@@ -1366,6 +1417,13 @@ type
     procedure AlignToPixel; override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
+    // CacheIndex and CacheEngine are primarily used in TALDynamicListBox to
+    // prevent duplicate drawables across multiple identical controls.
+    // CacheIndex specifies the slot in the cache engine where an existing
+    // drawable can be retrieved.
+    property CacheIndex: Integer read GetCacheIndex write SetCacheIndex;
+    // CacheEngine is not owned by the current control.
+    property CacheEngine: TALBufDrawableCacheEngine read GetCacheEngine write SetCacheEngine;
   published
     //property Action;
     property Align;
@@ -1543,6 +1601,7 @@ type
         function IsOpacityStored: Boolean;
       protected
         function GetInherit: Boolean; override;
+        function GetCacheSubIndex: Integer; override;
       public
         constructor Create(const AParent: TObject); override;
         procedure Assign(Source: TPersistent); override;
@@ -1553,18 +1612,24 @@ type
       // ------------------
       // THoveredStateStyle
       THoveredStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
       published
         property StateLayer;
       end;
       // ------------------
       // TPressedStateStyle
       TPressedStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
       published
         property StateLayer;
       end;
       // ------------------
       // TFocusedStateStyle
       TFocusedStateStyle = class(TBaseStateStyle)
+      protected
+        function GetCacheSubIndex: Integer; override;
       published
         property StateLayer;
       end;
@@ -1640,6 +1705,8 @@ type
     procedure AlignToPixel; override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
+    property CacheEngine;
+    property CacheIndex;
   published
     //property Action;
     property Align;
@@ -2168,7 +2235,6 @@ type
         procedure PressedChanged; override;
         procedure ValueRangeChanged(Sender: TObject); Virtual;
         procedure KeyDown(var Key: Word; var KeyChar: System.WideChar; Shift: TShiftState); override;
-        function HasCustomDraw: Boolean; override;
         {$IF NOT DEFINED(ALSkiaCanvas)}
         function GetRenderTargetRect(const ARect: TrectF): TRectF; override;
         {$ENDIF}
@@ -2396,7 +2462,6 @@ type
         //property OnResized;
       end;
   private
-    fDoubleBuffered: boolean;
     FTabStop: Boolean;
     FIsAligningTracks: Boolean;
     function FrequencyStored: Boolean;
@@ -2611,7 +2676,7 @@ type
         procedure StrokeChanged(Sender: TObject); override;
         procedure ShadowChanged(Sender: TObject); override;
         procedure StateStylesChanged(Sender: TObject); override;
-        procedure TouchTargetExpansionChanged(Sender: TObject);
+        procedure TouchTargetExpansionChanged(Sender: TObject); virtual;
         procedure DoResized; override;
      public
        constructor Create(const ACustomTrack: TALCustomTrack); override;
@@ -2987,6 +3052,8 @@ begin
   FRowCount := 4;
   FResourceName := 'aniindicator_540x432';
   FFrameIndex := TSmallPoint.Create(0,0);
+  FCacheIndex := 0;
+  FCacheEngine := nil;
   FTimer := TALDisplayTimer.Create;
   FTimer.Enabled := False;
   FTimer.Interval := FInterval;
@@ -3040,6 +3107,10 @@ begin
   end;
 
   if (not ALIsDrawableNull(FBufDrawable)) then exit;
+
+  if (CacheIndex > 0) and
+     (CacheEngine <> nil) and
+     (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   {$IFDEF debug}
   ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
@@ -3102,20 +3173,42 @@ begin
     Canvas.DrawDashRect(R, 0, 0, AllCorners, AbsoluteOpacity, $A0909090);
   end;
 
-  MakeBufDrawable;
+  var LDrawable: TALDrawable;
+  var LDrawableRect: TRectF;
+  if (CacheIndex <= 0) or
+     (CacheEngine = nil) or
+     (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+    MakeBufDrawable;
+    if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(fBufDrawable)) then begin
+      if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, fBufDrawable{ADrawable}, fBufDrawableRect{ARect}) then ALFreeAndNilDrawable(fBufDrawable)
+      else fBufDrawable := ALNullDrawable;
+      if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+        raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
+    end
+    else begin
+      LDrawable := FBufDrawable;
+      LDrawableRect := FBufDrawableRect;
+    end;
+  end;
 
   ALDrawDrawable(
     Canvas, // const ACanvas: Tcanvas;
-    fBufDrawable, // const ADrawable: TALDrawable;
+    LDrawable, // const ADrawable: TALDrawable;
     TRectF.Create(
       TPointF.Create(
         fFrameIndex.x * Width * ALGetScreenScale,
         fFrameIndex.Y * Height * ALGetScreenScale),
       Width * ALGetScreenScale,
       Height * ALGetScreenScale), // const ASrcRect: TrectF; // IN REAL PIXEL !
-    fBufDrawableRect, // const ADestRect: TrectF; // IN virtual pixels !
+    LDrawableRect, // const ADestRect: TrectF; // IN virtual pixels !
     AbsoluteOpacity); // const AOpacity: Single);
 
+end;
+
+{*************************************************}
+function TALAniIndicator.GetCacheSubIndex: Integer;
+begin
+  Result := 0;
 end;
 
 {**************************************************}
@@ -3431,7 +3524,6 @@ begin
   cursor := crHandPoint;
   AutoCapture := True;
   Locked := True;
-  DoubleBuffered := ACustomTrack.DoubleBuffered;
   //--
   FValueRange := TValueRange.create(self);
   {$IFDEF debug}
@@ -3767,30 +3859,17 @@ begin
     FScrollCapturedByMe := False;
 end;
 
-{****************************************************}
-function TALCustomTrack.TThumb.HasCustomDraw: Boolean;
-begin
-  // We need the BufDrawableRect because in MakeBufDrawable we do:
-  //   var LMainDrawableRect := BufDrawableRect;
-  //   LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
-  //   var LCenteredRect := LStateStyle.BufDrawableRect.CenterAt(LMainDrawableRect);
-  //   LStateStyle.BufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
-  // Additionally, in paint, if the current style has inherit=true, we do not
-  // fallback to the inherited paint.
-  Result := true;
-end;
-
 {***********************************************}
 procedure TALCustomTrack.TThumb.ClearBufDrawable;
 begin
   {$IFDEF debug}
   if (FStateStyles <> nil) and
      (not (csDestroying in ComponentState)) and
-     (ALIsDrawableNull(BufDrawable)) and // warn will be raise in inherited
-     ((not ALIsDrawableNull(FStateStyles.Disabled.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Hovered.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Pressed.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Focused.BufDrawable))) then
+     (ALIsDrawableNull(FBufDrawable)) and // warn will be raise in inherited
+     ((not ALIsDrawableNull(FStateStyles.Disabled.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Hovered.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Pressed.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Focused.FBufDrawable))) then
     ALLog(Classname + '.ClearBufDrawable', 'BufDrawable has been cleared | Name: ' + Name, TalLogType.warn);
   {$endif}
   if FStateStyles <> nil then
@@ -3812,7 +3891,7 @@ begin
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
   if LStateStyle = nil then exit;
   if LStateStyle.Inherit then exit;
-  if (not ALIsDrawableNull(LStateStyle.BufDrawable)) then exit;
+  if (not ALIsDrawableNull(LStateStyle.FBufDrawable)) then exit;
   LStateStyle.SupersedeNoChanges(true{ASaveState});
   try
 
@@ -3822,8 +3901,8 @@ begin
 
     // Create the BufDrawable
     CreateBufDrawable(
-      LStateStyle.BufDrawable, // var ABufDrawable: TALDrawable;
-      LStateStyle.BufDrawableRect, // var ABufDrawableRect: TRectF;
+      LStateStyle.FBufDrawable, // var ABufDrawable: TALDrawable;
+      LStateStyle.FBufDrawableRect, // var ABufDrawableRect: TRectF;
       ALGetScreenScale * LStateStyle.Scale, // const AScale: Single;
       LStateStyle.Fill, // const AFill: TALBrush;
       LStateStyle.StateLayer, // const AStateLayer: TALStateLayer;
@@ -3832,19 +3911,21 @@ begin
       LStateStyle.Stroke, // const AStroke: TALStrokeBrush;
       LStateStyle.Shadow); // const AShadow: TALShadow);
 
-    // LStateStyle.BufDrawableRect must include the LStateStyle.Scale
-    LStateStyle.BufDrawableRect.Top := LStateStyle.BufDrawableRect.Top * LStateStyle.Scale;
-    LStateStyle.BufDrawableRect.right := LStateStyle.BufDrawableRect.right * LStateStyle.Scale;
-    LStateStyle.BufDrawableRect.left := LStateStyle.BufDrawableRect.left * LStateStyle.Scale;
-    LStateStyle.BufDrawableRect.bottom := LStateStyle.BufDrawableRect.bottom * LStateStyle.Scale;
+    // LStateStyle.FBufDrawableRect must include the LStateStyle.Scale
+    LStateStyle.FBufDrawableRect.Top := LStateStyle.FBufDrawableRect.Top * LStateStyle.Scale;
+    LStateStyle.FBufDrawableRect.right := LStateStyle.FBufDrawableRect.right * LStateStyle.Scale;
+    LStateStyle.FBufDrawableRect.left := LStateStyle.FBufDrawableRect.left * LStateStyle.Scale;
+    LStateStyle.FBufDrawableRect.bottom := LStateStyle.FBufDrawableRect.bottom * LStateStyle.Scale;
 
-    // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect
-    // (due to scale), we must center LStateStyle.BufDrawableRect
+    // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect
+    // (due to scale), we must center LStateStyle.FBufDrawableRect
     // within the main BufDrawableRect to ensure that all changes are visually centered.
-    var LMainDrawableRect := BufDrawableRect;
+    var LMainDrawableRect: TRectF;
+    If AlIsDrawableNull(FBufDrawable) then LMainDrawableRect := LocalRect
+    else LMainDrawableRect := FBufDrawableRect;
     LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
-    var LCenteredRect := LStateStyle.BufDrawableRect.CenterAt(LMainDrawableRect);
-    LStateStyle.BufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
+    var LCenteredRect := LStateStyle.FBufDrawableRect.CenterAt(LMainDrawableRect);
+    LStateStyle.FBufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
 
   finally
     LStateStyle.RestorestateNoChanges;
@@ -3914,16 +3995,16 @@ begin
   else begin
     var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
     if LStateStyle <> nil then begin
-      LDrawable := LStateStyle.BufDrawable;
-      LDrawableRect := LStateStyle.BufDrawableRect;
+      LDrawable := LStateStyle.FBufDrawable;
+      LDrawableRect := LStateStyle.FBufDrawableRect;
       if ALIsDrawableNull(LDrawable) then begin
-        LDrawable := BufDrawable;
-        LDrawableRect := BufDrawableRect;
+        LDrawable := FBufDrawable;
+        LDrawableRect := FBufDrawableRect;
       end;
     end
     else begin
-      LDrawable := BufDrawable;
-      LDrawableRect := BufDrawableRect;
+      LDrawable := FBufDrawable;
+      LDrawableRect := FBufDrawableRect;
     end;
   end;
 
@@ -3945,8 +4026,7 @@ begin
     var LCanvasSaveState: TCanvasSaveState := ALScaleAndCenterCanvas(
                                                 Canvas, // Const ACanvas: TCanvas;
                                                 AbsoluteRect, // Const AAbsoluteRect: TRectF;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleX: Single;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleY: Single;
+                                                LCurrentAdjustedStateStyle.Scale, // Const AScale: Single;
                                                 true); // Const ASaveState: Boolean);
     try
 
@@ -4009,10 +4089,12 @@ begin
     LRect.left := LRect.left * LCurrentAdjustedStateStyle.Scale;
     LRect.bottom := LRect.bottom * LCurrentAdjustedStateStyle.Scale;
 
-    // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect
-    // (due to autosizing with different font sizes), we must center LStateStyle.BufDrawableRect
+    // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect
+    // (due to autosizing with different font sizes), we must center LStateStyle.FBufDrawableRect
     // within the main BufDrawableRect to ensure that all changes are visually centered.
-    var LMainDrawableRect := BufDrawableRect;
+    var LMainDrawableRect: TRectF;
+    If AlIsDrawableNull(FBufDrawable) then LMainDrawableRect := LocalRect
+    else LMainDrawableRect := FBufDrawableRect;
     LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
     var LCenteredRect := LRect.CenterAt(LMainDrawableRect);
     LRect.Offset(LCenteredRect.Left, LCenteredRect.top);
@@ -4908,7 +4990,6 @@ begin
   FStopIndicator.OnChanged := StopIndicatorChanged;
   Locked := True;
   HitTest := False;
-  DoubleBuffered := ACustomTrack.DoubleBuffered;
   //--
   {$IF defined(ALDPK)}
   FPrevStateStyles := TStateStyles.Create(nil);
@@ -5062,8 +5143,8 @@ begin
   {$IFDEF debug}
   if (FStateStyles <> nil) and
      (not (csDestroying in ComponentState)) and
-     (ALIsDrawableNull(BufDrawable)) and // warn will be raise in inherited
-     (not ALIsDrawableNull(FStateStyles.Disabled.BufDrawable)) then
+     (ALIsDrawableNull(FBufDrawable)) and // warn will be raise in inherited
+     (not ALIsDrawableNull(FStateStyles.Disabled.FBufDrawable)) then
     ALLog(Classname + '.ClearBufDrawable', 'BufDrawable has been cleared | Name: ' + Name, TalLogType.warn);
   {$endif}
   if FStateStyles <> nil then
@@ -5085,7 +5166,7 @@ begin
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
   if LStateStyle = nil then exit;
   if LStateStyle.Inherit then exit;
-  if (not ALIsDrawableNull(LStateStyle.BufDrawable)) then exit;
+  if (not ALIsDrawableNull(LStateStyle.FBufDrawable)) then exit;
   LStateStyle.SupersedeNoChanges(true{ASaveState});
   try
 
@@ -5095,8 +5176,8 @@ begin
 
     // Create the BufDrawable
     CreateBufDrawable(
-      LStateStyle.BufDrawable, // var ABufDrawable: TALDrawable;
-      LStateStyle.BufDrawableRect, // var ABufDrawableRect: TRectF;
+      LStateStyle.FBufDrawable, // var ABufDrawable: TALDrawable;
+      LStateStyle.FBufDrawableRect, // var ABufDrawableRect: TRectF;
       ALGetScreenScale, // const AScale: Single;
       LStateStyle.Fill, // const AFill: TALBrush;
       LStateStyle.StateLayer, // const AStateLayer: TALStateLayer;
@@ -5260,16 +5341,16 @@ begin
   var LDrawableRect: TRectF;
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
   if LStateStyle <> nil then begin
-    LDrawable := LStateStyle.BufDrawable;
-    LDrawableRect := LStateStyle.BufDrawableRect;
+    LDrawable := LStateStyle.FBufDrawable;
+    LDrawableRect := LStateStyle.FBufDrawableRect;
     if ALIsDrawableNull(LDrawable) then begin
-      LDrawable := BufDrawable;
-      LDrawableRect := BufDrawableRect;
+      LDrawable := FBufDrawable;
+      LDrawableRect := FBufDrawableRect;
     end;
   end
   else begin
-    LDrawable := BufDrawable;
-    LDrawableRect := BufDrawableRect;
+    LDrawable := FBufDrawable;
+    LDrawableRect := FBufDrawableRect;
   end;
 
   if ALIsDrawableNull(LDrawable) then begin
@@ -5327,8 +5408,8 @@ end;
 {*******************************************************************}
 function TALCustomTrack.TInactiveTrack.GetBufDrawableSrcRect: TRectF;
 begin
-  if ALIsDrawableNull(BufDrawable) then Exit(TRectF.Empty);
-  Result := TRectF.Create(0, 0, ALGetDrawableWidth(BufDrawable), ALGetDrawableHeight(BufDrawable));
+  if ALIsDrawableNull(FBufDrawable) then Exit(TRectF.Empty);
+  Result := TRectF.Create(0, 0, ALGetDrawableWidth(FBufDrawable), ALGetDrawableHeight(FBufDrawable));
   if FCustomTrack.Orientation = TOrientation.Horizontal then begin
     Result.SetLocation(
       Result.width - (Width * Canvas.Scale) - 1{For AddPixelForAlignment in ALCreateSurface},
@@ -5383,8 +5464,8 @@ end;
 {*****************************************************************}
 function TALCustomTrack.TActiveTrack.GetBufDrawableSrcRect: TRectF;
 begin
-  if ALIsDrawableNull(BufDrawable) then Exit(TRectF.Empty);
-  Result := TRectF.Create(0, 0, ALGetDrawableWidth(BufDrawable), ALGetDrawableHeight(BufDrawable));
+  if ALIsDrawableNull(FBufDrawable) then Exit(TRectF.Empty);
+  Result := TRectF.Create(0, 0, ALGetDrawableWidth(FBufDrawable), ALGetDrawableHeight(FBufDrawable));
   if FCustomTrack.Orientation = TOrientation.Horizontal then
     Result.Width := Width * Canvas.Scale
   else
@@ -5408,7 +5489,6 @@ begin
   inherited TabStop := False;
   FTabStop := True;
   FIsAligningTracks := False;
-  fDoubleBuffered := True;
   FOrientation := TOrientation.Horizontal;
   FOnChange := nil;
   //--
@@ -5511,6 +5591,7 @@ begin
   if FInactiveTrack <> nil then FInactiveTrack.MakeBufDrawable;
   if FActiveTrack <> nil then FActiveTrack.MakeBufDrawable;
   if FThumb <> nil then FThumb.MakeBufDrawable;
+  //if FValueIndicator <> nil then FValueIndicator.MakeBufDrawable;
 end;
 
 {****************************************}
@@ -5519,6 +5600,7 @@ begin
   if FInactiveTrack <> nil then FInactiveTrack.ClearBufDrawable;
   if FActiveTrack <> nil then FActiveTrack.ClearBufDrawable;
   if FThumb <> nil then FThumb.ClearBufDrawable;
+  if FValueIndicator <> nil then FValueIndicator.ClearBufDrawable;
 end;
 
 {*******************************************}
@@ -5627,16 +5709,16 @@ end;
 {*************************************************}
 function TALCustomTrack.GetDoubleBuffered: boolean;
 begin
-  result := fDoubleBuffered;
+  result := FThumb.DoubleBuffered;
 end;
 
 {****************************************************************}
 procedure TALCustomTrack.SetDoubleBuffered(const AValue: Boolean);
 begin
-  fDoubleBuffered := AValue;
+  FThumb.DoubleBuffered := AValue;
   if FInactiveTrack <> nil then FInactiveTrack.DoubleBuffered := AValue;
   if FActiveTrack <> nil then FActiveTrack.DoubleBuffered := AValue;
-  if FThumb <> nil then FThumb.DoubleBuffered := AValue;
+  if FValueIndicator <> nil then FValueIndicator.DoubleBuffered := AValue;
 end;
 
 {********************************************}
@@ -5820,6 +5902,7 @@ begin
   if FInactiveTrack <> nil then FInactiveTrack.enabled := enabled;
   if FActiveTrack <> nil then FActiveTrack.enabled := enabled;
   if FThumb <> nil then FThumb.enabled := enabled;
+  if FValueIndicator <> nil then FValueIndicator.enabled := enabled;
 end;
 
 {*****************************************************************}
@@ -5848,7 +5931,7 @@ begin
     if not (csLoading in ComponentState) then begin
       BeginUpdate;
       Try
-        SetBounds(Position.X, Position.Y, Size.Height, Size.Width);
+        SetBounds(Position.X, Position.Y, Height, Width);
         Margins.Rect := SwapTopBottomWithLeftRight(Margins.Rect);
         Padding.Rect := SwapTopBottomWithLeftRight(Padding.Rect);
         if FActiveTrack <> nil then begin
@@ -5987,8 +6070,8 @@ end;
 {************************************************************************}
 function TALRangeTrackBar.TMinInactiveTrack.GetBufDrawableSrcRect: TRectF;
 begin
-  if ALIsDrawableNull(BufDrawable) then Exit(TRectF.Empty);
-  Result := TRectF.Create(0, 0, ALGetDrawableWidth(BufDrawable), ALGetDrawableHeight(BufDrawable));
+  if ALIsDrawableNull(FBufDrawable) then Exit(TRectF.Empty);
+  Result := TRectF.Create(0, 0, ALGetDrawableWidth(FBufDrawable), ALGetDrawableHeight(FBufDrawable));
   if FCustomTrack.Orientation = TOrientation.Horizontal then
     Result.Width := Width * Canvas.Scale
   else
@@ -5999,8 +6082,8 @@ end;
 {************************************************************************}
 function TALRangeTrackBar.TMaxInactiveTrack.GetBufDrawableSrcRect: TRectF;
 begin
-  if ALIsDrawableNull(BufDrawable) then Exit(TRectF.Empty);
-  Result := TRectF.Create(0, 0, ALGetDrawableWidth(BufDrawable), ALGetDrawableHeight(BufDrawable));
+  if ALIsDrawableNull(FBufDrawable) then Exit(TRectF.Empty);
+  Result := TRectF.Create(0, 0, ALGetDrawableWidth(FBufDrawable), ALGetDrawableHeight(FBufDrawable));
   if FCustomTrack.Orientation = TOrientation.Horizontal then begin
     Result.SetLocation(
       Result.width - (Width * Canvas.Scale) - 1{For AddPixelForAlignment in ALCreateSurface},
@@ -6019,8 +6102,8 @@ end;
 {*******************************************************************}
 function TALRangeTrackBar.TActiveTrack.GetBufDrawableSrcRect: TRectF;
 begin
-  if ALIsDrawableNull(BufDrawable) then Exit(TRectF.Empty);
-  Result := TRectF.Create(0, 0, ALGetDrawableWidth(BufDrawable), ALGetDrawableHeight(BufDrawable));
+  if ALIsDrawableNull(FBufDrawable) then Exit(TRectF.Empty);
+  Result := TRectF.Create(0, 0, ALGetDrawableWidth(FBufDrawable), ALGetDrawableHeight(FBufDrawable));
   if FCustomTrack.Orientation = TOrientation.Horizontal then begin
     Var LThumbWidth: Single;
     If FcustomTrack.FThumb <> nil then LThumbWidth := FcustomTrack.FThumb.Width
@@ -6170,7 +6253,6 @@ end;
 {********************************************************************************}
 procedure TALRangeTrackBar.TMinThumb.TouchTargetExpansionChanged(Sender: TObject);
 begin
-  Inherited;
   if Assigned(FFormerTouchTargetExpansionChangedHandler) then
     FFormerTouchTargetExpansionChangedHandler(Sender);
   var LMaxThumb := TALRangeTrackBar(FCustomTrack).FMaxThumb;
@@ -7292,6 +7374,12 @@ begin
 end;
 
 {********************************************************************}
+function TALBaseCheckBox.TDefaultStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 1;
+end;
+
+{********************************************************************}
 function TALBaseCheckBox.TDisabledStateStyle.IsOpacityStored: Boolean;
 begin
   Result := not SameValue(FOpacity, TControl.DefaultDisabledOpacity, TEpsilon.Scale);
@@ -7347,6 +7435,30 @@ begin
   // disabledOpacity of the base control immediately every time it changes.
   // Essentially, it acts merely as a link to the disabledOpacity of the base control.
   Result := inherited GetInherit;
+end;
+
+{*********************************************************************}
+function TALBaseCheckBox.TDisabledStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 2;
+end;
+
+{********************************************************************}
+function TALBaseCheckBox.THoveredStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 3;
+end;
+
+{********************************************************************}
+function TALBaseCheckBox.TPressedStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 4;
+end;
+
+{********************************************************************}
+function TALBaseCheckBox.TFocusedStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 5;
 end;
 
 {******************************************************************************}
@@ -7687,6 +7799,8 @@ begin
   FDoubleBuffered := true;
   FXRadius := DefaultXRadius;
   FYRadius := DefaultYRadius;
+  FCacheIndex := 0;
+  FCacheEngine := nil;
   {$IF NOT DEFINED(ALSkiaCanvas)}
   FRenderTargetSurface := ALNullSurface;
   FRenderTargetCanvas := ALNullCanvas;
@@ -7734,6 +7848,12 @@ begin
   finally
     EndUpdate;
   end;
+end;
+
+{*************************************************}
+function TALBaseCheckBox.GetCacheSubIndex: Integer;
+begin
+  Result := 0;
 end;
 
 {**************************************************}
@@ -7932,16 +8052,16 @@ begin
   {$IFDEF debug}
   if (FStateStyles <> nil) and
      (not (csDestroying in ComponentState)) and
-     ((not ALIsDrawableNull(FStateStyles.Checked.Default.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Disabled.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Hovered.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Pressed.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Focused.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Default.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Disabled.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Hovered.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Pressed.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Focused.BufDrawable))) then
+     ((not ALIsDrawableNull(FStateStyles.Checked.Default.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Disabled.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Hovered.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Pressed.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Focused.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Default.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Disabled.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Hovered.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Pressed.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Focused.FBufDrawable))) then
     ALLog(Classname + '.ClearBufDrawable', 'BufDrawable has been cleared | Name: ' + Name, TalLogType.warn);
   {$endif}
   if FStateStyles <> nil then
@@ -7954,7 +8074,7 @@ procedure TALBaseCheckBox.MakeBufDrawable;
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   function _DoMakeBufDrawable(const AStateStyle: TBaseStateStyle): boolean;
   begin
-    if (not ALIsDrawableNull(AStateStyle.BufDrawable)) then exit(False);
+    if (not ALIsDrawableNull(AStateStyle.FBufDrawable)) then exit(False);
     AStateStyle.SupersedeNoChanges(true{ASaveState});
     try
 
@@ -7963,8 +8083,8 @@ procedure TALBaseCheckBox.MakeBufDrawable;
       {$endif}
 
       CreateBufDrawable(
-        AStateStyle.BufDrawable, // var ABufDrawable: TALDrawable;
-        AStateStyle.BufDrawableRect, // var ABufDrawableRect: TRectF;
+        AStateStyle.FBufDrawable, // var ABufDrawable: TALDrawable;
+        AStateStyle.FBufDrawableRect, // var ABufDrawableRect: TRectF;
         ALGetScreenScale * AStateStyle.Scale, // const AScale: Single;
         AStateStyle.Fill, // const AFill: TALBrush;
         AStateStyle.StateLayer, // const AStateLayer: TALStateLayer;
@@ -7972,17 +8092,17 @@ procedure TALBaseCheckBox.MakeBufDrawable;
         AStateStyle.CheckMark, // const ACheckMark: TCheckMarkBrush;
         AStateStyle.Shadow); // const AShadow: TALShadow);
 
-      // LStateStyle.BufDrawableRect must include the LScale
-      AStateStyle.BufDrawableRect.Top := AStateStyle.BufDrawableRect.Top * AStateStyle.Scale;
-      AStateStyle.BufDrawableRect.right := AStateStyle.BufDrawableRect.right * AStateStyle.Scale;
-      AStateStyle.BufDrawableRect.left := AStateStyle.BufDrawableRect.left * AStateStyle.Scale;
-      AStateStyle.BufDrawableRect.bottom := AStateStyle.BufDrawableRect.bottom * AStateStyle.Scale;
+      // LStateStyle.FBufDrawableRect must include the LScale
+      AStateStyle.FBufDrawableRect.Top := AStateStyle.FBufDrawableRect.Top * AStateStyle.Scale;
+      AStateStyle.FBufDrawableRect.right := AStateStyle.FBufDrawableRect.right * AStateStyle.Scale;
+      AStateStyle.FBufDrawableRect.left := AStateStyle.FBufDrawableRect.left * AStateStyle.Scale;
+      AStateStyle.FBufDrawableRect.bottom := AStateStyle.FBufDrawableRect.bottom * AStateStyle.Scale;
 
-      // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
-      // (due to scale), we must center LStateStyle.BufDrawableRect within the main BufDrawableRect (LocalRect)
+      // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
+      // (due to scale), we must center LStateStyle.FBufDrawableRect within the main BufDrawableRect (LocalRect)
       // to ensure that all changes are visually centered.
-      var LCenteredRect := AStateStyle.BufDrawableRect.CenterAt(LocalRect);
-      AStateStyle.BufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
+      var LCenteredRect := AStateStyle.FBufDrawableRect.CenterAt(LocalRect);
+      AStateStyle.FBufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
 
     finally
       AStateStyle.RestorestateNoChanges;
@@ -7997,14 +8117,30 @@ begin
     exit;
   end;
   //--
-  if Checked then _DoMakeBufDrawable(StateStyles.Checked.Default)
-  else _DoMakeBufDrawable(StateStyles.UnChecked.Default);
+  var LSubIndexOffset: Integer;
+  var LDefaultStateStyle: TBaseStateStyle;
+  if Checked then begin
+    LSubIndexOffset := GetCacheSubIndex{+0};
+    LDefaultStateStyle := StateStyles.Checked.Default;
+  end
+  else begin
+    LSubIndexOffset := GetCacheSubIndex+5;
+    LDefaultStateStyle := StateStyles.UnChecked.Default;
+  end;
+  //--
+  if (CacheIndex = 0) or
+     (CacheEngine = nil) or
+     (not CacheEngine.HasEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex})) then
+    _DoMakeBufDrawable(LDefaultStateStyle);
   //--
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
   if LStateStyle = nil then exit;
   if LStateStyle.Inherit then exit;
+  if (CacheIndex > 0) and
+     (CacheEngine <> nil) and
+     (CacheEngine.HasEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex})) then Exit;
   _DoMakeBufDrawable(LStateStyle);
-  // No need to center LStateStyle.BufDrawableRect on the main BufDrawableRect
+  // No need to center LStateStyle.FBufDrawableRect on the main BufDrawableRect
   // because BufDrawableRect always has the width and height of the localRect.
 end;
 
@@ -8354,32 +8490,59 @@ procedure TALBaseCheckBox.Paint;
 begin
 
   StateStyles.UpdateLastPaintedRawStyle;
-  MakeBufDrawable;
 
-  var LDrawable: TALDrawable;
-  var LDrawableRect: TRectF;
-  if StateStyles.IsTransitionAnimationRunning then begin
-    LDrawable := ALNullDrawable;
-    LDrawableRect := TRectF.Empty;
-  end
-  else begin
+  var LDrawable: TALDrawable := ALNullDrawable;
+  var LDrawableRect: TRectF := TRectF.Empty;
+  if not StateStyles.IsTransitionAnimationRunning then begin
+    //--
+    var LSubIndexOffset: Integer;
+    var LDefaultStateStyle: TBaseStateStyle;
+    if Checked then begin
+      LSubIndexOffset := GetCacheSubIndex{+0};
+      LDefaultStateStyle := StateStyles.Checked.Default;
+    end
+    else begin
+      LSubIndexOffset := GetCacheSubIndex+5;
+      LDefaultStateStyle := StateStyles.UnChecked.Default;
+    end;
+    //--
     var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
     if LStateStyle <> nil then begin
-      LDrawable := LStateStyle.BufDrawable;
-      LDrawableRect := LStateStyle.BufDrawableRect;
-      if ALIsDrawableNull(LDrawable) then begin
-        if checked then begin
-          LDrawable := StateStyles.Checked.default.BufDrawable;
-          LDrawableRect := StateStyles.Checked.default.BufDrawableRect;
+      if (CacheIndex <= 0) or
+         (CacheEngine = nil) or
+         (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+        MakeBufDrawable;
+        if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(LStateStyle.FBufDrawable)) then begin
+          if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex}, LStateStyle.FBufDrawable{ADrawable}, LStateStyle.FBufDrawableRect{ARect}) then ALFreeAndNilDrawable(LStateStyle.FBufDrawable)
+          else LStateStyle.FBufDrawable := ALNullDrawable;
+          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+            raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
         end
         else begin
-          LDrawable := StateStyles.UnChecked.default.BufDrawable;
-          LDrawableRect := StateStyles.UnChecked.default.BufDrawableRect;
+          LDrawable := LStateStyle.FBufDrawable;
+          LDrawableRect := LStateStyle.FBufDrawableRect;
         end;
       end;
-    end
-    else
-      raise Exception.Create('Error #EA9B4064-F1D2-4E04-82FE-99FD3ED8B1F3');
+    end;
+    //--
+    If ALIsDrawableNull(LDrawable) then begin
+      if (CacheIndex <= 0) or
+         (CacheEngine = nil) or
+         (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+        if LStateStyle = nil then MakeBufDrawable;
+        if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(LDefaultStateStyle.fBufDrawable)) then begin
+          if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex}, LDefaultStateStyle.fBufDrawable{ADrawable}, LDefaultStateStyle.fBufDrawableRect{ARect}) then ALFreeAndNilDrawable(LDefaultStateStyle.fBufDrawable)
+          else LDefaultStateStyle.fBufDrawable := ALNullDrawable;
+          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+            raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
+        end
+        else begin
+          LDrawable := LDefaultStateStyle.FBufDrawable;
+          LDrawableRect := LDefaultStateStyle.FBufDrawableRect;
+        end;
+      end;
+    end;
+    //--
   end;
 
   if ALIsDrawableNull(LDrawable) then begin
@@ -8395,8 +8558,7 @@ begin
     var LCanvasSaveState: TCanvasSaveState := ALScaleAndCenterCanvas(
                                                 Canvas, // Const ACanvas: TCanvas;
                                                 AbsoluteRect, // Const AAbsoluteRect: TRectF;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleX: Single;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleY: Single;
+                                                LCurrentAdjustedStateStyle.Scale, // Const AScale: Single;
                                                 true); // Const ASaveState: Boolean);
     try
 
@@ -8508,8 +8670,8 @@ begin
     LRect.left := LRect.left * LCurrentAdjustedStateStyle.Scale;
     LRect.bottom := LRect.bottom * LCurrentAdjustedStateStyle.Scale;
 
-    // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
-    // (due to scale), we must center LStateStyle.BufDrawableRect within the main BufDrawableRect (LocalRect)
+    // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
+    // (due to scale), we must center LStateStyle.FBufDrawableRect within the main BufDrawableRect (LocalRect)
     // to ensure that all changes are visually centered.
     var LCenteredRect := LRect.CenterAt(LocalRect);
     LRect.Offset(LCenteredRect.Left, LCenteredRect.top);
@@ -8881,6 +9043,12 @@ begin
   end;
 end;
 
+{*********************************************************************}
+function TALSwitch.TTrack.TDefaultStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 1;
+end;
+
 {******************************************************************************}
 constructor TALSwitch.TTrack.TDisabledStateStyle.Create(const AParent: TObject);
 begin
@@ -8922,6 +9090,30 @@ begin
   // disabledOpacity of the base control immediately every time it changes.
   // Essentially, it acts merely as a link to the disabledOpacity of the base control.
   Result := inherited GetInherit;
+end;
+
+{**********************************************************************}
+function TALSwitch.TTrack.TDisabledStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 2;
+end;
+
+{*********************************************************************}
+function TALSwitch.TTrack.THoveredStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 3;
+end;
+
+{*********************************************************************}
+function TALSwitch.TTrack.TPressedStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 4;
+end;
+
+{*********************************************************************}
+function TALSwitch.TTrack.TFocusedStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 5;
 end;
 
 {*******************************************************************************}
@@ -9260,6 +9452,8 @@ begin
   FDoubleBuffered := true;
   FXRadius := DefaultXRadius;
   FYRadius := DefaultYRadius;
+  FCacheIndex := 0;
+  FCacheEngine := nil;
   {$IF NOT DEFINED(ALSkiaCanvas)}
   FRenderTargetSurface := ALNullSurface;
   FRenderTargetCanvas := ALNullCanvas;
@@ -9316,6 +9510,16 @@ end;
 function TALSwitch.TTrack.GetDefaultSize: TSizeF;
 begin
   Result := TSizeF.Create(52, 32);
+end;
+
+{**************************************************}
+function TALSwitch.TTrack.GetCacheSubIndex: Integer;
+begin
+  // The Thumb uses 11 slots:
+  // 0     - Unused
+  // 1..5  - Checked state drawables
+  // 6..10 - Unchecked state drawables
+  Result := 11;
 end;
 
 {***************************************************}
@@ -9476,16 +9680,16 @@ begin
   {$IFDEF debug}
   if (FStateStyles <> nil) and
      (not (csDestroying in ComponentState)) and
-     ((not ALIsDrawableNull(FStateStyles.Checked.Default.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Disabled.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Hovered.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Pressed.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Checked.Focused.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Default.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Disabled.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Hovered.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Pressed.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.UnChecked.Focused.BufDrawable))) then
+     ((not ALIsDrawableNull(FStateStyles.Checked.Default.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Disabled.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Hovered.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Pressed.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Checked.Focused.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Default.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Disabled.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Hovered.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Pressed.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.UnChecked.Focused.FBufDrawable))) then
     ALLog(Classname + '.ClearBufDrawable', 'BufDrawable has been cleared | Name: ' + Name, TalLogType.warn);
   {$endif}
   if FStateStyles <> nil then
@@ -9498,7 +9702,7 @@ procedure TALSwitch.TTrack.MakeBufDrawable;
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   function _DoMakeBufDrawable(const AStateStyle: TBaseStateStyle): boolean;
   begin
-    if (not ALIsDrawableNull(AStateStyle.BufDrawable)) then exit(False);
+    if (not ALIsDrawableNull(AStateStyle.FBufDrawable)) then exit(False);
     AStateStyle.SupersedeNoChanges(true{ASaveState});
     try
 
@@ -9507,25 +9711,25 @@ procedure TALSwitch.TTrack.MakeBufDrawable;
       {$endif}
 
       CreateBufDrawable(
-        AStateStyle.BufDrawable, // var ABufDrawable: TALDrawable;
-        AStateStyle.BufDrawableRect, // var ABufDrawableRect: TRectF;
+        AStateStyle.FBufDrawable, // var ABufDrawable: TALDrawable;
+        AStateStyle.FBufDrawableRect, // var ABufDrawableRect: TRectF;
         ALGetScreenScale * AStateStyle.Scale, // const AScale: Single;
         AStateStyle.Fill, // const AFill: TALBrush;
         AStateStyle.StateLayer, // const AStateLayer: TALStateLayer;
         AStateStyle.Stroke, // const AStroke: TALStrokeBrush;
         AStateStyle.Shadow); // const AShadow: TALShadow);
 
-      // LStateStyle.BufDrawableRect must include the LScale
-      AStateStyle.BufDrawableRect.Top := AStateStyle.BufDrawableRect.Top * AStateStyle.Scale;
-      AStateStyle.BufDrawableRect.right := AStateStyle.BufDrawableRect.right * AStateStyle.Scale;
-      AStateStyle.BufDrawableRect.left := AStateStyle.BufDrawableRect.left * AStateStyle.Scale;
-      AStateStyle.BufDrawableRect.bottom := AStateStyle.BufDrawableRect.bottom * AStateStyle.Scale;
+      // LStateStyle.FBufDrawableRect must include the LScale
+      AStateStyle.FBufDrawableRect.Top := AStateStyle.FBufDrawableRect.Top * AStateStyle.Scale;
+      AStateStyle.FBufDrawableRect.right := AStateStyle.FBufDrawableRect.right * AStateStyle.Scale;
+      AStateStyle.FBufDrawableRect.left := AStateStyle.FBufDrawableRect.left * AStateStyle.Scale;
+      AStateStyle.FBufDrawableRect.bottom := AStateStyle.FBufDrawableRect.bottom * AStateStyle.Scale;
 
-      // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
-      // (due to scale), we must center LStateStyle.BufDrawableRect within the main BufDrawableRect (LocalRect)
+      // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
+      // (due to scale), we must center LStateStyle.FBufDrawableRect within the main BufDrawableRect (LocalRect)
       // to ensure that all changes are visually centered.
-      var LCenteredRect := AStateStyle.BufDrawableRect.CenterAt(LocalRect);
-      AStateStyle.BufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
+      var LCenteredRect := AStateStyle.FBufDrawableRect.CenterAt(LocalRect);
+      AStateStyle.FBufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
 
     finally
       AStateStyle.RestorestateNoChanges;
@@ -9540,14 +9744,30 @@ begin
     exit;
   end;
   //--
-  if Checked then _DoMakeBufDrawable(StateStyles.Checked.Default)
-  else _DoMakeBufDrawable(StateStyles.UnChecked.Default);
+  var LSubIndexOffset: Integer;
+  var LDefaultStateStyle: TBaseStateStyle;
+  if Checked then begin
+    LSubIndexOffset := GetCacheSubIndex{+0};
+    LDefaultStateStyle := StateStyles.Checked.Default;
+  end
+  else begin
+    LSubIndexOffset := GetCacheSubIndex+5;
+    LDefaultStateStyle := StateStyles.UnChecked.Default;
+  end;
+  //--
+  if (CacheIndex = 0) or
+     (CacheEngine = nil) or
+     (not CacheEngine.HasEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex})) then
+    _DoMakeBufDrawable(LDefaultStateStyle);
   //--
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
   if LStateStyle = nil then exit;
   if LStateStyle.Inherit then exit;
+  if (CacheIndex > 0) and
+     (CacheEngine <> nil) and
+     (CacheEngine.HasEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex})) then Exit;
   _DoMakeBufDrawable(LStateStyle);
-  // No need to center LStateStyle.BufDrawableRect on the main BufDrawableRect
+  // No need to center LStateStyle.FBufDrawableRect on the main BufDrawableRect
   // because BufDrawableRect always has the width and height of the localRect.
 end;
 
@@ -9691,32 +9911,59 @@ procedure TALSwitch.TTrack.Paint;
 begin
 
   StateStyles.UpdateLastPaintedRawStyle;
-  MakeBufDrawable;
 
-  var LDrawable: TALDrawable;
-  var LDrawableRect: TRectF;
-  if StateStyles.IsTransitionAnimationRunning then begin
-    LDrawable := ALNullDrawable;
-    LDrawableRect := TRectF.Empty;
-  end
-  else begin
+  var LDrawable: TALDrawable := ALNullDrawable;
+  var LDrawableRect: TRectF := TRectF.Empty;
+  if not StateStyles.IsTransitionAnimationRunning then begin
+    //--
+    var LSubIndexOffset: Integer;
+    var LDefaultStateStyle: TBaseStateStyle;
+    if Checked then begin
+      LSubIndexOffset := GetCacheSubIndex{+0};
+      LDefaultStateStyle := StateStyles.Checked.Default;
+    end
+    else begin
+      LSubIndexOffset := GetCacheSubIndex+5;
+      LDefaultStateStyle := StateStyles.UnChecked.Default;
+    end;
+    //--
     var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
     if LStateStyle <> nil then begin
-      LDrawable := LStateStyle.BufDrawable;
-      LDrawableRect := LStateStyle.BufDrawableRect;
-      if ALIsDrawableNull(LDrawable) then begin
-        if checked then begin
-          LDrawable := StateStyles.Checked.default.BufDrawable;
-          LDrawableRect := StateStyles.Checked.default.BufDrawableRect;
+      if (CacheIndex <= 0) or
+         (CacheEngine = nil) or
+         (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+        MakeBufDrawable;
+        if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(LStateStyle.FBufDrawable)) then begin
+          if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex}, LStateStyle.FBufDrawable{ADrawable}, LStateStyle.FBufDrawableRect{ARect}) then ALFreeAndNilDrawable(LStateStyle.FBufDrawable)
+          else LStateStyle.FBufDrawable := ALNullDrawable;
+          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+            raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
         end
         else begin
-          LDrawable := StateStyles.UnChecked.default.BufDrawable;
-          LDrawableRect := StateStyles.UnChecked.default.BufDrawableRect;
+          LDrawable := LStateStyle.FBufDrawable;
+          LDrawableRect := LStateStyle.FBufDrawableRect;
         end;
       end;
-    end
-    else
-      raise Exception.Create('Error #EA9B4064-F1D2-4E04-82FE-99FD3ED8B1F3');
+    end;
+    //--
+    If ALIsDrawableNull(LDrawable) then begin
+      if (CacheIndex <= 0) or
+         (CacheEngine = nil) or
+         (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+        if LStateStyle = nil then MakeBufDrawable;
+        if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(LDefaultStateStyle.fBufDrawable)) then begin
+          if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex}, LDefaultStateStyle.fBufDrawable{ADrawable}, LDefaultStateStyle.fBufDrawableRect{ARect}) then ALFreeAndNilDrawable(LDefaultStateStyle.fBufDrawable)
+          else LDefaultStateStyle.fBufDrawable := ALNullDrawable;
+          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, LSubIndexOffset+LDefaultStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+            raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
+        end
+        else begin
+          LDrawable := LDefaultStateStyle.FBufDrawable;
+          LDrawableRect := LDefaultStateStyle.FBufDrawableRect;
+        end;
+      end;
+    end;
+    //--
   end;
 
   if ALIsDrawableNull(LDrawable) then begin
@@ -9732,8 +9979,7 @@ begin
     var LCanvasSaveState: TCanvasSaveState := ALScaleAndCenterCanvas(
                                                 Canvas, // Const ACanvas: TCanvas;
                                                 AbsoluteRect, // Const AAbsoluteRect: TRectF;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleX: Single;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleY: Single;
+                                                LCurrentAdjustedStateStyle.Scale, // Const AScale: Single;
                                                 true); // Const ASaveState: Boolean);
     try
 
@@ -9827,8 +10073,8 @@ begin
     LRect.left := LRect.left * LCurrentAdjustedStateStyle.Scale;
     LRect.bottom := LRect.bottom * LCurrentAdjustedStateStyle.Scale;
 
-    // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
-    // (due to scale), we must center LStateStyle.BufDrawableRect within the main BufDrawableRect (LocalRect)
+    // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect (LocalRect)
+    // (due to scale), we must center LStateStyle.FBufDrawableRect within the main BufDrawableRect (LocalRect)
     // to ensure that all changes are visually centered.
     var LCenteredRect := LRect.CenterAt(LocalRect);
     LRect.Offset(LCenteredRect.Left, LCenteredRect.top);
@@ -10442,6 +10688,32 @@ begin
 end;
 
 {****************************************}
+function TALSwitch.GetCacheIndex: integer;
+begin
+  Result := FThumb.CacheIndex;
+end;
+
+{*******************************************************}
+procedure TALSwitch.SetCacheIndex(const AValue: Integer);
+begin
+  FThumb.CacheIndex := AValue;
+  FTrack.CacheIndex := AValue;
+end;
+
+{***********************************************************}
+function TALSwitch.GetCacheEngine: TALBufDrawableCacheEngine;
+begin
+  Result := FThumb.CacheEngine;
+end;
+
+{**************************************************************************}
+procedure TALSwitch.SetCacheEngine(const AValue: TALBufDrawableCacheEngine);
+begin
+  FThumb.CacheEngine := AValue;
+  FTrack.CacheEngine := AValue;
+end;
+
+{****************************************}
 function TALSwitch.GetMinThumbPos: Single;
 begin
   result := Track.Padding.left + fThumb.Margins.left;
@@ -10783,6 +11055,30 @@ begin
   // disabledOpacity of the base control immediately every time it changes.
   // Essentially, it acts merely as a link to the disabledOpacity of the base control.
   Result := inherited GetInherit;
+end;
+
+{***************************************************************}
+function TALButton.TDisabledStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 1;
+end;
+
+{**************************************************************}
+function TALButton.THoveredStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 2;
+end;
+
+{**************************************************************}
+function TALButton.TPressedStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 3;
+end;
+
+{**************************************************************}
+function TALButton.TFocusedStateStyle.GetCacheSubIndex: Integer;
+begin
+  Result := 4;
 end;
 
 {*******************************************************************}
@@ -11235,11 +11531,11 @@ begin
   {$IFDEF debug}
   if (FStateStyles <> nil) and
      (not (csDestroying in ComponentState)) and
-     (ALIsDrawableNull(BufDrawable)) and // warn will be raise in inherited
-     ((not ALIsDrawableNull(FStateStyles.Disabled.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Hovered.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Pressed.BufDrawable)) or
-      (not ALIsDrawableNull(FStateStyles.Focused.BufDrawable))) then
+     (ALIsDrawableNull(FBufDrawable)) and // warn will be raise in inherited
+     ((not ALIsDrawableNull(FStateStyles.Disabled.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Hovered.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Pressed.FBufDrawable)) or
+      (not ALIsDrawableNull(FStateStyles.Focused.FBufDrawable))) then
     ALLog(Classname + '.ClearBufDrawable', 'BufDrawable has been cleared | Name: ' + Name, TalLogType.warn);
   {$endif}
   if FStateStyles <> nil then
@@ -11261,7 +11557,10 @@ begin
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
   if LStateStyle = nil then exit;
   if LStateStyle.Inherit then exit;
-  if (not ALIsDrawableNull(LStateStyle.BufDrawable)) then exit;
+  if (not ALIsDrawableNull(LStateStyle.FBufDrawable)) then exit;
+  if (CacheIndex > 0) and
+     (CacheEngine <> nil) and
+     (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex+LStateStyle.CacheSubIndex{ASubIndex})) then Exit;
   LStateStyle.SupersedeNoChanges(true{ASaveState});
   try
 
@@ -11274,8 +11573,8 @@ begin
     var LAllTextDrawn: Boolean;
     var LElements: TALTextElements;
     CreateBufDrawable(
-      LStateStyle.BufDrawable, // var ABufDrawable: TALDrawable;
-      LStateStyle.BufDrawableRect, // var ABufDrawableRect: TRectF;
+      LStateStyle.FBufDrawable, // var ABufDrawable: TALDrawable;
+      LStateStyle.FBufDrawableRect, // var ABufDrawableRect: TRectF;
       LTextBroken, // var ABufTextBroken: Boolean;
       LAllTextDrawn, // var ABufAllTextDrawn: Boolean;
       LElements, // var ABufElements: TALTextElements;
@@ -11290,19 +11589,25 @@ begin
       LStateStyle.Stroke, // const AStroke: TALStrokeBrush;
       LStateStyle.Shadow); // const AShadow: TALShadow);
 
-    // LStateStyle.BufDrawableRect must include the LScale
-    LStateStyle.BufDrawableRect.Top := LStateStyle.BufDrawableRect.Top * LStateStyle.Scale;
-    LStateStyle.BufDrawableRect.right := LStateStyle.BufDrawableRect.right * LStateStyle.Scale;
-    LStateStyle.BufDrawableRect.left := LStateStyle.BufDrawableRect.left * LStateStyle.Scale;
-    LStateStyle.BufDrawableRect.bottom := LStateStyle.BufDrawableRect.bottom * LStateStyle.Scale;
+    // LStateStyle.FBufDrawableRect must include the LScale
+    LStateStyle.FBufDrawableRect.Top := LStateStyle.FBufDrawableRect.Top * LStateStyle.Scale;
+    LStateStyle.FBufDrawableRect.right := LStateStyle.FBufDrawableRect.right * LStateStyle.Scale;
+    LStateStyle.FBufDrawableRect.left := LStateStyle.FBufDrawableRect.left * LStateStyle.Scale;
+    LStateStyle.FBufDrawableRect.bottom := LStateStyle.FBufDrawableRect.bottom * LStateStyle.Scale;
 
-    // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect
-    // (due to autosizing with different font sizes), we must center LStateStyle.BufDrawableRect
+    // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect
+    // (due to autosizing with different font sizes), we must center LStateStyle.FBufDrawableRect
     // within the main BufDrawableRect to ensure that all changes are visually centered.
-    var LMainDrawableRect := BufDrawableRect;
+    var LMainDrawableRect: TRectF;
+    if (CacheIndex <= 0) or
+       (CacheEngine = nil) or
+       (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, LMainDrawableRect{ARect})) then begin
+      If AlIsDrawableNull(FBufDrawable) then LMainDrawableRect := LocalRect
+      else LMainDrawableRect := FBufDrawableRect;
+    end;
     LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
-    var LCenteredRect := LStateStyle.BufDrawableRect.CenterAt(LMainDrawableRect);
-    LStateStyle.BufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
+    var LCenteredRect := LStateStyle.FBufDrawableRect.CenterAt(LMainDrawableRect);
+    LStateStyle.FBufDrawableRect.Offset(LCenteredRect.Left, LCenteredRect.top);
 
   finally
     LStateStyle.RestorestateNoChanges;
@@ -11379,28 +11684,48 @@ procedure TALButton.Paint;
 begin
 
   StateStyles.UpdateLastPaintedRawStyle;
-  MakeBufDrawable;
 
-  var LDrawable: TALDrawable;
-  var LDrawableRect: TRectF;
-  if StateStyles.IsTransitionAnimationRunning then begin
-    LDrawable := ALNullDrawable;
-    LDrawableRect := TRectF.Empty;
-  end
-  else begin
+  var LDrawable: TALDrawable := ALNullDrawable;
+  var LDrawableRect: TRectF := TRectF.Empty;
+  if not StateStyles.IsTransitionAnimationRunning then begin
+    //--
     var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
     if LStateStyle <> nil then begin
-      LDrawable := LStateStyle.BufDrawable;
-      LDrawableRect := LStateStyle.BufDrawableRect;
-      if ALIsDrawableNull(LDrawable) then begin
-        LDrawable := BufDrawable;
-        LDrawableRect := BufDrawableRect;
+      if (CacheIndex <= 0) or
+         (CacheEngine = nil) or
+         (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex+LStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+        MakeBufDrawable;
+        if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(LStateStyle.FBufDrawable)) then begin
+          if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, GetCacheSubIndex+LStateStyle.CacheSubIndex{ASubIndex}, LStateStyle.FBufDrawable{ADrawable}, LStateStyle.FBufDrawableRect{ARect}) then ALFreeAndNilDrawable(LStateStyle.FBufDrawable)
+          else LStateStyle.FBufDrawable := ALNullDrawable;
+          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex+LStateStyle.CacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+            raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
+        end
+        else begin
+          LDrawable := LStateStyle.FBufDrawable;
+          LDrawableRect := LStateStyle.FBufDrawableRect;
+        end;
       end;
-    end
-    else begin
-      LDrawable := BufDrawable;
-      LDrawableRect := BufDrawableRect;
     end;
+    //--
+    If ALIsDrawableNull(LDrawable) then begin
+      if (CacheIndex <= 0) or
+         (CacheEngine = nil) or
+         (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect})) then begin
+        if LStateStyle = nil then MakeBufDrawable;
+        if (CacheIndex > 0) and (CacheEngine <> nil) and (not ALIsDrawableNull(fBufDrawable)) then begin
+          if not CacheEngine.TrySetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, fBufDrawable{ADrawable}, fBufDrawableRect{ARect}) then ALFreeAndNilDrawable(fBufDrawable)
+          else fBufDrawable := ALNullDrawable;
+          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, LDrawable{ADrawable}, LDrawableRect{ARect}) then
+            raise Exception.Create('Error BB5ACD27-7CF2-44D3-AEB1-22C8BB492762');
+        end
+        else begin
+          LDrawable := FBufDrawable;
+          LDrawableRect := FBufDrawableRect;
+        end;
+      end;
+    end;
+    //--
   end;
 
   if ALIsDrawableNull(LDrawable) then begin
@@ -11421,8 +11746,7 @@ begin
     var LCanvasSaveState: TCanvasSaveState := ALScaleAndCenterCanvas(
                                                 Canvas, // Const ACanvas: TCanvas;
                                                 AbsoluteRect, // Const AAbsoluteRect: TRectF;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleX: Single;
-                                                LCurrentAdjustedStateStyle.Scale, // Const AScaleY: Single;
+                                                LCurrentAdjustedStateStyle.Scale, // Const AScale: Single;
                                                 true); // Const ASaveState: Boolean);
     try
 
@@ -11499,10 +11823,16 @@ begin
     LRect.left := LRect.left * LCurrentAdjustedStateStyle.Scale;
     LRect.bottom := LRect.bottom * LCurrentAdjustedStateStyle.Scale;
 
-    // Since LStateStyle.BufDrawableRect can have different dimensions than the main BufDrawableRect
-    // (due to autosizing with different font sizes), we must center LStateStyle.BufDrawableRect
+    // Since LStateStyle.FBufDrawableRect can have different dimensions than the main BufDrawableRect
+    // (due to autosizing with different font sizes), we must center LStateStyle.FBufDrawableRect
     // within the main BufDrawableRect to ensure that all changes are visually centered.
-    var LMainDrawableRect := BufDrawableRect;
+    var LMainDrawableRect: TRectF;
+    if (CacheIndex <= 0) or
+       (CacheEngine = nil) or
+       (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, LMainDrawableRect{ARect})) then begin
+      If AlIsDrawableNull(FBufDrawable) then LMainDrawableRect := LocalRect
+      else LMainDrawableRect := FBufDrawableRect;
+    end;
     LMainDrawableRect.Offset(-LMainDrawableRect.Left, -LMainDrawableRect.Top);
     var LCenteredRect := LRect.CenterAt(LMainDrawableRect);
     LRect.Offset(LCenteredRect.Left, LCenteredRect.top);
