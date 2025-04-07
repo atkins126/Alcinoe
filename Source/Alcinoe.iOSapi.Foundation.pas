@@ -13,7 +13,7 @@ uses
 type
 
   {*************************************}
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1940 has been resolved. If resolved, remove the class definition below.'}
   {$ENDIF}
   ALNSAttributedStringClass = interface(NSAttributedStringClass)
@@ -26,7 +26,7 @@ type
   TALNSAttributedString = class(TOCGenericImport<ALNSAttributedStringClass, ALNSAttributedString>)  end;
 
   {*************************************}
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-28096 has been resolved. If resolved, remove the class definition below.'}
   {$ENDIF}
   NSPersonNameComponentsClass = interface(NSObjectClass)
@@ -50,6 +50,21 @@ type
     function phoneticRepresentation : NSPersonNameComponents; cdecl;
   end;
 
+function NSKeyValueChangeNewKey: NSString;
+function NSKeyValueChangeOldKey: NSString;
+
 implementation
+
+{****************************************}
+function NSKeyValueChangeNewKey: NSString;
+begin
+  result := CocoaNSStringConst(libFoundation, 'NSKeyValueChangeNewKey');
+end;
+
+{****************************************}
+function NSKeyValueChangeOldKey: NSString;
+begin
+  result := CocoaNSStringConst(libFoundation, 'NSKeyValueChangeOldKey');
+end;
 
 end.

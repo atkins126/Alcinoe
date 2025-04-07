@@ -15,7 +15,7 @@ uses
 type
 
   {*************************************}
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if FMX.Types.TAlignLayout was not updated and adjust the IFDEF'}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342 was implemented and adjust the IFDEF'}
   {$ENDIF}
@@ -66,13 +66,13 @@ type
     MostBottomRight); // Added from TAlignLayout - Works like TAlignLayout.MostBottom, then aligns the control to the right.
 
   {*************************************}
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if FMX.Controls.TControl was not updated and adjust the IFDEF'}
   {$ENDIF}
   TALControl = class(TControl)
   private
     FForm: TCommonCustomForm; // 8 bytes
-    FParentALControl: TALControl; // 8 bytes
+    FALParentControl: TALControl; // 8 bytes
     FFormerMarginsChangedHandler: TNotifyEvent; // 16 bytes
     FControlAbsolutePosAtMouseDown: TpointF; // 8 bytes
     FScale: Single; // 4 bytes
@@ -138,15 +138,18 @@ type
     procedure BeginTextUpdate; virtual;
     procedure EndTextUpdate; virtual;
     procedure SetFixedSizeBounds(X, Y, AWidth, AHeight: Single); Virtual;
+    function GetAbsoluteDisplayedRect: TRectF; virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure EndUpdate; override;
     procedure SetNewScene(AScene: IScene); override;
-    function IsVisibleWithinFormBounds: Boolean;
+    function IsReadyToDisplay: Boolean; virtual;
+    function IsDisplayed: Boolean; virtual;
+    property DisplayedRect: TRectF read GetAbsoluteDisplayedRect;
     property Form: TCommonCustomForm read FForm;
     property DisableDoubleClickHandling: Boolean read FDisableDoubleClickHandling write FDisableDoubleClickHandling;
-    {$IFNDEF ALCompilerVersionSupported122}
+    {$IFNDEF ALCompilerVersionSupported123}
       {$MESSAGE WARN 'Check if property FMX.Controls.TControl.Pressed still not fire a PressChanged event when it gets updated, and adjust the IFDEF'}
     {$ENDIF}
     property Pressed: Boolean read GetPressed write SetPressed;
@@ -159,11 +162,11 @@ type
     property DoubleBuffered: Boolean read GetDoubleBuffered write SetDoubleBuffered default False;
     property IsPixelAlignmentEnabled: Boolean read GetIsPixelAlignmentEnabled write SetIsPixelAlignmentEnabled;
     property Align: TALAlignLayout read FAlign write SetAlign default TALAlignLayout.None;
-    property ParentALControl: TALControl read FParentALControl;
+    property ALParentControl: TALControl read FALParentControl;
   end;
 
   {*************************************}
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if FMX.Controls.TContent was not updated and adjust the IFDEF'}
   {$ENDIF}
   TALContent = class(TALControl, IContent)
@@ -256,14 +259,14 @@ Type
 constructor TALControl.Create(AOwner: TComponent);
 begin
   inherited;
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if MarginsChanged is not implemented in FMX.Controls.TControl and adjust the IFDEF'}
   {$ENDIF}
   FFormerMarginsChangedHandler := Margins.OnChange;
   Margins.OnChange := MarginsChangedHandler;
   Size.SetPlatformDefaultWithoutNotification(False);
   FForm := nil;
-  FParentALControl := nil;
+  FALParentControl := nil;
   FControlAbsolutePosAtMouseDown := TpointF.zero;
   FScale := 1;
   FFocusOnMouseDown := False;
@@ -328,20 +331,38 @@ end;
 //   EndUpdate;
 //   EndTextUpdate;
 procedure TALControl.BeginTextUpdate;
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  Procedure DoBeginTextUpdate(const AControl: TControl);
+  begin
+    for var I := 0 to AControl.ControlsCount - 1 do
+      if AControl.Controls[i] is TALControl then
+        TALControl(AControl.Controls[i]).BeginTextUpdate
+      else
+        DoBeginTextUpdate(AControl.Controls[i]);
+  end;
+
 begin
   FTextUpdating := True;
-  for var I := 0 to ControlsCount - 1 do
-    if Controls[i] is TALControl then
-      TALControl(Controls[i]).BeginTextUpdate;
+  DoBeginTextUpdate(Self);
 end;
 
 {*********************************}
 procedure TALControl.EndTextUpdate;
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  Procedure DoEndTextUpdate(const AControl: TControl);
+  begin
+    for var I := 0 to AControl.ControlsCount - 1 do
+      if AControl.Controls[i] is TALControl then
+        TALControl(AControl.Controls[i]).EndTextUpdate
+      else
+        DoEndTextUpdate(AControl.Controls[i]);
+  end;
+
 begin
   FTextUpdating := False;
-  for var I := 0 to ControlsCount - 1 do
-    if Controls[i] is TALControl then
-      TALControl(Controls[i]).EndTextUpdate;
+  DoEndTextUpdate(Self);
 end;
 
 {**************************}
@@ -458,7 +479,7 @@ begin
   //ALLog(ClassName+'.DoRealign', 'Name: ' + Name);
   {$ENDIF}
 
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-15768 was implemented and adjust the IFDEF'}
   {$ENDIF}
   // I decided to remove this workaround because it doesn't
@@ -483,7 +504,7 @@ begin
   if TNonReentrantHelper.EnterSection(FIsSetBoundsLocked) then begin
     try
 
-      {$IFNDEF ALCompilerVersionSupported122}
+      {$IFNDEF ALCompilerVersionSupported123}
         {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342 was implemented and adjust the IFDEF'}
       {$ENDIF}
       //TALAlignLayout.TopCenter
@@ -583,7 +604,7 @@ begin
     AHeight := Height;
   end;
 
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342 was implemented and adjust the IFDEF'}
   {$ENDIF}
   //TALAlignLayout.TopCenter
@@ -1018,8 +1039,8 @@ begin
                              TALAlignLayout.MostBottom,
                              TALAlignLayout.Horizontal,
                              TALAlignLayout.VertCenter]);
-    if (not result) and (ParentALControl <> nil) then
-      Result := ParentALControl.HasUnconstrainedAutosizeX;
+    if (not result) and (ALParentControl <> nil) then
+      Result := ALParentControl.HasUnconstrainedAutosizeX;
   end;
 end;
 
@@ -1036,8 +1057,8 @@ begin
                              TALAlignLayout.MostRight,
                              TALAlignLayout.Vertical,
                              TALAlignLayout.HorzCenter]);
-    if (not result) and (ParentALControl <> nil) then
-      Result := ParentALControl.HasUnconstrainedAutosizeY;
+    if (not result) and (ALParentControl <> nil) then
+      Result := ALParentControl.HasUnconstrainedAutosizeY;
   end;
 end;
 
@@ -1065,19 +1086,54 @@ begin
   FIsPixelAlignmentEnabled := AValue;
 end;
 
-{*****************************************************}
-function TALControl.IsVisibleWithinFormBounds: Boolean;
+{********************************************}
+function TALControl.IsReadyToDisplay: Boolean;
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  function CheckAllChildrenAreReadyToDisplay(const AControl: TControl): boolean;
+  begin
+    Result := True;
+    for var I := 0 to AControl.ControlsCount - 1 do begin
+      if AControl.Controls[i] is TALControl then Result := TALControl(AControl.Controls[i]).IsReadyToDisplay
+      else Result := CheckAllChildrenAreReadyToDisplay(AControl.Controls[i]);
+      if not Result then exit;
+    end;
+  end;
+
 begin
-  Result := GetParentedVisible;
-  if not result then exit;
-  if Form <> nil then
-    Result := Form.ClientRect.IntersectsWith(LocalToAbsolute(LocalRect));
+  MakeBufDrawable;
+  Result := CheckAllChildrenAreReadyToDisplay(Self);
+end;
+
+{***************************************}
+function TALControl.IsDisplayed: Boolean;
+begin
+  Result := not GetAbsoluteDisplayedRect.IsEmpty;
+end;
+
+{***************************************************}
+function TALControl.GetAbsoluteDisplayedRect: TRectF;
+begin
+  if (not Visible) or (form = nil) then Exit(TRectF.Empty);
+  var LAbsoluteIntersectionRect := AbsoluteRect;
+  var LControlTmp := Tcontrol(Self);
+  while LControlTmp.ParentControl <> nil do begin
+    if not LControlTmp.Visible then Exit(TRectF.Empty);
+    if LControlTmp.ClipChildren then begin
+      var LAbsoluteClipRect := LControlTmp.LocalToAbsolute(LControlTmp.ClipRect);
+      LAbsoluteIntersectionRect.Intersect(AbsoluteClipRect);
+      if LAbsoluteIntersectionRect.IsEmpty then
+        Exit(TRectF.Empty);
+    end;
+    LControlTmp := LControlTmp.ParentControl;
+  end;
+  Result := TRectF.Intersect(Form.ClientRect, LAbsoluteIntersectionRect)
 end;
 
 {***********************************************}
 procedure TALControl.SetNewScene(AScene: IScene);
 begin
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1323 have been implemented and adjust the IFDEF'}
     {$MESSAGE WARN 'Check if FMX.Controls.TControl.Pressed is still changed only in SetNewScene/DoMouseLeave/MouseDown/MouseUp/MouseClick'}
     {$MESSAGE WARN 'Check if FMX.Controls.TControl.IsFocused is still changed only in SetNewScene/DoEnter/DoExit'}
@@ -1170,7 +1226,7 @@ end;
 {*************************************************************************************}
 procedure TALControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1323 have been implemented and adjust the IFDEF'}
   {$ENDIF}
   var LPrevPressed := Pressed;
@@ -1211,7 +1267,7 @@ end;
 {***********************************************************************************}
 procedure TALControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1323 have been implemented and adjust the IFDEF'}
   {$ENDIF}
   var LPrevPressed := Pressed;
@@ -1246,7 +1302,7 @@ begin
     {$ENDIF}
     exit;
   end;
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1323 have been implemented and adjust the IFDEF'}
   {$ENDIF}
   var LPrevPressed := Pressed;
@@ -1278,7 +1334,7 @@ end;
 {****************************************************}
 procedure TALControl.DoMatrixChanged(Sender: TObject);
 begin
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if FMX.Controls.TControl.DoMatrixChanged was not updated and adjust the IFDEF'}
     {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2823 was not corrected and adjust the IFDEF'}
   {$ENDIF}
@@ -1382,11 +1438,11 @@ begin
   // Note: The procedure TControl.PaintTo(const ACanvas: TCanvas; const ARect: TRectF; const AParent: TFmxObject = nil)
   // temporarily updates the ParentControl. Unfortunately, ParentControl is not a virtual property,
   // and TControl.UpdateParentProperties is strictly private. As a result, within TControl.PaintTo,
-  // the value of FParentALControl will be incorrect.
+  // the value of FALParentControl will be incorrect.
   if (ParentControl <> nil) and (ParentControl is TALControl) then
-    FParentALControl := TALControl(ParentControl)
+    FALParentControl := TALControl(ParentControl)
   else
-    FParentALControl := nil;
+    FALParentControl := nil;
 end;
 
 {**********************************************************}
@@ -1404,7 +1460,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported122}
+{$IFNDEF ALCompilerVersionSupported123}
   {$MESSAGE WARN 'Check if FMX.Controls.TContentTabList was not updated and adjust the IFDEF'}
 {$ENDIF}
 type

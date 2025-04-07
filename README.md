@@ -12,7 +12,7 @@ built with the philosophy that every developer deserves the
 platforms—all while maintaining **independence** from the 
 dominance of GAFA (Google, Apple, Facebook, Amazon). 
 
-**Alcinoe** is fully compatible with **Delphi Athens 12.2**. 
+**Alcinoe** is fully compatible with **Delphi Athens 12.3**. 
 If you find this library helpful, please consider giving it a 
 star on GitHub. It’s free and greatly supports the project’s 
 visibility and growth.
@@ -100,7 +100,6 @@ forced to apply patches to the original Delphi source files:
 * [Missing CoreText Constant Functions in iOSapi.CoreText.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1938)
 * [Missing CVMetalTexture and CVMetalTextureCache Declarations in iOSapi.CoreVideo.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1939)
 * [Missing Method Declarations in UITextView and UITextField Interfaces in iOSapi.UIKit.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1941)
-* [Incorrect External Declarations in System.Skia.API for Android Linking in Athens 12.2](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1997)
 * [Add Additional Notification Icon Sizes for iOS 16+](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2171)
 * [Update TAlignLayout to Include New Alignment Options for Centering Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342)
 * [Enhance TCustomForm.DoAddObject to Properly Handle FUpdating State for Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2388)
@@ -377,13 +376,13 @@ In contrast, Delphi’s official video players are native
 video player windows overlaid on the form, which do not 
 support Z-ORDER.
 
-On Android, **Alcinoe** uses **ExoPlayer**, which provides 
+On Android, **Alcinoe** uses **Media3 ExoPlayer**, which provides 
 advanced features such as dynamic adaptive streaming over 
 HTTP (DASH), HLS, SmoothStreaming, and common encryption—capabilities 
-not available in MediaPlayer. **ExoPlayer** is also designed 
+not available in MediaPlayer. **Media3 ExoPlayer** is also designed 
 to be easily customizable and extendable. On iOS, 
 **AVPlayer** is used, offering similar HLS support to 
-**ExoPlayer**.
+**Media3 ExoPlayer**.
 
 <p align="left">
   <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/videoplayer1.jpg?raw=true" alt="video player for FireMonkey" width="270" style="width:270px;"/>

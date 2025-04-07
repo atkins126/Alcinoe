@@ -7,7 +7,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported122}
+{$IFNDEF ALCompilerVersionSupported123}
   //Please run <Alcinoe>\Tools\NativeBridgeFileGenerator\NativeBridgeFileGeneratorAndroid.bat
   //with the library identifiers androidx.media3:media3-exoplayer:xx.xx.xx where xx.xx.xx
   //is the last version of the Media3 exoplayer (You can find this version at
@@ -88,6 +88,7 @@ type
     function getCurrentPosition: Int64; cdecl;
     procedure clearVideoSurface; cdecl;
     procedure setVideoSurface(surface: JSurface); cdecl;
+    function getVolume: Single; cdecl;
     procedure setVolume(volume: Single); cdecl;
     procedure setMediaItem(mediaItem: JMediaItem); cdecl; overload;
     procedure setMediaItem(mediaItem: JMediaItem; startPositionMs: Int64); cdecl; overload;
@@ -106,7 +107,7 @@ type
   end;
   TJExoPlayer = class(TJavaGenericImport<JExoPlayerClass, JExoPlayer>) end;
 
-  {***********************************************************************************************************************}
+  {*************************************************************************************************************************}
   //https://github.com/androidx/media/blob/release/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/ExoPlayer.java
   JExoPlayer_BuilderClass = interface(JObjectClass)
     ['{AE382CD9-C438-41A6-A83B-3650BA28F850}']
@@ -116,6 +117,9 @@ type
   JExoPlayer_Builder = interface(JObject)
     ['{BC387B76-5B9D-42D0-B7D8-B252089C708E}']
     function build: JExoPlayer; cdecl;
+    function setLooper(looper: JLooper): JExoPlayer_Builder; cdecl;
+    function setPlaybackLooper(playbackLooper: JLooper): JExoPlayer_Builder; cdecl;
+    function setUseLazyPreparation(useLazyPreparation: Boolean): JExoPlayer_Builder; cdecl;
   end;
   TJExoPlayer_Builder = class(TJavaGenericImport<JExoPlayer_BuilderClass, JExoPlayer_Builder>) end;
 
@@ -200,7 +204,7 @@ type
   end;
   TJPlayer_PositionInfo = class(TJavaGenericImport<JPlayer_PositionInfoClass, JPlayer_PositionInfo>) end;
 
-  {***********************************************************************************************************************************}
+  {**********************************************************************************************************************************}
   //https://github.com/androidx/media/blob/release/libraries/datasource/src/main/java/androidx/media3/datasource/TransferListener.java
   JTransferListenerClass = interface(IJavaClass)
     ['{9B26DEB2-564E-400A-B57D-71A56BAC7197}']
@@ -237,11 +241,16 @@ type
   //https://github.com/androidx/media/blob/release/libraries/common/src/main/java/androidx/media3/common/PlaybackParameters.java
   JPlaybackParametersClass = interface(JObjectClass)
     ['{9081DF30-C4B5-4DB0-8FFF-08F64DF1AC03}']
-    {class} function init(speed: Single; pitch: Single): JPlaybackParameters; cdecl;
+    {class} function init(speed: Single): JPlaybackParameters; cdecl; overload;
+    {class} function init(speed: Single; pitch: Single): JPlaybackParameters; cdecl; overload;
   end;
   [JavaSignature('androidx/media3/common/PlaybackParameters')]
   JPlaybackParameters = interface(JObject)
     ['{1B3494CD-CC19-4A71-904D-6BEDCB31E2D9}']
+    function _Getspeed: Single; cdecl;
+    function _Getpitch: Single; cdecl;
+    property speed: Single read _Getspeed;
+    property pitch: Single read _Getpitch;
   end;
   TJPlaybackParameters = class(TJavaGenericImport<JPlaybackParametersClass, JPlaybackParameters>) end;
 

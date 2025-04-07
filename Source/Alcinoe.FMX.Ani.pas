@@ -40,7 +40,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported122}
+{$IFNDEF ALCompilerVersionSupported123}
   {$MESSAGE WARN 'Check if FMX.Ani.pas was not updated and adjust the IFDEF'}
 {$ENDIF}
 
@@ -504,7 +504,7 @@ type
   // (i.e. under-damped), the mass tends to overshoot, and return, and overshoot again. Without any
   // damping (i.e. damping ratio := 0), the mass will oscillate forever.
   // Taken from Android SpringForce
-  {$IFNDEF ALCompilerVersionSupported122}
+  {$IFNDEF ALCompilerVersionSupported123}
     {$MESSAGE WARN 'Check if android SpringForce.java was not updated and adjust the IFDEF'}
     //Compare <Alcinoe>\References\Android\SpringForce.java with https://android.googlesource.com/platform/frameworks/support/dynamicanimation/dynamicanimation/src/main/java/androidx/dynamicanimation/animation/SpringForce.java
   {$ENDIF}
@@ -865,7 +865,7 @@ end;
 
 {************************************************************}
 // Taken from android.widget.Scroller.ViscousFluidInterpolator
-{$IFNDEF ALCompilerVersionSupported122}
+{$IFNDEF ALCompilerVersionSupported123}
   {$MESSAGE WARN 'Check if android.widget.Scroller.ViscousFluidInterpolator was not updated and adjust the IFDEF'}
   //Compare <Alcinoe>\References\Android\Scroller.java with <SDKs>c:\SDKs\android\sources\android-33\android\widget\Scroller.java
 {$ENDIF}
@@ -1007,7 +1007,7 @@ begin
     else
       TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
   end;
-  fDisplayLink.addToRunLoop(TNSRunLoop.Wrap(TNSRunLoop.OCClass.currentRunLoop), NSRunLoopCommonModes); // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+  fDisplayLink.addToRunLoop(TNSRunLoop.Wrap(TNSRunLoop.OCClass.mainRunLoop), NSRunLoopCommonModes); // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
   fDisplayLink.setPaused(true);
   FTimerEvent := nil;
   Interval := 1;
@@ -1070,6 +1070,10 @@ end;
 {***********************************************************}
 procedure TALAniThread.AddAnimation(const Ani: TALAnimation);
 begin
+  {$IF defined(DEBUG)}
+  if TThread.Current.ThreadID <> MainThreadID then
+    raise Exception.Create('TALAniThread.AddAnimation must only be called from the main thread.');
+  {$ENDIF}
   if FAniList.IndexOf(Ani) < 0 then
     FAniList.Add(Ani);
   if not Enabled and (FAniList.Count > 0) then
@@ -1080,6 +1084,10 @@ end;
 {**************************************************************}
 procedure TALAniThread.RemoveAnimation(const Ani: TALAnimation);
 begin
+  {$IF defined(DEBUG)}
+  if TThread.Current.ThreadID <> MainThreadID then
+    raise Exception.Create('TALAniThread.RemoveAnimation must only be called from the main thread.');
+  {$ENDIF}
   FAniList.Remove(Ani);
   Enabled := FAniList.Count > 0;
 end;
