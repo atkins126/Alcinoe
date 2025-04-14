@@ -106,6 +106,10 @@ forced to apply patches to the original Delphi source files:
 * [Add the CAFrameRateRange record and preferredFramesPerSecond/preferredFrameRateRange to CADisplayLink](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2424)
 * [Add getEventTimeNanos and getHistoricalEventTimeNanos to JMotionEvent](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2992)
 * [Incorrect indentation of end; in TScreen.IndexFormOfObject](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2902)
+* [ForceQueue with Delay Does Not Work on Android](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3206)
+* [FullScreenManager.showSystemUI Resets SystemUiVisibility](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3207)
+* [Component Type Name Cannot Contain a "."](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3213)
+* [TControl.SetBounds: Missing ParentContentChanged Call on Size-Only Updates](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3264)
 
 
 Install Alcinoe
@@ -365,6 +369,46 @@ responsive text behavior. Learn more at
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/htmltext.png?raw=true" />
 <br/>
+  
+TALPageController – The Page Transition Maestro
+===============================================
+
+**TALPageController** is a component that manages 
+and controls page transitions within your application, 
+similar to Flutter's PageController. It allows you to smoothly 
+navigate between different pages, track the current page index, 
+and customize the behavior of scrolling animations and 
+transitions. Learn more at 
+[Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls)
+
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pagecontroller.gif?raw=true" />
+<br/>
+  
+TALPageIndicator – Animated Multi-Page Navigator
+================================================
+
+Page indicators are a key element in multi-page applications, 
+offering users a clear sense of their current location and 
+the overall number of pages. **TALPageIndicator** is a lightweight 
+component that delivers animated, customizable page indicators 
+with a variety of effects, making it easy to integrate and 
+ensuring smooth, visually appealing transitions throughout your 
+interface. It comes with a set of built-in effects to animate 
+the active dot, each of which can be customized to suit your 
+design preferences.
+
+| Effect             |                                                         Preview                                                                         |  
+|:-------------------|:---------------------------------------------------------------------------------------------------------------------------------------:|  
+| Worm               |              ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_worm.gif?raw=true)           |
+| ThinWorm           |            ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_thinworm.gif?raw=true)         |
+| JumpingDotTopView  |           ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_jumpingdottopview.gif?raw=true) | 
+| jumpingDotSideView | ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_jumpingdotsideview.gif?raw=true)          | 
+| Slide              |              ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_slide.gif?raw=true)          |
+| Scale              |              ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_scale.gif?raw=true)          | 
+| LinearSwap         |              ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_linearswap.gif?raw=true)     | 
+| SpinSwap           |         ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_spinswap.gif?raw=true)            |
+| Color              |        ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_color.gif?raw=true)                | 
+
   
 Video Player for FireMonkey
 ===========================
@@ -1070,6 +1114,33 @@ undesired conversions.
 History
 =======
 
+#### 13/04/2025 ####
+
+- **TALTabControl** has been replaced by **TALPageController**.
+- **TALPageIndicator** has been added.
+- **TALBufDrawableCacheEngine** now inherits from **TALRefCountObject**.
+- Renamed **TALBounds.OnChange** to **TALBounds.OnChanged**.
+- Renamed **TALPosition.OnChange** to **TALPosition.OnChanged**.
+- Added the function **ALGetHasTouchScreen**.
+- Removed **TALControl.BeginTextUpdate** and **TALControl.EndTextUpdate**.
+- Added Metal support to **TALColorAdjustEffect**, removed Highlights and 
+  Shadows, and changed the Contrast parameter to accept values from -1 to 1 (instead of -2 to 2).
+- Added **TALRefCountBitmap**.
+- Removed *AutoShowing* and *Opacity* from **TALScrollEngine**; these properties 
+  are now directly managed in **TALScrollBox.TScrollBar**.
+- Added **TALScrollEngine.startScroll** and introduced **TALScrollEngine.TouchMode** 
+  (with options: Disabled, Enabled, Auto) as well as **TALScrollEngine.Friction**.
+- Added the fill property and published ScrollEngine to **TALScrollBox**.
+- Removed **HasTouchScreen**, **AutoHide**, and **ShowScrollBars** from **TALScrollEngine**.
+- Changed **TALScrollBox.TViewportPositionChangeEvent** from:
+  ```
+  procedure (Sender: TObject; const OldViewportPosition, NewViewportPosition: TPointF) of object;
+  ```
+  to
+  ```
+  procedure (Sender: TObject; const OldViewportPosition, NewViewportPosition: TALPointD) of object;
+  ```
+  
 #### 02/02/2025 ####
 
 - Replace **RotationCenter** with **Pivot** ([RSS-2824](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2824)).
