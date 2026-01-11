@@ -56,23 +56,23 @@ goto BUILD_TESTS
 :DO_BUILD_TESTS
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\dbgout.log
-del "%FileName%" /s
+del "%FileName%" /s >nul 2>&1
 if exist "%FileName%" goto ERROR
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\*.identcache
-del "%FileName%" /s
+del "%FileName%" /s >nul 2>&1
 if exist "%FileName%" goto ERROR
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\*.dproj.local
-del "%FileName%" /s
+del "%FileName%" /s >nul 2>&1
 if exist "%FileName%" goto ERROR
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\*.groupproj.local
-del "%FileName%" /s
+del "%FileName%" /s >nul 2>&1
 if exist "%FileName%" goto ERROR
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\*.deployproj.local
-del "%FileName%" /s
+del "%FileName%" /s >nul 2>&1
 if exist "%FileName%" goto ERROR
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\_Source\Dcu
@@ -100,14 +100,13 @@ REM -----
 REM Debug
 REM -----
 
-echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Debug /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Debug;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Debug;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Debug /p:Platform=Win64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Debug;DCC_MapFile=3 /p:Platform=Win64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Debug;DCC_MapFile=3 /p:Platform=Win64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM ----------
@@ -116,12 +115,12 @@ REM ----------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Debug_Skia /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Debug_Skia;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Debug_Skia;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Debug_Skia /p:Platform=Win64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Debug_Skia;DCC_MapFile=3 /p:Platform=Win64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Debug_Skia;DCC_MapFile=3 /p:Platform=Win64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM ------------------
@@ -130,7 +129,7 @@ REM ------------------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Debug_ALSkiaEngine /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Debug_ALSkiaEngine;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Debug_ALSkiaEngine;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM ---------------------
@@ -139,7 +138,7 @@ REM ---------------------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Debug_ALSkiaAvailable /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Debug_ALSkiaAvailable;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Debug_ALSkiaAvailable;DCC_MapFile=3 /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM -------
@@ -148,42 +147,42 @@ REM -------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=Android[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=Android /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=Android /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=Android64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=Android64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=Android64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=iOSDevice64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=iOSDevice64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=iOSDevice64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=iOSSimARM64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=iOSSimARM64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=iOSSimARM64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=OSX64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=OSX64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=OSX64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=OSXARM64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=OSXARM64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=OSXARM64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release /p:Platform=Win64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release /p:Platform=Win64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release /p:Platform=Win64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM ------------
@@ -192,42 +191,42 @@ REM ------------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=Android[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=Android /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=Android /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=Android64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=Android64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=Android64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=iOSDevice64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=iOSDevice64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=iOSDevice64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=iOSSimARM64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=iOSSimARM64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=iOSSimARM64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=OSX64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=OSX64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=OSX64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=OSXARM64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=OSXARM64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=OSXARM64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_Skia /p:Platform=Win64[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_Skia /p:Platform=Win64 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_Skia /p:Platform=Win64 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM --------------------
@@ -236,7 +235,7 @@ REM --------------------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_ALSkiaEngine /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_ALSkiaEngine /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_ALSkiaEngine /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 REM -----------------------
@@ -245,7 +244,7 @@ REM -----------------------
 
 echo.
 echo [36mMSBuild ALDUnitXTests.dproj /p:config=Release_ALSkiaAvailable /p:Platform=Win32[0m
-msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:config=Release_ALSkiaAvailable /p:Platform=Win32 /t:build /verbosity:minimal
+msbuild "%ALBaseDir%\Tests\DUnitX\_Source\ALDUnitXTests.dproj" /p:DCC_UseMSBuildExternally=true /p:config=Release_ALSkiaAvailable /p:Platform=Win32 /t:build /verbosity:minimal
 IF ERRORLEVEL 1 goto ERROR
 
 echo.
@@ -350,7 +349,7 @@ echo 3) Both Win32 and Win64 tests
 :ASK_PLATFORM
 
 set Platform=
-set /P Platform=Enter number to select a platform (Empty to Win64): %=%
+set /P Platform=Select a platform (Empty to Win64): %=%
 more < nul > nul & REM This instruction to clear the ERRORLEVEL because previous instruction set ERRORLEVEL to 1 if empty input
 
 if "%Platform%"=="" goto RUN_WIN64_TESTS_WITHOUT_CODE_COVERAGE
@@ -417,7 +416,11 @@ EXIT /B 1
 :FINISHED
 
 SET FileName=%ALBaseDir%\Tests\DUnitX\dbgout.log
-del "%FileName%" /s
+del "%FileName%" /s >nul 2>&1
+if exist "%FileName%" goto ERROR
+
+SET FileName=%ALBaseDir%\Tests\DUnitX\*.cmds
+del "%FileName%" /s >nul 2>&1
 if exist "%FileName%" goto ERROR
 
 if "%Standalone%"=="1" (

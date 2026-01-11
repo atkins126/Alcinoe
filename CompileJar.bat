@@ -29,13 +29,14 @@ set LibraryToBuild=
 if NOT "%Standalone%"=="1" GOTO SKIP_INTERACTION
 
 echo.
-echo 1) alcinoe-common
+echo 1) alcinoe-broadcastreceiver
 echo 2) alcinoe-datepicker
 echo 3) alcinoe-edittext
 echo 4) alcinoe-facebook-share
 echo 5) alcinoe-firebase-messaging
 echo 6) alcinoe-installreferrer
-echo 7) alcinoe-webrtc
+echo 7) alcinoe-webkit
+echo 8) alcinoe-http
 
 set /P LibraryToBuild=Select a library (Empty for all): %=%
 more < nul > nul & REM This instruction to clear the ERRORLEVEL because previous instruction set ERRORLEVEL to 1 if empty input
@@ -95,29 +96,29 @@ REM Go to the library we want to build
 REM ----------------------------------
 
 if "%LibraryToBuild%"=="" goto ALL_LIBRARIES
-if "%LibraryToBuild%"=="1" goto alcinoe_common
+if "%LibraryToBuild%"=="1" goto alcinoe_broadcastreceiver
 if "%LibraryToBuild%"=="2" goto alcinoe_datepicker
 if "%LibraryToBuild%"=="3" goto alcinoe_edittext
 if "%LibraryToBuild%"=="4" goto alcinoe_facebook_share
 if "%LibraryToBuild%"=="5" goto alcinoe_firebase_messaging
 if "%LibraryToBuild%"=="6" goto alcinoe_installreferrer
-if "%LibraryToBuild%"=="7" goto alcinoe_webrtc
+if "%LibraryToBuild%"=="7" goto alcinoe_webkit
+if "%LibraryToBuild%"=="8" goto alcinoe_http
 goto FINISHED
 
 :ALL_LIBRARIES
 
 
-REM ------------------------
-REM Build alcinoe-common.jar
-REM ------------------------
+REM -----------------------------------
+REM Build alcinoe-broadcastreceiver.jar
+REM -----------------------------------
 
-:alcinoe_common
-echo [36mBuild alcinoe-common[0m
+:alcinoe_broadcastreceiver
+echo [36mBuild alcinoe-broadcastreceiver[0m
 type nul > %TMPDependenciesFile%
 SET ClassPath="%SDKApiLevelPath%\android.jar"
-SET SourceFiles=%ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\util\*.java
-SET SourceFiles=%SourceFiles% %ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\content\*.java
-Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-common" "1.0.1"
+SET SourceFiles=%SourceFiles% %ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\broadcastreceiver\*.java
+Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-broadcastreceiver" "1.0.2"
 if NOT "%LibraryToBuild%"=="" GOTO FINISHED
 
 
@@ -148,17 +149,66 @@ if NOT "%LibraryToBuild%"=="" GOTO FINISHED
 
 
 REM ------------------------
-REM Build alcinoe-webrtc.jar
+REM Build alcinoe-webkit.jar
 REM ------------------------
 
-:alcinoe_webrtc
-echo [36mBuild alcinoe-webrtc[0m
+:alcinoe_webkit
+echo [36mBuild alcinoe-webkit[0m
 type nul > %TMPDependenciesFile%
 SET ClassPath="%SDKApiLevelPath%\android.jar"
 Call :UPDATE_ClASSPATH "https://dl.google.com/android/maven2" "androidx.annotation" "annotation" "1.3.0"
-Call :UPDATE_ClASSPATH "https://artifactory.wetransform.to/artifactory/libs-snapshot" "org.webrtc" "google-webrtc" "1.0.25331"
-SET SourceFiles=%ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\webrtc\*.java
-Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-webrtc" "1.0.0"
+SET SourceFiles=%ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\webkit\*.java
+Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-webkit" "1.0.0"
+if NOT "%LibraryToBuild%"=="" GOTO FINISHED
+
+
+REM ----------------------
+REM Build alcinoe-http.jar
+REM ----------------------
+
+:alcinoe_http
+echo [36mBuild alcinoe-http[0m
+type nul > %TMPDependenciesFile%
+SET ClassPath="%SDKApiLevelPath%\android.jar"
+Call :UPDATE_ClASSPATH "https://repo1.maven.org/maven2" "io.magicfoundation.alcinoe" "alcinoe-broadcastreceiver" "1.0.2"
+Call :UPDATE_ClASSPATH "https://dl.google.com/android/maven2" "androidx.annotation" "annotation" "1.3.0"
+Call :UPDATE_ClASSPATH "https://dl.google.com/android/maven2" "androidx.work" "work-runtime" "2.11.0"
+REM Mandatory dependencies of androidx.work:work-runtime:2.11.0 required to build the JAR
+REM Use Tools\AndroidLibScanner\AndroidLibScanner.bat to determine the required versions of those dependencies
+Call :UPDATE_ClASSPATH "https://repo1.maven.org/maven2" "org.jetbrains.kotlin" "kotlin-stdlib" "2.1.20"
+Call :UPDATE_ClASSPATH "https://repo1.maven.org/maven2" "com.google.guava" "listenablefuture" "1.0"
+SET SourceFiles=%ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\http\*.java
+Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-http" "1.0.0"
+
+SET HttpLibDir=%ALBaseDir%\Libraries\jar\io\magicfoundation\alcinoe\alcinoe-http\1.0.0\
+SET HttpLibFilename=alcinoe-http-1.0.0
+SET AndroidManifestFilename=%HttpLibDir%\AndroidManifest.xml
+IF EXIST "%AndroidManifestFilename%" del "%AndroidManifestFilename%" /s > nul
+IF EXIST "%AndroidManifestFilename%" goto ERROR
+
+@echo ^<?xml version="1.0" encoding="utf-8"?^>>> %AndroidManifestFilename%
+@echo ^<manifest xmlns:android="http://schemas.android.com/apk/res/android">> %AndroidManifestFilename%
+@echo           package="io.magicfoundation.alcinoe.http"^>>> %AndroidManifestFilename%
+@echo   ^<application^>>> %AndroidManifestFilename%
+@echo     ^<receiver android:name="io.magicfoundation.alcinoe.broadcastreceiver.ALBroadcastReceiver">> %AndroidManifestFilename%
+@echo               android:exported="false"^>>> %AndroidManifestFilename%
+@echo       ^<intent-filter^>>> %AndroidManifestFilename%
+@echo         ^<action android:name="io.magicfoundation.alcinoe.http.action.HTTP_COMPLETED" /^>>> %AndroidManifestFilename%
+@echo       ^</intent-filter^>>> %AndroidManifestFilename%
+@echo     ^</receiver^>>> %AndroidManifestFilename%
+@echo   ^</application^>>> %AndroidManifestFilename%
+@echo ^</manifest^>>> %AndroidManifestFilename%
+
+IF EXIST "%HttpLibDir%\%HttpLibFilename%.zip" del "%HttpLibDir%\%HttpLibFilename%.zip" /s >nul
+IF EXIST "%HttpLibDir%\%HttpLibFilename%.zip" goto ERROR
+IF EXIST "%HttpLibDir%\%HttpLibFilename%.aar" del "%HttpLibDir%\%HttpLibFilename%.aar" /s >nul
+IF EXIST "%HttpLibDir%\%HttpLibFilename%.aar" goto ERROR
+rename "%HttpLibDir%\%HttpLibFilename%.jar" classes.jar
+powershell -command "Compress-Archive -Path '%HttpLibDir%\AndroidManifest.xml','%HttpLibDir%\classes.jar' -DestinationPath '%HttpLibDir%\%HttpLibFilename%.zip'"
+rename "%HttpLibDir%\%HttpLibFilename%.zip" %HttpLibFilename%.aar
+del "%AndroidManifestFilename%" /s > nul
+del "%HttpLibDir%\classes.jar" /s > nul
+
 if NOT "%LibraryToBuild%"=="" GOTO FINISHED
 
 
@@ -179,15 +229,15 @@ Call :UPDATE_ClASSPATH "https://dl.google.com/android/maven2" "com.google.androi
 SET SourceFiles=%ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\firebase\messaging\*.java
 Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-firebase-messaging" "1.0.1"
 
-SET FirebaseMessagingDir=%ALBaseDir%\Libraries\jar\io\magicfoundation\alcinoe\alcinoe-firebase-messaging\1.0.1\
-SET FirebaseMessagingFilename=alcinoe-firebase-messaging-1.0.1
-SET AndroidManifestFilename=%FirebaseMessagingDir%\AndroidManifest.xml
+SET FirebaseMessagingLibDir=%ALBaseDir%\Libraries\jar\io\magicfoundation\alcinoe\alcinoe-firebase-messaging\1.0.1\
+SET FirebaseMessagingLibFilename=alcinoe-firebase-messaging-1.0.1
+SET AndroidManifestFilename=%FirebaseMessagingLibDir%\AndroidManifest.xml
 IF EXIST "%AndroidManifestFilename%" del "%AndroidManifestFilename%" /s > nul
 IF EXIST "%AndroidManifestFilename%" goto ERROR
 
-@echo ^<?xml version="1.0" encoding="utf-8"?^>> %AndroidManifestFilename%
+@echo ^<?xml version="1.0" encoding="utf-8"?^>>> %AndroidManifestFilename%
 @echo ^<manifest xmlns:android="http://schemas.android.com/apk/res/android">> %AndroidManifestFilename%
-@echo           package="io.magicfoundation.alcinoe.alcinoe-firebase-messaging" ^>>> %AndroidManifestFilename%
+@echo           package="io.magicfoundation.alcinoe.alcinoe-firebase-messaging"^>>> %AndroidManifestFilename%
 @echo   ^<application^>>> %AndroidManifestFilename%
 @echo     ^<service android:name="io.magicfoundation.alcinoe.firebase.messaging.ALFirebaseMessagingService">> %AndroidManifestFilename%
 @echo              android:directBootAware="true">> %AndroidManifestFilename%
@@ -199,15 +249,15 @@ IF EXIST "%AndroidManifestFilename%" goto ERROR
 @echo   ^</application^>>> %AndroidManifestFilename%
 @echo ^</manifest^>>> %AndroidManifestFilename%
 
-IF EXIST "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.zip" del "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.zip" /s >nul
-IF EXIST "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.zip" goto ERROR
-IF EXIST "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.aar" del "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.aar" /s >nul
-IF EXIST "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.aar" goto ERROR
-rename "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.jar" classes.jar
-powershell -command "Compress-Archive -Path '%FirebaseMessagingDir%\AndroidManifest.xml','%FirebaseMessagingDir%\classes.jar' -DestinationPath '%FirebaseMessagingDir%\%FirebaseMessagingFilename%.zip'"
-rename "%FirebaseMessagingDir%\%FirebaseMessagingFilename%.zip" %FirebaseMessagingFilename%.aar
+IF EXIST "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.zip" del "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.zip" /s >nul
+IF EXIST "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.zip" goto ERROR
+IF EXIST "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.aar" del "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.aar" /s >nul
+IF EXIST "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.aar" goto ERROR
+rename "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.jar" classes.jar
+powershell -command "Compress-Archive -Path '%FirebaseMessagingLibDir%\AndroidManifest.xml','%FirebaseMessagingLibDir%\classes.jar' -DestinationPath '%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.zip'"
+rename "%FirebaseMessagingLibDir%\%FirebaseMessagingLibFilename%.zip" %FirebaseMessagingLibFilename%.aar
 del "%AndroidManifestFilename%" /s > nul
-del "%FirebaseMessagingDir%\classes.jar" /s > nul
+del "%FirebaseMessagingLibDir%\classes.jar" /s > nul
 
 if NOT "%LibraryToBuild%"=="" GOTO FINISHED
 
@@ -220,13 +270,13 @@ REM --------------------------------
 echo [36mBuild alcinoe-facebook-share[0m
 type nul > %TMPDependenciesFile%
 SET ClassPath="%SDKApiLevelPath%\android.jar"
-Call :UPDATE_ClASSPATH "https://repo1.maven.org/maven2" "com.facebook.android" "facebook-common" "15.2.0"
-REM Mandatory dependencies of com.facebook.android:facebook-common:15.2.0 required to build the JAR
+Call :UPDATE_ClASSPATH "https://repo1.maven.org/maven2" "com.facebook.android" "facebook-common" "18.0.3"
+REM Mandatory dependencies of com.facebook.android:facebook-common:18.0.3 required to build the JAR
 REM Use Tools\AndroidLibScanner\AndroidLibScanner.bat to determine the required versions of those dependencies
 Call :UPDATE_ClASSPATH "https://dl.google.com/android/maven2" "androidx.fragment" "fragment" "1.3.0"
 Call :UPDATE_ClASSPATH "https://dl.google.com/android/maven2" "androidx.annotation" "annotation" "1.1.0"
 SET SourceFiles=%ALBaseDir%\Source\Java\io\magicfoundation\alcinoe\facebook\share\*.java
-Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-facebook-share" "1.0.1"
+Call :BUILD_JAR "io.magicfoundation.alcinoe" "alcinoe-facebook-share" "1.0.2"
 if NOT "%LibraryToBuild%"=="" GOTO FINISHED
 
 
@@ -295,6 +345,7 @@ Set SrcUrl=%~1/%groupID4URL%/%~3/%~4/%~3-%~4
 Set groupID4DIR=%~2
 Set groupID4DIR=%groupID4DIR:.=\%
 Set DestDIR=%ALBaseDir%\Libraries\jar\%groupID4DIR%\%~3\%~4\
+
 IF EXIST "%DestDIR%\%~3-%~4.pom" (
   EXIT /B 0
 )

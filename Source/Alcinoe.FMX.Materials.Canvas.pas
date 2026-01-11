@@ -11,7 +11,7 @@ uses
 
 type
 
-  {***********************************************************************}
+  {*****************************************************************}
   TALCanvasColorAdjustTextureMaterial = class(TCanvasTextureMaterial)
   private
     fShaderVariables: TALColorAdjustShaderVariables;
@@ -32,7 +32,7 @@ type
   public
   end;
 
-  {***********************************************************************************************}
+  {*****************************************************************************************}
   TALCanvasExternalOESColorAdjustTextureMaterial = class(TALCanvasExternalOESTextureMaterial)
   private
     fShaderVariables: TALColorAdjustShaderVariables;
@@ -56,7 +56,7 @@ type
     property CbCrTexture: TTexture read getCbCrTexture;
   end;
 
-  {*********************************************************************************************************************************}
+  {***************************************************************************************************************************}
   TALCanvas420YpCbCr8BiPlanarVideoRangeColorAdjustTextureMaterial = class(TALCanvas420YpCbCr8BiPlanarVideoRangeTextureMaterial)
   private
     fShaderVariables: TALColorAdjustShaderVariables;
@@ -82,7 +82,7 @@ type
     property CrTexture: TTexture read getCrTexture;
   end;
 
-  {*********************************************************************************************************}
+  {***************************************************************************************************}
   TALCanvas420YpCbCr8PlanarColorAdjustTextureMaterial = class(TALCanvas420YpCbCr8PlanarTextureMaterial)
   private
     fShaderVariables: TALColorAdjustShaderVariables;
@@ -106,6 +106,7 @@ uses
   System.Classes,
   system.sysutils,
   Alcinoe.FMX.Types3D,
+  Alcinoe.Localization,
   Alcinoe.StringUtils,
   Alcinoe.Common;
 
@@ -153,21 +154,21 @@ begin
   Result := ALDef420YpCbCr8PlanarMaterial;
 end;
 
-{**********************************************************************}
+{*****************************************************}
 constructor TALCanvasColorAdjustTextureMaterial.Create;
 begin
   inherited create;
   fShaderVariables := TALColorAdjustShaderVariables.create;
 end;
 
-{**********************************************************************}
+{*****************************************************}
 destructor TALCanvasColorAdjustTextureMaterial.Destroy;
 begin
   ALFreeAndNil(fShaderVariables);
   inherited destroy;
 end;
 
-{************************************************************************************************}
+{*******************************************************************************}
 procedure TALCanvasColorAdjustTextureMaterial.DoApply(const Context: TContext3D);
 begin
   inherited DoApply(Context);
@@ -175,7 +176,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvasColorAdjustTextureMaterial.DoInitialize;
@@ -340,7 +341,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvasExternalOESTextureMaterial.DoInitialize;
@@ -436,21 +437,21 @@ begin
   ]);
 end;
 
-{**********************************************************************}
+{****************************************************************}
 constructor TALCanvasExternalOESColorAdjustTextureMaterial.Create;
 begin
   inherited create;
   fShaderVariables := TALColorAdjustShaderVariables.create;
 end;
 
-{**********************************************************************}
+{****************************************************************}
 destructor TALCanvasExternalOESColorAdjustTextureMaterial.Destroy;
 begin
   ALFreeAndNil(fShaderVariables);
   inherited destroy;
 end;
 
-{************************************************************************************************}
+{******************************************************************************************}
 procedure TALCanvasExternalOESColorAdjustTextureMaterial.DoApply(const Context: TContext3D);
 begin
   inherited DoApply(Context);
@@ -458,7 +459,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvasExternalOESColorAdjustTextureMaterial.DoInitialize;
@@ -575,7 +576,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvas420YpCbCr8BiPlanarVideoRangeTextureMaterial.DoInitialize;
@@ -689,21 +690,21 @@ begin
   ]);
 end;
 
-{***************************************************************************************}
+{*********************************************************************************}
 constructor TALCanvas420YpCbCr8BiPlanarVideoRangeColorAdjustTextureMaterial.Create;
 begin
   inherited create;
   fShaderVariables := TALColorAdjustShaderVariables.create;
 end;
 
-{***************************************************************************************}
+{*********************************************************************************}
 destructor TALCanvas420YpCbCr8BiPlanarVideoRangeColorAdjustTextureMaterial.Destroy;
 begin
   ALFreeAndNil(fShaderVariables);
   inherited destroy;
 end;
 
-{*****************************************************************************************************************}
+{***********************************************************************************************************}
 procedure TALCanvas420YpCbCr8BiPlanarVideoRangeColorAdjustTextureMaterial.DoApply(const Context: TContext3D);
 begin
   inherited DoApply(Context);
@@ -711,7 +712,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvas420YpCbCr8BiPlanarVideoRangeColorAdjustTextureMaterial.DoInitialize;
@@ -856,7 +857,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvas420YpCbCr8PlanarTextureMaterial.DoInitialize;
@@ -973,21 +974,21 @@ begin
   ]);
 end;
 
-{***************************************************************************}
+{*********************************************************************}
 constructor TALCanvas420YpCbCr8PlanarColorAdjustTextureMaterial.Create;
 begin
   inherited create;
   fShaderVariables := TALColorAdjustShaderVariables.create;
 end;
 
-{***************************************************************************}
+{*********************************************************************}
 destructor TALCanvas420YpCbCr8PlanarColorAdjustTextureMaterial.Destroy;
 begin
   ALFreeAndNil(fShaderVariables);
   inherited destroy;
 end;
 
-{*****************************************************************************************************}
+{***********************************************************************************************}
 procedure TALCanvas420YpCbCr8PlanarColorAdjustTextureMaterial.DoApply(const Context: TContext3D);
 begin
   inherited DoApply(Context);
@@ -995,7 +996,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Materials.Canvas.TCanvasTextureMaterial.DoInitialize is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 procedure TALCanvas420YpCbCr8PlanarColorAdjustTextureMaterial.DoInitialize;
@@ -1121,6 +1122,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Materials.Canvas','initialization');
+  {$ENDIF}
   ALDefExternalOESMaterial := nil;
   ALDef420YpCbCr8BiPlanarVideoRangeMaterial := nil;
   ALDef420YpCbCr8PlanarMaterial := nil;

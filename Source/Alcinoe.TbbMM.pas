@@ -42,6 +42,8 @@ unit Alcinoe.TbbMM;
 
 interface
 
+{$I Alcinoe.inc}
+
 implementation
 
 type
@@ -98,6 +100,9 @@ const
   );
 
 initialization
+  {$IF defined(DEBUG)}
+  //ALLog('Alcinoe.TbbMM','initialization');
+  {$ENDIF}
   SetMemoryManager(MemoryManager);
 
 end.

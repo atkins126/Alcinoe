@@ -4,14 +4,12 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Objects.pas was not updated and adjust the IFDEF'}
 {$ENDIF}
 
 uses
-  {$IF defined(MSWindows)}
-  Winapi.Windows,
-  {$ENDIF}
+  System.Net.URLClient,
   System.Classes,
   System.Types,
   System.UITypes,
@@ -37,13 +35,14 @@ uses
   FMX.types,
   FMX.graphics,
   FMX.objects,
+  Alcinoe.Common,
   Alcinoe.FMX.CacheEngines,
   Alcinoe.FMX.Types3D,
   Alcinoe.FMX.Ani,
   Alcinoe.FMX.Controls,
   Alcinoe.FMX.Graphics,
   Alcinoe.FMX.BreakText,
-  Alcinoe.FMX.Common;
+  Alcinoe.fmx.Common;
 
 type
 
@@ -52,7 +51,7 @@ type
   strict private
     FFill: TALBrush;
     FStroke: TALStrokeBrush;
-    fShadow: TALShadow;
+    FShadow: TALShadow;
     function GetFill: TALBrush;
     procedure SetFill(const Value: TALBrush);
     function GetStroke: TALStrokeBrush;
@@ -69,7 +68,9 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent{TALControl}); override;
     procedure AlignToPixel; override;
+    procedure ApplyColorScheme; override;
     property Fill: TALBrush read GetFill write SetFill;
     property Stroke: TALStrokeBrush read GetStroke write SetStroke;
     property Shadow: TALShadow read GetShadow write SetShadow;
@@ -89,13 +90,6 @@ type
   // differences are often negligible. Thus, providing just one high-resolution
   // bitmap (at the largest scale of 4) could be sufficient and would help
   // reduce the application's size.
-  //
-  // Moreover, transitioning from smartphones to tablets, I've noticed that
-  // maintaining proper proportions requires increasing the font and image
-  // sizes by 15%. Therefore, to avoid resizing and truly leverage
-  // multi-resolution bitmaps, one might need up to 10 different bitmaps per
-  // image. This leads me to conclude that the concept of multi-resolution
-  // bitmaps is fundamentally flawed.
   [ComponentPlatforms($FFFF)]
   TALImage = class(TALControl)
   public
@@ -110,23 +104,21 @@ type
       end;
   protected
     type
-      TResourceDownloadContext = Class(TObject)
+      TResourceDownloadContext = Class(TALWorkerContext)
       private
-        Lock: TObject;
-        FreeByThread: Boolean;
+        function GetOwner: TALImage;
       public
-        Owner: TALImage;
         Rect: TRectF;
         Scale: Single;
         AlignToPixel: Boolean;
         Color: TAlphaColor;
+        TintColor: TAlphaColor;
         ResourceName: String;
         ResourceStream: TStream;
         MaskResourceName: String;
-        MaskBitmap: TALRefCountBitmap;
         WrapMode: TALImageWrapMode;
         CropCenter: TpointF;
-        RotateAccordingToExifOrientation: Boolean;
+        ApplyMetadataOrientation: Boolean;
         StrokeColor: TAlphaColor;
         StrokeThickness: Single;
         ShadowBlur: Single;
@@ -138,18 +130,24 @@ type
         XRadius: Single;
         YRadius: Single;
         BlurRadius: single;
-        constructor Create(const AOwner: TALImage); virtual;
+        constructor Create(const AOwner: TALImage); reintroduce; virtual;
         destructor Destroy; override;
+        Property Owner: TALImage read GetOwner;
       End;
   private
+    FOwnsResourceStream: Boolean; // 1 byte
     FBackgroundColor: TAlphaColor; // 4 bytes
     FLoadingColor: TAlphaColor; // 4 bytes
-    fResourceName: String; // 8 bytes
+    FTintColor: TAlphaColor; // 4 bytes
+    FBackgroundColorKey: String; // 8 bytes
+    FLoadingColorKey: String; // 8 bytes
+    FTintColorKey: String; // 8 bytes
+    FResourceName: String; // 8 bytes
+    FResourceStream: TStream; // 8 bytes
     FMaskResourceName: String; // 8 bytes
-    FMaskBitmap: TALRefCountBitmap; // 8 bytes
+    FHTTPHeaders: TNetHeaders; // 8 bytes
     FWrapMode: TALImageWrapMode; // 1 bytes
-    fExifOrientationInfo: TalExifOrientationInfo; // 1 bytes
-    fRotateAccordingToExifOrientation: Boolean; // 1 bytes
+    FApplyMetadataOrientation: Boolean; // 1 bytes
     FCorners: TCorners; // 1 bytes
     FSides: TSides; // 1 bytes
     FXRadius: Single; // 4 bytes
@@ -160,7 +158,7 @@ type
     FCacheEngine: TALBufDrawableCacheEngine; // 8 bytes
     FCropCenter: TALPosition; // 8 bytes
     FStroke: TALStrokeBrush; // 8 bytes
-    fShadow: TALShadow; // 8 bytes
+    FShadow: TALShadow; // 8 bytes
     FResourceDownloadContext: TResourceDownloadContext; // [MultiThread] | 8 bytes
     FFadeInDuration: Single; // 4 bytes
     FFadeInStartTimeNano: Int64; // 8 bytes
@@ -171,14 +169,22 @@ type
     function GetShadow: TALShadow;
     procedure SetShadow(const Value: TALShadow);
     procedure SetWrapMode(const Value: TALImageWrapMode);
-    procedure SetRotateAccordingToExifOrientation(const Value: Boolean);
+    procedure SetApplyMetadataOrientation(const Value: Boolean);
     procedure setResourceName(const Value: String);
+    procedure setResourceStream(const Value: TStream);
     procedure setMaskResourceName(const Value: String);
-    procedure setMaskBitmap(const Value: TALRefCountBitmap);
     procedure setBackgroundColor(const Value: TAlphaColor);
+    procedure setBackgroundColorKey(const Value: String);
     procedure setLoadingColor(const Value: TAlphaColor);
+    procedure setLoadingColorKey(const Value: String);
+    procedure SetTintColor(const Value: TAlphaColor);
+    procedure setTintColorKey(const Value: String);
     function IsBackgroundColorStored: Boolean;
+    function IsBackgroundColorKeyStored: Boolean;
     function IsLoadingColorStored: Boolean;
+    function IsLoadingColorKeyStored: Boolean;
+    function IsTintColorStored: Boolean;
+    function IsTintColorKeyStored: Boolean;
     function IsFadeInDurationStored: Boolean;
     function IsCornersStored: Boolean;
     function IsSidesStored: Boolean;
@@ -193,12 +199,21 @@ type
     function CreateCropCenter: TALPosition; virtual;
     function CreateStroke: TALStrokeBrush; virtual;
     function CreateShadow: TALShadow; virtual;
+    procedure ApplyBackgroundColorScheme; virtual;
+    procedure ApplyLoadingColorScheme; virtual;
+    procedure ApplyTintColorScheme; virtual;
     function GetCacheSubIndex: Integer; virtual;
     function GetLoadingCacheSubIndex: Integer; virtual;
     function GetDoubleBuffered: boolean; override;
     function GetDefaultBackgroundColor: TalphaColor; virtual;
+    function GetDefaultBackgroundColorKey: String; virtual;
     function GetDefaultLoadingColor: TalphaColor; virtual;
+    function GetDefaultLoadingColorKey: String; virtual;
+    function GetDefaultTintColor: TAlphaColor; virtual;
+    function GetDefaultTintColorKey: String; virtual;
     function GetDefaultFadeInDuration: Single; virtual;
+    function GetDefaultCorners: TCorners; virtual;
+    function GetDefaultSides: TSides; virtual;
     function GetDefaultXRadius: Single; virtual;
     function GetDefaultYRadius: Single; virtual;
     function GetDefaultBlurRadius: Single; virtual;
@@ -213,24 +228,23 @@ type
     procedure CancelResourceDownload;
     class function CanStartResourceDownload(var AContext: Tobject): boolean; virtual; // [MultiThread]
     class procedure HandleResourceDownloadSuccess(const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject); virtual; // [MultiThread]
-    class procedure HandleResourceDownloadError(const AErrMessage: string; var AContext: Tobject); virtual; // [MultiThread]
+    class procedure HandleResourceDownloadError(const AResponse: IHTTPResponse; const AErrMessage: string; var AContext: Tobject); virtual; // [MultiThread]
     class function GetResourceDownloadPriority(const AContext: Tobject): Int64; virtual; // [MultiThread]
     class Procedure CreateBufDrawable(var AContext: TObject); overload; virtual; // [MultiThread]
     class Procedure CreateBufDrawable(
                       var ABufDrawable: TALDrawable;
                       out ABufDrawableRect: TRectF;
-                      out AExifOrientationInfo: TalExifOrientationInfo;
                       const ARect: TRectF;
                       const AScale: Single;
                       const AAlignToPixel: Boolean;
                       const AColor: TAlphaColor;
+                      const ATintColor: TAlphaColor;
                       const AResourceName: String;
                       const AResourceStream: TStream;
                       const AMaskResourceName: String;
-                      const AMaskBitmap: TALRefCountBitmap;
                       const AWrapMode: TALImageWrapMode;
                       const ACropCenter: TpointF;
-                      const ARotateAccordingToExifOrientation: Boolean;
+                      const AApplyMetadataOrientation: Boolean;
                       const AStrokeColor: TAlphaColor;
                       const AStrokeThickness: Single;
                       const AShadowBlur: Single;
@@ -247,25 +261,45 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    function IsReadyToDisplay: Boolean; override;
+    procedure BeforeDestruction; override;
+    procedure Assign(Source: TPersistent{TALControl}); override;
+    function IsReadyToDisplay(const AStrict: Boolean = False): Boolean; override;
     procedure AlignToPixel; override;
+    procedure ApplyColorScheme; override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
     property DefaultBackgroundColor: TAlphaColor read GetDefaultBackgroundColor;
+    property DefaultBackgroundColorKey: String read GetDefaultBackgroundColorKey;
     property DefaultLoadingColor: TAlphaColor read GetDefaultLoadingColor;
+    property DefaultLoadingColorKey: String read GetDefaultLoadingColorKey;
+    property DefaultTintColor: TAlphaColor read GetDefaultTintColor;
+    property DefaultTintColorKey: String read GetDefaultTintColorKey;
     property DefaultFadeInDuration: Single read GetDefaultFadeInDuration;
+    property DefaultCorners: TCorners read GetDefaultCorners;
+    property DefaultSides: TSides read GetDefaultSides;
     property DefaultXRadius: Single read GetDefaultXRadius;
     property DefaultYRadius: Single read GetDefaultYRadius;
     property DefaultBlurRadius: Single read GetDefaultBlurRadius;
-    // MaskBitmap will not be owned and will not be freed with the TALImage
-    property MaskBitmap: TALRefCountBitmap read fMaskBitmap write setMaskBitmap;
-    // CacheIndex and CacheEngine are primarily used in TALDynamicListBox to
-    // prevent duplicate drawables across multiple identical controls.
-    // CacheIndex specifies the slot in the cache engine where an existing
-    // drawable can be retrieved.
+    /// <summary>
+    ///   When you assign a stream to ResourceStream, TALImage takes ownership and will free it.
+    /// </summary>
+    property ResourceStream: TStream read FResourceStream write setResourceStream;
+    property OwnsResourceStream: Boolean read FOwnsResourceStream write FOwnsResourceStream;
+    /// <summary>
+    ///   Extra HTTP request headers to apply when downloading the image.
+    /// </summary>
+    property HTTPHeaders: TNetHeaders read FHTTPHeaders write FHTTPHeaders;
+    /// <summary>
+    ///   CacheIndex and CacheEngine are primarily used in TALDynamicListBox to
+    ///   prevent duplicate drawables across multiple identical controls.
+    ///   CacheIndex specifies the slot in the cache engine where an existing
+    ///   drawable can be retrieved.
+    /// </summary>
     property CacheIndex: Integer read FCacheIndex write FCacheIndex;
     property LoadingCacheIndex: Integer read FLoadingCacheIndex write FLoadingCacheIndex;
-    // CacheEngine is not owned by the current control.
+    /// <summary>
+    ///   CacheEngine is not owned by the current control.
+    /// </summary>
     property CacheEngine: TALBufDrawableCacheEngine read FCacheEngine write FCacheEngine;
   published
     //property Action;
@@ -273,18 +307,24 @@ type
     property Anchors;
     //property AutoSize;
     property BackgroundColor: TAlphaColor read fBackgroundColor write setBackgroundColor Stored IsBackgroundColorStored;
+    property BackgroundColorKey: String read fBackgroundColorKey write setBackgroundColorKey Stored IsBackgroundColorKeyStored;
     property LoadingColor: TAlphaColor read FLoadingColor write setLoadingColor Stored IsLoadingColorStored;
+    property LoadingColorKey: String read FLoadingColorKey write setLoadingColorKey Stored IsLoadingColorKeyStored;
+    property TintColor: TAlphaColor read FTintColor write SetTintColor stored IsTintColorStored;
+    property TintColorKey: String read FTintColorKey write setTintColorKey Stored IsTintColorKeyStored;
     property BlurRadius: Single read FBlurRadius write SetBlurRadius stored IsBlurRadiusStored nodefault;
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Corners: TCorners read FCorners write SetCorners stored IsCornersStored;
-    // CropCenter is use when wrapmode = FitIntoAndCrop. It's define the center of
-    // crop in the source image (ex: center the result on a face instead
-    // of the middle of the bounds). If CropCenter contain negative value then it's
-    // indicate percentage
+    /// <summary>
+    ///   CropCenter is use when wrapmode = FitIntoAndCrop. It's define the center of
+    ///   crop in the source image (ex: center the result on a face instead
+    ///   of the middle of the bounds).
+    /// </summary>
     property CropCenter: TALPosition read GetCropCenter write SetCropCenter;
     property Cursor;
     //property DoubleBuffered;
@@ -304,13 +344,25 @@ type
     property Padding;
     property PopupMenu;
     property Position;
-    // If a file extension (e.g., .png) is detected in ResourceName, the image is loaded from the
-    // specified file (With the full path of the file obtained using ALGetResourceFilename).
-    // If ResourceName is a URL, the image is downloaded in the background from the internet.
-    // In debug mode, the image is loaded from a file located in the /Resources/ sub-folder of the
-    // project directory (with the extensions .png or .jpg).
-    property ResourceName: String read fResourceName write setResourceName;
-    property RotateAccordingToExifOrientation: Boolean read fRotateAccordingToExifOrientation write SetRotateAccordingToExifOrientation default false;
+    /// <summary>
+    ///   If a file extension (e.g., .png) is detected in ResourceName, the image is loaded from the
+    ///   specified file (With the full path of the file obtained using ALGetResourceFilename).
+    ///   If ResourceName is a URL, the image is downloaded in the background from the internet.
+    ///   In debug mode, the image is loaded from a file located in the /Resources/ sub-folder of the
+    ///   project directory (with the extensions .png or .jpg).
+    /// </summary>
+    property ResourceName: String read FResourceName write setResourceName;
+    /// <summary>
+    ///   When <c>True</c>, applies the image’s EXIF orientation (rotate/flip)
+    ///   so the bitmap is rendered upright. When <c>False</c> (default),
+    ///   the raw pixels are used as-is without any EXIF-based transform.
+    /// </summary>
+    /// <remarks>
+    ///   On a Skia canvas this behavior is always enforced as <c>True</c>
+    ///   (the Delphi IDE uses a Skia canvas), so the property is effectively
+    ///   ignored there and images are displayed with EXIF orientation applied.
+    /// </remarks>
+    property ApplyMetadataOrientation: Boolean read FApplyMetadataOrientation write SetApplyMetadataOrientation default false;
     property RotationAngle;
     //property RotationCenter;
     property Pivot;
@@ -342,7 +394,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -356,66 +408,54 @@ type
   TALAnimatedImage = class(TALControl)
   Public
     type
-      TAnimation = class(TALPersistentObserver)
+      TAnimation = class(TALInterpolatedAnimation)
       private
         fOwner: TALAnimatedImage;
-        FFloatAnimation: TALFloatAnimation;
-        FSpeed: Single;
         FDuration: Single;
-        function GetAutoReverse: Boolean;
-        function GetEnabled: Boolean; virtual;
-        function GetDelay: Single;
+        FSpeed: Single;
+        FStartProgress: Single;
+        FStopProgress: Single;
+        fCurrentProgress: Single;
+        FEnabled: Boolean;
         function GetDuration: Single;
-        function GetInverse: Boolean;
-        function GetLoop: Boolean;
+        {$IF defined(ALSkiaAvailable)}
+        procedure SetDuration(const Value: Single);
+        {$ENDIF}
         function GetCurrentTime: Single;
-        function GetPause: Boolean;
-        function GetRunning: Boolean;
-        function GetStartProgress: Single;
-        function GetStopProgress: Single;
-        function GetCurrentProgress: Single;
         function GetSpeed: Single;
-        procedure SetEnabled(const Value: Boolean); virtual;
-        procedure SetAutoReverse(const Value: Boolean);
-        procedure SetDelay(const Value: Single);
-        procedure SetInverse(const Value: Boolean);
-        procedure SetLoop(const Value: Boolean);
-        procedure SetPause(const Value: Boolean);
+        procedure SetSpeed(const Value: Single);
+        procedure SetEnabled(const Value: Boolean);
         procedure SetStartProgress(const Value: Single);
         procedure SetStopProgress(const Value: Single);
-        procedure SetSpeed(const Value: Single);
         function IsStopProgressStored: Boolean;
         function IsSpeedStored: Boolean;
-        procedure UpdateFloatAnimationDuration;
+        procedure UpdateInheritedAnimationDuration;
         procedure repaint;
       protected
-        procedure SetDuration(const Value: Single);
-        procedure doFirstFrame(Sender: TObject);
-        procedure doProcess(Sender: TObject);
-        procedure doFinish(Sender: TObject);
+        procedure ProcessAnimation; override;
+        procedure DoFirstFrame; override;
+        procedure DoProcess; override;
+        procedure DoFinish; override;
+        function GetDefaultLoop: Boolean; override;
       public
         constructor Create(const AOwner: TALAnimatedImage); reintroduce; virtual;
-        destructor Destroy; override;
-        procedure Start; virtual;
-        procedure Stop; virtual;
-        procedure StopAtCurrent; virtual;
-        property Running: Boolean read getRunning;
-        property Pause: Boolean read getPause write setPause;
-        property CurrentProgress: Single read GetCurrentProgress;
+        procedure Assign(Source: TPersistent); override;
+        procedure Start; override;
+        property CurrentProgress: Single read FCurrentProgress;
         property CurrentTime: Single read GetCurrentTime;
       published
-        property AutoReverse: Boolean read getAutoReverse write setAutoReverse default False;
-        property Delay: Single read getDelay write setDelay;
-        property Duration: Single read getDuration;
-        property Enabled: Boolean read getEnabled write SetEnabled default False;
-        property Inverse: Boolean read getInverse write setInverse default False;
-        property Loop: Boolean read getLoop write setLoop default True;
+        property AutoReverse;
+        property Delay;
+        property Duration: Single read getDuration stored false;
+        property Enabled Read FEnabled write SetEnabled stored true default True;
+        property Inverse;
+        property Loop;
         property Speed: Single read GetSpeed write setSpeed stored IsSpeedStored nodefault;
-        property StartProgress: Single read GetStartProgress write SetStartProgress;
-        property StopProgress: Single read GetStopProgress write setStopProgress stored IsStopProgressStored nodefault;
+        property StartProgress: Single read FStartProgress write SetStartProgress;
+        property StopProgress: Single read FStopProgress write SetStopProgress stored IsStopProgressStored nodefault;
       end;
   private
-    fAnimation: TAnimation;
+    fAnimation: TAnimation; // 8 bytes
     {$IF defined(ALSkiaAvailable)}
       fSkottieAnimation: sk_skottieanimation_t;
       fAnimcodecplayer: sk_animcodecplayer_t;
@@ -430,22 +470,44 @@ type
         {$ENDIF}
       {$ENDIF}
     {$ENDIF}
-    fResourceName: String;
-    FWrapMode: TALImageWrapMode;
-    FOnAnimationFirstFrame: TNotifyEvent;
-    FOnAnimationProcess: TNotifyEvent;
-    FOnAnimationFinish: TNotifyEvent;
+    FResourceName: String; // 8 bytes
+    FResourceStream: TStream; // 8 bytes
+    FTintColor: TAlphaColor; // 4 bytes
+    FTintColorKey: String; // 8 bytes
+    FWrapMode: TALImageWrapMode; // 1 byte
+    FOwnsResourceStream: Boolean; // 1 byte
+    FOnAnimationFirstFrame: TNotifyEvent; // 16 bytes
+    FOnAnimationProcess: TNotifyEvent; // 16 bytes
+    FOnAnimationFinish: TNotifyEvent; // 16 bytes
     procedure SetWrapMode(const Value: TALImageWrapMode);
     procedure setResourceName(const Value: String);
+    procedure setResourceStream(const Value: TStream);
     procedure SetAnimation(const Value: TAnimation);
+    procedure SetTintColor(const Value: TAlphaColor);
+    procedure setTintColorKey(const Value: String);
+    function IsTintColorStored: Boolean;
+    function IsTintColorKeyStored: Boolean;
   protected
+    procedure ApplyTintColorScheme; virtual;
+    function GetDefaultTintColor: TAlphaColor; virtual;
+    function GetDefaultTintColorKey: String; virtual;
     procedure Paint; override;
     procedure DoResized; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure BeforeDestruction; override;
+    procedure Assign(Source: TPersistent{TALControl}); override;
+    procedure ApplyColorScheme; override;
     procedure CreateCodec; virtual;
     procedure ReleaseCodec; virtual;
+    property DefaultTintColor: TAlphaColor read GetDefaultTintColor;
+    property DefaultTintColorKey: String read GetDefaultTintColorKey;
+    /// <summary>
+    ///   When you assign a stream to ResourceStream, TALImage takes ownership and will free it.
+    /// </summary>
+    property ResourceStream: TStream read FResourceStream write setResourceStream;
+    property OwnsResourceStream: Boolean read FOwnsResourceStream write FOwnsResourceStream;
   published
     //property Action;
     property Align;
@@ -455,6 +517,7 @@ type
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Cursor;
@@ -477,7 +540,7 @@ type
     // specified file (With the full path of the file obtained using ALGetResourceFilename).
     // In debug mode, the image is loaded from a file located in the /Resources/ sub-folder of the
     // project directory (with the extensions .png or .jpg).
-    property ResourceName: String read fResourceName write setResourceName;
+    property ResourceName: String read FResourceName write setResourceName;
     property RotationAngle;
     //property RotationCenter;
     property Pivot;
@@ -485,6 +548,8 @@ type
     property Size;
     //property TabOrder;
     //property TabStop;
+    property TintColor: TAlphaColor read FTintColor write SetTintColor stored IsTintColorStored;
+    property TintColorKey: String read FTintColorKey write setTintColorKey Stored IsTintColorKeyStored;
     property TouchTargetExpansion;
     property Visible;
     property Width;
@@ -507,7 +572,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -542,6 +607,8 @@ type
     function GetCacheSubIndex: Integer; virtual;
     function GetDoubleBuffered: boolean; override;
     procedure SetDoubleBuffered(const AValue: Boolean); override;
+    function GetDefaultCorners: TCorners; virtual;
+    function GetDefaultSides: TSides; virtual;
     function GetDefaultXRadius: Single; virtual;
     function GetDefaultYRadius: Single; virtual;
     procedure SetXRadius(const Value: Single); virtual;
@@ -582,6 +649,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent{TALControl}); override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
     property DoubleBuffered default true;
@@ -589,6 +657,8 @@ type
     property Sides: TSides read FSides write SetSides stored IsSidesStored;
     property XRadius: Single read FXRadius write SetXRadius stored IsXRadiusStored nodefault;
     property YRadius: Single read FYRadius write SetYRadius stored IsYRadiusStored nodefault;
+    property DefaultCorners: TCorners read GetDefaultCorners;
+    property DefaultSides: TSides read GetDefaultSides;
     property DefaultXRadius: Single read GetDefaultXRadius;
     property DefaultYRadius: Single read GetDefaultYRadius;
   end;
@@ -607,6 +677,7 @@ type
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Corners;
@@ -657,7 +728,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -728,6 +799,7 @@ type
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Cursor;
@@ -774,7 +846,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -845,6 +917,7 @@ type
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Cursor;
@@ -891,7 +964,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -941,6 +1014,7 @@ type
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Cursor;
@@ -968,7 +1042,7 @@ type
     property Stroke;
     //property TabOrder;
     //property TabStop;
-    //property TouchTargetExpansion;
+    property TouchTargetExpansion;
     property Visible;
     property Width;
     //property OnCanFocus;
@@ -986,7 +1060,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -997,6 +1071,9 @@ type
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALBaseText = class(TALShape)
+  public
+    const DefaultMaxWidth = 65535;
+    const DefaultMaxHeight = 65535;
   public
     type
       TFill = class(TALBrush)
@@ -1015,6 +1092,7 @@ type
   private
     fDoubleBuffered: boolean;
     FMultiLineTextOptions: TALMultiLineTextOptions;
+    FMaxContainedSize: TSizeF; // 4 bytes
     FOnElementClick: TElementNotifyEvent;
     FOnElementMouseDown: TElementMouseEvent;
     FOnElementMouseMove: TElementMouseMoveEvent;
@@ -1058,19 +1136,23 @@ type
     function GetDoubleBuffered: boolean; override;
     procedure SetDoubleBuffered(const AValue: Boolean); override;
     procedure SetAlign(const Value: TALAlignLayout); override;
-    procedure SetAutoSize(const Value: Boolean); override;
+    procedure SetAutoSize(const Value: TALAutoSizeMode); override;
+    function GetEffectiveMaxSize: TSizeF; Virtual;
     function GetElementAtPos(const APos: TPointF): TALTextElement;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Single); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Single); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Single); override;
     procedure DoMouseEnter; override;
     procedure DoMouseLeave; override;
+    procedure DoClickSound; override;
     procedure Click; override;
     procedure PaddingChanged; override;
     procedure TextSettingsChanged(Sender: TObject); virtual;
     procedure FillChanged(Sender: TObject); override;
     procedure StrokeChanged(Sender: TObject); override;
     procedure ShadowChanged(Sender: TObject); override;
+    function GetDefaultCorners: TCorners; virtual;
+    function GetDefaultSides: TSides; virtual;
     function GetDefaultXRadius: Single; virtual;
     function GetDefaultYRadius: Single; virtual;
     procedure SetXRadius(const Value: Single); virtual;
@@ -1084,6 +1166,7 @@ type
     procedure Paint; override;
     procedure Loaded; override;
     procedure DoResized; override;
+    procedure ParentRealigning; override;
     procedure AdjustSize; override;
     function GetMultiLineTextOptions(
                const AScale: Single;
@@ -1095,7 +1178,9 @@ type
                const AFill: TALBrush;
                const AStateLayer: TALStateLayer;
                const AStroke: TALStrokeBrush;
-               const AShadow: TALShadow): TALMultiLineTextOptions;
+               const AShadow: TALShadow;
+               const AXRadius: Single;
+               const AYRadius: Single): TALMultiLineTextOptions;
     Procedure DrawMultilineTextAdjustRect(const ACanvas: TALCanvas; const AOptions: TALMultiLineTextOptions; var ARect: TrectF; var ASurfaceSize: TSizeF); virtual;
     Procedure DrawMultilineTextBeforeDrawBackground(const ACanvas: TALCanvas; const AOptions: TALMultiLineTextOptions; Const ARect: TrectF); virtual;
     Procedure DrawMultilineTextBeforeDrawParagraph(const ACanvas: TALCanvas; const AOptions: TALMultiLineTextOptions; Const ARect: TrectF); virtual;
@@ -1115,7 +1200,9 @@ type
                 const AFill: TALBrush;
                 const AStateLayer: TALStateLayer;
                 const AStroke: TALStrokeBrush;
-                const AShadow: TALShadow);
+                const AShadow: TALShadow;
+                const AXRadius: Single;
+                const AYRadius: Single);
     Procedure MeasureMultilineText(
                 out ARect: TRectF;
                 out ATextBroken: Boolean;
@@ -1130,7 +1217,9 @@ type
                 const AFill: TALBrush;
                 const AStateLayer: TALStateLayer;
                 const AStroke: TALStrokeBrush;
-                const AShadow: TALShadow);
+                const AShadow: TALShadow;
+                const AXRadius: Single;
+                const AYRadius: Single);
     Procedure CreateBufDrawable(
                 var ABufDrawable: TALDrawable;
                 out ABufDrawableRect: TRectF;
@@ -1146,7 +1235,9 @@ type
                 const AFill: TALBrush;
                 const AStateLayer: TALStateLayer;
                 const AStroke: TALStrokeBrush;
-                const AShadow: TALShadow);
+                const AShadow: TALShadow;
+                const AXRadius: Single;
+                const AYRadius: Single);
     {$IF NOT DEFINED(ALSkiaCanvas)}
     function GetRenderTargetRect(const ARect: TrectF): TRectF; virtual;
     procedure InitRenderTargets(var ARect: TrectF); virtual;
@@ -1173,21 +1264,33 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent{TALControl}); override;
     procedure AlignToPixel; override;
+    procedure ApplyColorScheme; override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
     function TextBroken: Boolean;
-    property AutoSize;
+    property AutoSize default TALAutoSizeMode.Both;
     property AutoTranslate: Boolean read FAutoTranslate write FAutoTranslate default true;
     property Corners: TCorners read FCorners write SetCorners stored IsCornersStored;
     property HitTest default False;
+    /// <summary>
+    ///   If MaxWidth = 0, there is no explicit maximum; the control grows to the
+    ///   largest width that still fully fits inside its parent container.
+    /// </summary>
     property MaxWidth: Single read fMaxWidth write SetMaxWidth stored IsMaxWidthStored nodefault;
+    /// <summary>
+    ///   If MaxHeight = 0, there is no explicit maximum; the control grows to the
+    ///   largest height that still fully fits inside its parent container.
+    /// </summary>
     property MaxHeight: Single read fMaxHeight write SetMaxHeight stored IsMaxHeightStored nodefault;
     property Sides: TSides read FSides write SetSides stored IsSidesStored;
     property Text: string read FText write SetText;
     property XRadius: Single read FXRadius write SetXRadius stored IsXRadiusStored nodefault;
     property YRadius: Single read FYRadius write SetYRadius stored IsYRadiusStored nodefault;
     property DoubleBuffered default true;
+    property DefaultCorners: TCorners read GetDefaultCorners;
+    property DefaultSides: TSides read GetDefaultSides;
     property DefaultXRadius: Single read GetDefaultXRadius;
     property DefaultYRadius: Single read GetDefaultYRadius;
   end;
@@ -1220,6 +1323,7 @@ type
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Corners;
@@ -1280,7 +1384,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -1299,6 +1403,7 @@ uses
   system.Math.Vectors,
   FMX.utils,
   FMX.platform,
+  FMX.Forms,
   {$IF defined(ALSkiaAvailable)}
   FMX.Skia,
   FMX.Skia.Canvas,
@@ -1316,17 +1421,15 @@ uses
   FMX.Canvas.GPU,
   FMX.Surfaces,
   {$ENDIF}
-  {$IF defined(MSWindows)}
-  FMX.Platform.Win,
-  {$ENDIF}
   {$IFDEF ALDPK}
   DesignIntf,
   system.ioutils,
   {$ENDIF}
-  Alcinoe.Http.Client,
+  Alcinoe.Url,
+  Alcinoe.FMX.Styles,
   Alcinoe.HTTP.Client.Net.Pool,
-  Alcinoe.StringUtils,
-  Alcinoe.Common;
+  Alcinoe.Localization,
+  Alcinoe.StringUtils;
 
 {**********************************************}
 constructor TALShape.Create(AOwner: TComponent);
@@ -1336,8 +1439,8 @@ begin
   FFill.OnChanged := FillChanged;
   FStroke := CreateStroke;
   FStroke.OnChanged := StrokeChanged;
-  fShadow := CreateShadow;
-  fShadow.OnChanged := ShadowChanged;
+  FShadow := CreateShadow;
+  FShadow.OnChanged := ShadowChanged;
 end;
 
 {**************************}
@@ -1345,8 +1448,26 @@ destructor TALShape.Destroy;
 begin
   ALFreeAndNil(FFill);
   ALFreeAndNil(FStroke);
-  ALFreeAndNil(fShadow);
+  ALFreeAndNil(FShadow);
   inherited;
+end;
+
+{*********************************************************}
+procedure TALShape.Assign(Source: TPersistent{TALControl});
+begin
+  BeginUpdate;
+  Try
+    if Source is TALShape then begin
+      Fill.Assign(TALShape(Source).Fill);
+      Stroke.Assign(TALShape(Source).Stroke);
+      Shadow.Assign(TALShape(Source).Shadow);
+    end
+    else
+      ALAssignError(Source{ASource}, Self{ADest});
+    inherited Assign(Source);
+  Finally
+    EndUpdate;
+  End;
 end;
 
 {*************************************}
@@ -1376,6 +1497,20 @@ begin
     Fill.AlignToPixel;
     Stroke.AlignToPixel;
     Shadow.AlignToPixel;
+  finally
+    EndUpdate;
+  end;
+end;
+
+{**********************************}
+procedure TALShape.ApplyColorScheme;
+begin
+  beginUpdate;
+  try
+    inherited;
+    Fill.ApplyColorScheme;
+    Stroke.ApplyColorScheme;
+    Shadow.ApplyColorScheme;
   finally
     EndUpdate;
   end;
@@ -1444,67 +1579,69 @@ end;
 {*****************************************************}
 function TALImage.TCropCenter.GetDefaultValue: TPointF;
 begin
-  Result := TpointF.Create(-50,-50);
+  Result := TpointF.Create(0.5,0.5);
 end;
 
 {***************************************************************************}
 constructor TALImage.TResourceDownloadContext.Create(const AOwner: TALImage);
 begin
-  inherited Create;
-  Lock := TObject.Create;
-  FreeByThread := True;
-  Owner := AOwner;
-  Rect := Owner.LocalRect;
+  inherited Create(AOwner);
+  Rect := AOwner.LocalRect;
   Scale := ALGetScreenScale;
-  AlignToPixel := Owner.IsPixelAlignmentEnabled;
-  Color := Owner.BackgroundColor;
-  ResourceName := Owner.ResourceName;
+  AlignToPixel := AOwner.AutoAlignToPixel;
+  Color := AOwner.BackgroundColor;
+  TintColor := AOwner.TintColor;
+  ResourceName := AOwner.ResourceName;
   ResourceStream := nil;
-  MaskResourceName := Owner.MaskResourceName;
-  MaskBitmap := Owner.MaskBitmap;
-  if MaskBitmap <> nil then MaskBitmap.IncreaseRefCount;
-  WrapMode := Owner.WrapMode;
-  CropCenter := Owner.CropCenter.Point;
-  RotateAccordingToExifOrientation := Owner.RotateAccordingToExifOrientation;
-  StrokeColor := Owner.Stroke.Color;
-  StrokeThickness := Owner.Stroke.Thickness;
-  ShadowBlur := Owner.Shadow.Blur;
-  ShadowOffsetX := Owner.Shadow.OffsetX;
-  ShadowOffsetY := Owner.Shadow.OffsetY;
-  ShadowColor := Owner.Shadow.Color;
-  Corners := Owner.Corners;
-  Sides := Owner.Sides;
-  XRadius := Owner.XRadius;
-  YRadius := Owner.YRadius;
-  BlurRadius := Owner.BlurRadius;
+  MaskResourceName := AOwner.MaskResourceName;
+  WrapMode := AOwner.WrapMode;
+  CropCenter := AOwner.CropCenter.Point;
+  ApplyMetadataOrientation := AOwner.ApplyMetadataOrientation;
+  StrokeColor := AOwner.Stroke.Color;
+  StrokeThickness := AOwner.Stroke.Thickness;
+  ShadowBlur := AOwner.Shadow.Blur;
+  ShadowOffsetX := AOwner.Shadow.OffsetX;
+  ShadowOffsetY := AOwner.Shadow.OffsetY;
+  ShadowColor := AOwner.Shadow.Color;
+  Corners := AOwner.Corners;
+  Sides := AOwner.Sides;
+  XRadius := AOwner.XRadius;
+  YRadius := AOwner.YRadius;
+  BlurRadius := AOwner.BlurRadius;
 end;
 
 {***************************************************}
 destructor TALImage.TResourceDownloadContext.Destroy;
 begin
-  ALFreeAndNil(Lock);
   ALFreeAndNil(ResourceStream);
-  if MaskBitmap <> nil then begin
-    MaskBitmap.DecreaseRefCount;
-    MaskBitmap := nil;
-  end;
   inherited
+end;
+
+{************************************************************}
+function TALImage.TResourceDownloadContext.GetOwner: TALImage;
+begin
+  Result := TALImage(FOwner);
 end;
 
 {**********************************************}
 constructor TALImage.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FOwnsResourceStream := True;
   FBackgroundColor := DefaultBackgroundColor;
   FLoadingColor := DefaultLoadingColor;
-  fResourceName := '';
+  FTintColor := DefaultTintColor;
+  FBackgroundColorKey := DefaultBackgroundColorKey;
+  FLoadingColorKey := DefaultLoadingColorKey;
+  FTintColorKey := DefaultTintColorKey;
+  FResourceName := '';
+  FResourceStream := nil;
   FMaskResourceName := '';
-  FMaskBitmap := nil;
+  FHTTPHeaders := nil;
   FWrapMode := TALImageWrapMode.Fit;
-  fExifOrientationInfo := TalExifOrientationInfo.UNDEFINED;
-  fRotateAccordingToExifOrientation := False;
-  FCorners := AllCorners;
-  FSides := AllSides;
+  FApplyMetadataOrientation := False;
+  FCorners := DefaultCorners;
+  FSides := DefaultSides;
   FXRadius := DefaultXRadius;
   FYRadius := DefaultYRadius;
   FBlurRadius := DefaultBlurRadius;
@@ -1515,8 +1652,8 @@ begin
   FCropCenter.OnChanged := CropCenterChanged;
   FStroke := CreateStroke;
   FStroke.OnChanged := StrokeChanged;
-  fShadow := CreateShadow;
-  fShadow.OnChanged := ShadowChanged;
+  FShadow := CreateShadow;
+  FShadow.OnChanged := ShadowChanged;
   FResourceDownloadContext := nil;
   FFadeInDuration := DefaultFadeInDuration;
   FFadeInStartTimeNano := 0;
@@ -1527,21 +1664,81 @@ end;
 {**************************}
 destructor TALImage.Destroy;
 begin
+  if FOwnsResourceStream then
+    ALFreeAndNil(FResourceStream);
   ALFreeAndNil(fCropCenter);
   ALFreeAndNil(FStroke);
-  ALFreeAndNil(fShadow);
-  if FMaskBitmap <> nil then begin
-    FMaskBitmap.DecreaseRefCount;
-    FMaskBitmap := nil;
-  end;
+  ALFreeAndNil(FShadow);
   inherited; // Will call CancelResourceDownload via ClearBufDrawable
 end;
 
-{******************************************}
-function TALImage.IsReadyToDisplay: Boolean;
+{***********************************}
+procedure TALImage.BeforeDestruction;
+begin
+  if BeforeDestructionExecuted then exit;
+  CancelResourceDownload;
+  inherited;
+end;
+
+{*********************************************************}
+procedure TALImage.Assign(Source: TPersistent{TALControl});
+begin
+  BeginUpdate;
+  Try
+    if Source is TALImage then begin
+      BackgroundColor := TALImage(Source).BackgroundColor;
+      BackgroundColorKey := TALImage(Source).BackgroundColorKey;
+      LoadingColor := TALImage(Source).LoadingColor;
+      LoadingColorKey := TALImage(Source).LoadingColorKey;
+      TintColor := TALImage(Source).TintColor;
+      TintColorKey := TALImage(Source).TintColorKey;
+      ResourceName := TALImage(Source).ResourceName;
+      if (TALImage(Source).OwnsResourceStream) and
+         (TALImage(Source).ResourceStream <> nil) then begin
+        var LStream := TMemoryStream.Create;
+        try
+          LStream.CopyFrom(TALImage(Source).ResourceStream);
+          ResourceStream := LStream;
+          OwnsResourceStream := True;
+        except
+          ALFreeAndNil(LStream);
+          raise;
+        end;
+      end
+      else begin
+        ResourceStream := TALImage(Source).ResourceStream;
+        OwnsResourceStream := TALImage(Source).OwnsResourceStream;
+      end;
+      MaskResourceName := TALImage(Source).MaskResourceName;
+      HTTPHeaders := TALImage(Source).HTTPHeaders;
+      WrapMode := TALImage(Source).WrapMode;
+      ApplyMetadataOrientation := TALImage(Source).ApplyMetadataOrientation;
+      Corners := TALImage(Source).Corners;
+      Sides := TALImage(Source).Sides;
+      XRadius := TALImage(Source).XRadius;
+      YRadius := TALImage(Source).YRadius;
+      BlurRadius := TALImage(Source).BlurRadius;
+      CacheIndex := TALImage(Source).CacheIndex;
+      LoadingCacheIndex := TALImage(Source).LoadingCacheIndex;
+      CacheEngine := TALImage(Source).CacheEngine;
+      CropCenter.Assign(TALImage(Source).CropCenter);
+      Stroke.Assign(TALImage(Source).Stroke);
+      Shadow.Assign(TALImage(Source).Shadow);
+      FadeInDuration := TALImage(Source).FadeInDuration;
+    end
+    else
+      ALAssignError(Source{ASource}, Self{ADest});
+    inherited Assign(Source);
+  Finally
+    EndUpdate;
+  End;
+end;
+
+{**************************************************************************}
+function TALImage.IsReadyToDisplay(const AStrict: Boolean = False): Boolean;
 begin
   Result := Inherited and
-            (FResourceDownloadContext = nil) and
+            ((not AStrict) or (FResourceDownloadContext = nil)) and
             ((FFadeInStartTimeNano <= 0) or
              ((ALElapsedTimeNano - FFadeInStartTimeNano) / ALNanosPerSec > FFadeInDuration));
 end;
@@ -1577,6 +1774,61 @@ begin
   end;
 end;
 
+{********************************************}
+procedure TALImage.ApplyBackgroundColorScheme;
+begin
+  if FBackgroundColorKey <> '' then begin
+    var LBackgroundColor := TALStyleManager.Instance.GetColor(FBackgroundColorKey);
+    if FBackgroundColor <> LBackgroundColor then begin
+      FBackgroundColor := LBackgroundColor;
+      ClearBufDrawable;
+      Repaint;
+    end;
+  end;
+end;
+
+{*****************************************}
+procedure TALImage.ApplyLoadingColorScheme;
+begin
+  if FLoadingColorKey <> '' then begin
+    var LLoadingColor := TALStyleManager.Instance.GetColor(FLoadingColorKey);
+    if FLoadingColor <> LLoadingColor then begin
+      FLoadingColor := LLoadingColor;
+      ClearBufDrawable;
+      Repaint;
+    end;
+  end;
+end;
+
+{**************************************}
+procedure TALImage.ApplyTintColorScheme;
+begin
+  if FTintColorKey <> '' then begin
+    var LTintColor := TALStyleManager.Instance.GetColor(FTintColorKey);
+    if FTintColor <> LTintColor then begin
+      FTintColor := LTintColor;
+      ClearBufDrawable;
+      Repaint;
+    end;
+  end;
+end;
+
+{**********************************}
+procedure TALImage.ApplyColorScheme;
+begin
+  beginUpdate;
+  try
+    inherited;
+    Stroke.ApplyColorScheme;
+    Shadow.ApplyColorScheme;
+    ApplyBackgroundColorScheme;
+    ApplyLoadingColorScheme;
+    ApplyTintColorScheme;
+  finally
+    EndUpdate;
+  end;
+end;
+
 {******************************************}
 function TALImage.GetCacheSubIndex: Integer;
 begin
@@ -1601,16 +1853,52 @@ begin
   Result := TalphaColors.Null;
 end;
 
+{*****************************************************}
+function TALImage.GetDefaultBackgroundColorKey: String;
+begin
+  Result := '';
+end;
+
 {****************************************************}
 function TALImage.GetDefaultLoadingColor: TalphaColor;
 begin
   Result := $FFe0e4e9;
 end;
 
+{**************************************************}
+function TALImage.GetDefaultLoadingColorKey: String;
+begin
+  Result := '';
+end;
+
+{*************************************************}
+function TALImage.GetDefaultTintColor: TAlphaColor;
+begin
+  Result := TAlphaColors.null;
+end;
+
+{***********************************************}
+function TALImage.GetDefaulttintColorKey: String;
+begin
+  Result := '';
+end;
+
 {*************************************************}
 function TALImage.GetDefaultFadeInDuration: Single;
 begin
   Result := 0.250;
+end;
+
+{********************************************}
+function TALImage.GetDefaultCorners: TCorners;
+begin
+  Result := AllCorners;
+end;
+
+{****************************************}
+function TALImage.GetDefaultSides: TSides;
+begin
+  Result := AllSides;
 end;
 
 {******************************************}
@@ -1677,12 +1965,12 @@ begin
   end;
 end;
 
-{***************************************************************************}
-procedure TALImage.SetRotateAccordingToExifOrientation(const Value: Boolean);
+{*******************************************************************}
+procedure TALImage.SetApplyMetadataOrientation(const Value: Boolean);
 begin
-  if FRotateAccordingToExifOrientation <> Value then begin
+  if FApplyMetadataOrientation <> Value then begin
     ClearBufDrawable;
-    FRotateAccordingToExifOrientation := Value;
+    FApplyMetadataOrientation := Value;
     Repaint;
   end;
 end;
@@ -1697,6 +1985,18 @@ begin
   end;
 end;
 
+{*********************************************************}
+procedure TALImage.setResourceStream(const Value: TStream);
+begin
+  if FResourceStream <> Value then begin
+    if FOwnsResourceStream then
+      ALFreeAndNil(FResourceStream);
+    ClearBufDrawable;
+    FResourceStream := Value;
+    Repaint;
+  end;
+end;
+
 {**********************************************************}
 procedure TALImage.setMaskResourceName(const Value: String);
 begin
@@ -1707,25 +2007,23 @@ begin
   end;
 end;
 
-{*******************************************************}
-procedure TALImage.setMaskBitmap(const Value: TALRefCountBitmap);
-begin
-  if FMaskBitmap <> Value then begin
-    ClearBufDrawable;
-    if FMaskBitmap <> nil then FMaskBitmap.DecreaseRefCount;
-    FMaskBitmap := Value;
-    if FMaskBitmap <> nil then FMaskBitmap.IncreaseRefCount;
-    Repaint;
-  end;
-end;
-
 {**************************************************************}
 procedure TALImage.setBackgroundColor(const Value: TAlphaColor);
 begin
   if FBackgroundColor <> Value then begin
-    ClearBufDrawable;
     FBackgroundColor := Value;
+    FBackgroundColorKey := '';
+    ClearBufDrawable;
     Repaint;
+  end;
+end;
+
+{************************************************************}
+procedure TALImage.setBackgroundColorKey(const Value: String);
+begin
+  if FBackgroundColorKey <> Value then begin
+    FBackgroundColorKey := Value;
+    ApplyBackgroundColorScheme;
   end;
 end;
 
@@ -1733,9 +2031,39 @@ end;
 procedure TALImage.setLoadingColor(const Value: TAlphaColor);
 begin
   if FLoadingColor <> Value then begin
-    ClearBufDrawable;
     FLoadingColor := Value;
+    FLoadingColorKey := '';
+    ClearBufDrawable;
     Repaint;
+  end;
+end;
+
+{*********************************************************}
+procedure TALImage.setLoadingColorKey(const Value: String);
+begin
+  if FLoadingColorKey <> Value then begin
+    FLoadingColorKey := Value;
+    ApplyLoadingColorScheme;
+  end;
+end;
+
+{********************************************************}
+procedure TALImage.setTintColor(const Value: TAlphaColor);
+begin
+  if FTintColor <> Value then begin
+    FTintColor := Value;
+    FTintColorKey := '';
+    ClearBufDrawable;
+    Repaint;
+  end;
+end;
+
+{******************************************************}
+procedure TALImage.setTintColorKey(const Value: String);
+begin
+  if FTintColorKey <> Value then begin
+    FTintColorKey := Value;
+    ApplyTintColorScheme;
   end;
 end;
 
@@ -1797,10 +2125,34 @@ begin
   Result := FBackgroundColor <> DefaultBackgroundColor;
 end;
 
+{****************************************************}
+function TALImage.IsBackgroundColorKeyStored: Boolean;
+begin
+  Result := FBackgroundColorKey <> DefaultBackgroundColorKey;
+end;
+
 {**********************************************}
 function TALImage.IsLoadingColorStored: Boolean;
 begin
   Result := FLoadingColor <> DefaultLoadingColor;
+end;
+
+{*************************************************}
+function TALImage.IsLoadingColorKeyStored: Boolean;
+begin
+  Result := FLoadingColorKey <> DefaultLoadingColorKey;
+end;
+
+{*******************************************}
+function TALImage.IsTintColorStored: Boolean;
+begin
+  Result := FTintColor <> DefaultTintColor;
+end;
+
+{**********************************************}
+function TALImage.IsTintColorKeyStored: Boolean;
+begin
+  Result := FTintColorKey <> DefaultTintColorKey;
 end;
 
 {************************************************}
@@ -1812,13 +2164,13 @@ end;
 {*****************************************}
 function TALImage.IsCornersStored: Boolean;
 begin
-  Result := FCorners <> AllCorners;
+  Result := FCorners <> DefaultCorners;
 end;
 
 {***************************************}
 function TALImage.IsSidesStored: Boolean;
 begin
-  Result := FSides <> AllSides
+  Result := FSides <> DefaultSides;
 end;
 
 {*****************************************}
@@ -1890,15 +2242,15 @@ begin
   // to lock its access for reading or updating.
   if FResourceDownloadContext <> nil then begin
     var LContextToFree: TResourceDownloadContext;
-    var LLock := FResourceDownloadContext.lock;
-    TMonitor.Enter(LLock);
+    var LLock := FResourceDownloadContext.FLock;
+    ALMonitorEnter(LLock{$IF defined(DEBUG)}, 'TALImage.CancelResourceDownload'{$ENDIF});
     try
-      if not FResourceDownloadContext.FreeByThread then LContextToFree := FResourceDownloadContext
+      if not FResourceDownloadContext.FManagedByWorkerThread then LContextToFree := FResourceDownloadContext
       else LContextToFree := nil;
-      FResourceDownloadContext.Owner := nil;
+      FResourceDownloadContext.FOwner := nil;
       FResourceDownloadContext := nil;
     Finally
-      TMonitor.Exit(LLock);
+      ALMonitorExit(LLock{$IF defined(DEBUG)}, 'TALImage.CancelResourceDownload'{$ENDIF});
     End;
     ALFreeAndNil(LContextToFree);
   end;
@@ -1908,7 +2260,7 @@ end;
 //[MultiThread]
 class function TALImage.CanStartResourceDownload(var AContext: Tobject): boolean;
 begin
-  result := TResourceDownloadContext(AContext).owner <> nil;
+  result := TResourceDownloadContext(AContext).FOwner <> nil;
 end;
 
 {*************}
@@ -1916,7 +2268,7 @@ end;
 class procedure TALImage.HandleResourceDownloadSuccess(const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject);
 begin
   var LContext := TResourceDownloadContext(AContext);
-  if LContext.owner = nil then exit;
+  if LContext.FOwner = nil then exit;
   LContext.ResourceStream := AContentStream;
   TALGraphicThreadPool.Instance.ExecuteProc(
     CreateBufDrawable, // const AProc: TALWorkerThreadProc;
@@ -1928,19 +2280,19 @@ end;
 
 {*************}
 //[MultiThread]
-class procedure TALImage.HandleResourceDownloadError(const AErrMessage: string; var AContext: Tobject);
+class procedure TALImage.HandleResourceDownloadError(const AResponse: IHTTPResponse; const AErrMessage: string; var AContext: Tobject);
 begin
   var LContext := TResourceDownloadContext(AContext);
-  if LContext.owner = nil then exit;
+  if LContext.FOwner = nil then exit;
   {$IFDEF ALDPK}
-  TMonitor.Enter(LContext.Lock);
+  ALMonitorEnter(LContext.FLock{$IF defined(DEBUG)}, 'TALImage.HandleResourceDownloadError (1)'{$ENDIF});
   try
     if LContext.Owner <> nil then begin
-      LContext.FreeByThread := False;
+      LContext.FManagedByWorkerThread := False;
       AContext := nil; // AContext will be free by CancelResourceDownload
     end;
   finally
-    TMonitor.Exit(LContext.Lock);
+    ALMonitorExit(LContext.FLock{$IF defined(DEBUG)}, 'TALImage.HandleResourceDownloadError (1)'{$ENDIF});
   end;
   exit;
   {$ENDIF}
@@ -1950,14 +2302,14 @@ begin
       'BrokenImage resource is missing or incorrect | ' +
       AErrMessage,
       TalLogType.error);
-    TMonitor.Enter(LContext.Lock);
+    ALMonitorEnter(LContext.FLock{$IF defined(DEBUG)}, 'TALImage.HandleResourceDownloadError (2)'{$ENDIF});
     try
-      if LContext.Owner <> nil then begin
-        LContext.FreeByThread := False;
+      if LContext.FOwner <> nil then begin
+        LContext.FManagedByWorkerThread := False;
         AContext := nil; // AContext will be free by CancelResourceDownload
       end;
     finally
-      TMonitor.Exit(LContext.Lock);
+      ALMonitorExit(LContext.FLock{$IF defined(DEBUG)}, 'TALImage.HandleResourceDownloadError (2)'{$ENDIF});
     end;
     exit;
   end;
@@ -1973,13 +2325,13 @@ begin
   //LContext.Scale: Single;
   //LContext.AlignToPixel: Boolean;
   LContext.Color := TalphaColors.Null;
+  LContext.TintColor := TAlphaColors.Null;
   LContext.ResourceName := ALBrokenImageResourceName;
   ALFreeAndNil(LContext.ResourceStream);
   LContext.MaskResourceName := '';
-  LContext.MaskBitmap := nil;
   LContext.WrapMode := TALImageWrapMode.Fit;
   //LContext.CropCenter: TpointF;
-  //LContext.RotateAccordingToExifOrientation: Boolean;
+  //LContext.ApplyMetadataOrientation: Boolean;
   LContext.StrokeColor := TalphaColors.Null;
   //LContext.StrokeThickness: Single;
   //LContext.ShadowBlur: Single;
@@ -2010,26 +2362,24 @@ end;
 class Procedure TALImage.CreateBufDrawable(var AContext: TObject);
 begin
   var LContext := TResourceDownloadContext(AContext);
-  if LContext.owner = nil then exit;
+  if LContext.FOwner = nil then exit;
   var LBufDrawable: TALDrawable := ALNullDrawable;
   var LBufDrawableRect: TRectF;
-  var LExifOrientationInfo: TalExifOrientationInfo;
   Try
     CreateBufDrawable(
       LBufDrawable, // var ABufDrawable: TALDrawable;
       LBufDrawableRect, // out ABufDrawableRect: TRectF;
-      LExifOrientationInfo, // out AExifOrientationInfo: TalExifOrientationInfo;
       LContext.Rect, // const ARect: TRectF;
       LContext.Scale, // const AScale: Single;
       LContext.AlignToPixel, // const AAlignToPixel: Boolean;
       LContext.Color, // const AColor: TAlphaColor;
+      LContext.TintColor, // const ATintColor: TAlphaColor;
       LContext.ResourceName, // const AResourceName: String;
       LContext.ResourceStream, // const AResourceStream: TStream;
       LContext.MaskResourceName, // const AMaskResourceName: String;
-      LContext.MaskBitmap, // const AMaskBitmap: TALRefCountBitmap;
       LContext.WrapMode, // const AWrapMode: TALImageWrapMode;
       LContext.CropCenter, // const ACropCenter: TpointF;
-      LContext.RotateAccordingToExifOrientation, // const ARotateAccordingToExifOrientation: Boolean;
+      LContext.ApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
       LContext.StrokeColor, // const AStrokeColor: TAlphaColor;
       LContext.StrokeThickness, // const AStrokeThickness: Single;
       LContext.ShadowBlur, // const AShadowBlur: Single;
@@ -2039,33 +2389,33 @@ begin
       LContext.Corners, // const ACorners: TCorners;
       LContext.Sides, // const ASides: TSides;
       LContext.XRadius, // const AXRadius: Single;
-      LContext.YRadius, // const AYRadius: Single)
+      LContext.YRadius, // const AYRadius: Single;
       LContext.BlurRadius); // const ABlurRadius: Single)
   except
     On E: Exception do begin
-      HandleResourceDownloadError(E.Message, AContext);
+      HandleResourceDownloadError(nil{AResponse}, E.Message, AContext);
       exit;
     end;
   End;
   TThread.queue(nil,
     procedure
     begin
-      if LContext.Owner <> nil then begin
-        if (LContext.Owner.FFadeInDuration > 0) and
+      if LContext.FOwner <> nil then begin
+        var LOwner := LContext.Owner;
+        if (LOwner.FFadeInDuration > 0) and
            (LContext.ResourceName <> ALBrokenImageResourceName) and
            (not ALIsDrawableNull(LBufDrawable)) then begin
-          LContext.Owner.FFadeInStartTimeNano := ALElapsedTimeNano;
+          LOwner.FFadeInStartTimeNano := ALElapsedTimeNano;
         end
         else begin
-          ALFreeAndNilDrawable(LContext.Owner.fBufLoadingDrawable);
-          LContext.Owner.FFadeInStartTimeNano := 0;
+          ALFreeAndNilDrawable(LOwner.fBufLoadingDrawable);
+          LOwner.FFadeInStartTimeNano := 0;
         end;
-        ALFreeAndNilDrawable(LContext.Owner.fBufDrawable);
-        LContext.Owner.fBufDrawable := LBufDrawable;
-        LContext.Owner.FBufDrawableRect := LBufDrawableRect;
-        LContext.Owner.FExifOrientationInfo := LExifOrientationInfo;
-        LContext.Owner.FResourceDownloadContext := nil;
-        LContext.Owner.Repaint;
+        ALFreeAndNilDrawable(LOwner.fBufDrawable);
+        LOwner.fBufDrawable := LBufDrawable;
+        LOwner.FBufDrawableRect := LBufDrawableRect;
+        LOwner.FResourceDownloadContext := nil;
+        LOwner.Repaint;
       end;
       ALFreeAndNil(LContext);
     end);
@@ -2077,18 +2427,17 @@ end;
 class Procedure TALImage.CreateBufDrawable(
                   var ABufDrawable: TALDrawable;
                   out ABufDrawableRect: TRectF;
-                  out AExifOrientationInfo: TalExifOrientationInfo;
                   const ARect: TRectF;
                   const AScale: Single;
                   const AAlignToPixel: Boolean;
                   const AColor: TAlphaColor;
+                  const ATintColor: TAlphaColor;
                   const AResourceName: String;
                   const AResourceStream: TStream;
                   const AMaskResourceName: String;
-                  const AMaskBitmap: TALRefCountBitmap;
                   const AWrapMode: TALImageWrapMode;
                   const ACropCenter: TpointF;
-                  const ARotateAccordingToExifOrientation: Boolean;
+                  const AApplyMetadataOrientation: Boolean;
                   const AStrokeColor: TAlphaColor;
                   const AStrokeThickness: Single;
                   const AShadowBlur: Single;
@@ -2104,52 +2453,12 @@ begin
 
   if (not ALIsDrawableNull(ABufDrawable)) then exit;
 
-  var LMaskBitmap: TALbitmap;
-  if AMaskBitmap <> nil then LMaskBitmap := AMaskBitmap.Bitmap
-  else LMaskBitmap := ALNullBitmap;
-
   var lResourceName: String;
   if ALIsHttpOrHttpsUrl(AResourceName) then lResourceName := ''
   else lResourceName := AResourceName;
   var LFileName := ALGetResourceFilename(lResourceName);
 
   ABufDrawableRect := ARect;
-  if (ARotateAccordingToExifOrientation) then begin
-    {$IF defined(ALSkiaEngine)}
-    // SkImage automatically loads the image with the correct orientation based on EXIF data.
-    // Therefore, if we apply ExifOrientationInfo to rotate the image again, the result will be incorrect.
-    AExifOrientationInfo := TalExifOrientationInfo.UNDEFINED;
-    {$ELSE}
-    if LFileName <> '' then AExifOrientationInfo := AlGetExifOrientationInfo(LFilename)
-    else if AResourceStream <> nil then AExifOrientationInfo := AlGetExifOrientationInfo(AResourceStream)
-    else AExifOrientationInfo := TalExifOrientationInfo.UNDEFINED;
-    if AExifOrientationInfo in [TalExifOrientationInfo.TRANSPOSE,
-                                TalExifOrientationInfo.ROTATE_90,
-                                TalExifOrientationInfo.TRANSVERSE,
-                                TalExifOrientationInfo.ROTATE_270] then begin
-      ABufDrawableRect.Width := ARect.Height;
-      ABufDrawableRect.Height := ARect.Width;
-    end;
-    {$ENDIF}
-  end
-  else begin
-    {$IF defined(ALSkiaEngine)}
-    // SkImage automatically loads the image with the correct orientation based on EXIF data.
-    // If we want to disable this behavior, we need to manually rotate the image to its original orientation.
-    if LFileName <> '' then AExifOrientationInfo := AlGetExifOrientationInfo(LFilename)
-    else if AResourceStream <> nil then AExifOrientationInfo := AlGetExifOrientationInfo(AResourceStream)
-    else AExifOrientationInfo := TalExifOrientationInfo.UNDEFINED;
-    if AExifOrientationInfo in [TalExifOrientationInfo.TRANSPOSE,
-                                TalExifOrientationInfo.ROTATE_90,
-                                TalExifOrientationInfo.TRANSVERSE,
-                                TalExifOrientationInfo.ROTATE_270] then begin
-      ABufDrawableRect.Width := ARect.Height;
-      ABufDrawableRect.Height := ARect.Width;
-    end;
-    {$ELSE}
-    AExifOrientationInfo := TalExifOrientationInfo.UNDEFINED;
-    {$ENDIF}
-  end;
 
   {$REGION 'Use ALCreateDrawableFromResource'}
   if ((AResourceStream <> nil) or (LFileName <> '') or (LResourceName <> '')) and
@@ -2166,11 +2475,12 @@ begin
                         AResourceName, // const AResourceName: String;
                         AResourceStream, // const AResourceStream: TStream;
                         AMaskResourceName, // const AMaskResourceName: String;
-                        LMaskBitmap, // const AMaskBitmap: TALBitmap;
                         AScale, // const AScale: Single;
-                        ARect.Width, ARect.Height, // const W, H: single;
+                        ABufDrawableRect.Width, ABufDrawableRect.Height, // const W, H: single;
+                        AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                         AWrapMode, // const AWrapMode: TALImageWrapMode;
                         ACropCenter, // const ACropCenter: TpointF;
+                        ATintColor, // const ATintColor: TAlphaColor;
                         ABlurRadius, // const ABlurRadius: single;
                         AXRadius, // const AXRadius: Single;
                         AYRadius); // const AYRadius: Single);
@@ -2193,6 +2503,7 @@ begin
   {$REGION 'Use TALDrawRectangleHelper'}
   var LSurfaceRect := ALGetShapeSurfaceRect(
                         ABufDrawableRect, // const ARect: TRectF;
+                        AAlignToPixel, // const AAlignToPixel: Boolean;
                         AColor, // const AFillColor: TAlphaColor;
                         [], // const AFillGradientColors: TArray<TAlphaColor>;
                         LResourceName, // const AFillResourceName: String;
@@ -2230,7 +2541,8 @@ begin
         .SetFillResourceName(LResourceName)
         .SetFillResourceStream(AResourceStream)
         .SetFillMaskResourceName(AMaskResourceName)
-        .SetFillMaskBitmap(LMaskBitmap)
+        .SetFillApplyMetadataOrientation(AApplyMetadataOrientation)
+        .SetFillImageTintColor(ATintColor)
         .SetFillWrapMode(AWrapMode)
         .SetFillCropCenter(ACropCenter)
         .SetFillBlurRadius(ABlurRadius)
@@ -2268,8 +2580,8 @@ begin
 
   if //--- Do not create BufDrawable if the size is 0
      (Size.Size.IsZero) or
-     //--- Do not create BufDrawable if fResourceName is empty
-     (fResourceName = '')
+     //--- Do not create BufDrawable if FResourceName and FResourceStream are empty
+     ((FResourceName = '') and (FResourceStream = nil))
   then begin
     ClearBufDrawable;
     exit;
@@ -2283,10 +2595,11 @@ begin
      (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   if (FResourceDownloadContext = nil) and
+     (FResourceStream = nil) and
      (ALIsHttpOrHttpsUrl(ResourceName)) then begin
 
     {$IFDEF debug}
-    ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Starting download | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+    ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Starting download | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
     {$endif}
 
     FResourceDownloadContext := TResourceDownloadContext.Create(Self);
@@ -2298,7 +2611,8 @@ begin
         HandleResourceDownloadError, // const AOnErrorCallBack: TALNetHttpClientPoolOnErrorProc;
         FResourceDownloadContext, // const AContext: Tobject; // Context will be free by the worker thread
         true, // const AUseCache: Boolean = True;
-        GetResourceDownloadPriority); // const AGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
+        GetResourceDownloadPriority, // const AGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
+        HTTPHeaders); // const AHeaders: TNetHeaders = nil;
     except
       ALFreeAndNil(FResourceDownloadContext);
       Raise;
@@ -2306,7 +2620,6 @@ begin
 
     if (LoadingColor <> TAlphaColors.Null) and
        ((MaskResourceName <> '') or
-        (MaskBitmap <> nil) or
         (not SameValue(xRadius, 0, TEpsilon.Vector)) or
         (not SameValue(yRadius, 0, TEpsilon.Vector))) then begin
 
@@ -2315,24 +2628,23 @@ begin
          (CacheEngine.HasEntry(LoadingCacheIndex{AIndex}, GetLoadingCacheSubIndex{ASubIndex})) then Exit;
 
       {$IFDEF debug}
-      ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Creating loading content | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+      ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Creating loading content | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
       {$endif}
 
       CreateBufDrawable(
         FBufLoadingDrawable, // var ABufDrawable: TALDrawable;
         FBufLoadingDrawableRect, // out ABufDrawableRect: TRectF;
-        FExifOrientationInfo, // out AExifOrientationInfo: TalExifOrientationInfo;
         LocalRect, // const ARect: TRectF;
         ALGetScreenScale, // const AScale: Single;
-        IsPixelAlignmentEnabled, // const AAlignToPixel: Boolean;
-        LoadingColor, // const AColor: TAlphaColor;
-        '', // const AResourceName: String;
+        AutoAlignToPixel, // const AAlignToPixel: Boolean;
+        ALIfThen(MaskResourceName <> '', TAlphaColors.null, LoadingColor), // const AColor: TAlphaColor;
+        ALIfThen(MaskResourceName <> '', LoadingColor, TAlphaColors.null), // const ATintColor: TAlphaColor;
+        MaskResourceName, // const AResourceName: String;
         nil, // const AResourceStream: TStream;
-        MaskResourceName, // const AMaskResourceName: String;
-        MaskBitmap, // const AMaskBitmap: TALRefCountBitmap;
-        TALImageWrapMode.Fit, // const AWrapMode: TALImageWrapMode;
+        '', // const AMaskResourceName: String;
+        WrapMode, // const AWrapMode: TALImageWrapMode;
         TpointF.Zero, // const ACropCenter: TpointF;
-        false, // const ARotateAccordingToExifOrientation: Boolean;
+        false, // const AApplyMetadataOrientation: Boolean;
         TAlphaColors.Null, // const AStrokeColor: TAlphaColor;
         0, // const AStrokeThickness: Single;
         0, // const AShadowBlur: Single;
@@ -2351,24 +2663,23 @@ begin
   end;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   CreateBufDrawable(
     FBufDrawable, // var ABufDrawable: TALDrawable;
     FBufDrawableRect, // out ABufDrawableRect: TRectF;
-    FExifOrientationInfo, // out AExifOrientationInfo: TalExifOrientationInfo;
     LocalRect, // const ARect: TRectF;
     ALGetScreenScale, // const AScale: Single;
-    IsPixelAlignmentEnabled, // const AAlignToPixel: Boolean;
+    AutoAlignToPixel, // const AAlignToPixel: Boolean;
     BackGroundColor, // const AColor: TAlphaColor;
+    TintColor, // const ATintColor: TAlphaColor;
     ResourceName, // const AResourceName: String;
-    nil, // const AResourceStream: TStream;
+    ResourceStream, // const AResourceStream: TStream;
     MaskResourceName, // const AMaskResourceName: String;
-    MaskBitmap, // const AMaskBitmap: TALRefCountBitmap;
     WrapMode, // const AWrapMode: TALImageWrapMode;
     CropCenter.Point, // const ACropCenter: TpointF;
-    RotateAccordingToExifOrientation, // const ARotateAccordingToExifOrientation: Boolean;
+    ApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
     Stroke.Color, // const AStrokeColor: TAlphaColor;
     Stroke.Thickness, // const AStrokeThickness: Single;
     Shadow.Blur, // const AShadowBlur: Single;
@@ -2378,13 +2689,40 @@ begin
     Corners, // const ACorners: TCorners;
     Sides, // const ASides: TSides;
     XRadius, // const AXRadius: Single;
-    YRadius, // const AYRadius: Single)
+    YRadius, // const AYRadius: Single;
     BlurRadius); // const ABlurRadius: Single);
 
 end;
 
 {***********************}
 procedure TALImage.Paint;
+
+  {~~~~~~~~~~~~~~~~~~~~}
+  procedure _Invalidate;
+  begin
+    // We cannot call Repaint from within a paint method,
+    // but we can call Form.Invalidate. We use Form.Invalidate
+    // to avoid using any TALFloatAnimation object
+    {$IF defined(ANDROID)}
+    If Form <> nil then
+      Form.Invalidate;
+    {$ELSE}
+    If Form <> nil then begin
+      var LForm := Form;
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          If (Screen <> nil) then
+            for var I := 0 to Screen.FormCount - 1 do
+              if LForm = Screen.Forms[I] then begin
+                LForm.Invalidate;
+                Break;
+              end;
+        end);
+    end;
+    {$ENDIF}
+  end;
+
 begin
 
   // Draw a dashed rectangle in design mode
@@ -2408,22 +2746,7 @@ begin
     if LElapsedTime > FFadeInDuration then FFadeInStartTimeNano := 0
     else begin
       LOpacity := LOpacity * (LElapsedTime / FFadeInDuration);
-      // We cannot call Repaint from within a paint method,
-      // but we can call Form.Invalidate. We use Form.Invalidate
-      // to avoid using any TALFloatAnimation object
-      {$IF defined(MSWindows)}
-      If Form <> nil then begin
-        var LWnd := FormToHWND(Form);
-        TThread.ForceQueue(nil,
-          procedure
-          begin
-            Winapi.Windows.InvalidateRect(LWnd, nil, False);
-          end);
-      end;
-      {$ELSE}
-      If Form <> nil then
-        Form.Invalidate;
-      {$ENDIF}
+      _invalidate;
     end;
   end;
 
@@ -2477,7 +2800,7 @@ begin
           (LoadingColor <> TAlphaColors.Null) then begin
     {$IF DEFINED(ALSkiaCanvas)}
     TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-      .SetAlignToPixel(IsPixelAlignmentEnabled)
+      .SetAlignToPixel(AutoAlignToPixel)
       .SetDstRect(LocalRect)
       .SetOpacity(AbsoluteOpacity)
       .SetFillColor(FloadingColor)
@@ -2500,87 +2823,6 @@ begin
   if FFadeInStartTimeNano <= 0 then
     ALFreeAndNilDrawable(fBufLoadingDrawable);
 
-  // Handle the fExifOrientationInfo
-  case fExifOrientationInfo of
-    TalExifOrientationInfo.FLIP_HORIZONTAL: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      LMatrix := LMatrix * TMatrix.CreateScaling(-1, 1); // matrix.setScale(-1, 1);
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.FLIP_VERTICAL: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      LMatrix := LMatrix * TMatrix.CreateScaling(1, -1); // matrix.setRotate(180); matrix.setScale(-1, 1);
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.NORMAL:;
-    TalExifOrientationInfo.ROTATE_180: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(180)); // matrix.setRotate(180);
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.ROTATE_270: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      {$IF defined(ALSkiaEngine)}
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(90)); // matrix.setRotate(90);
-      {$ELSE}
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(-90)); // matrix.setRotate(-90);
-      {$ENDIF}
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.ROTATE_90: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      {$IF defined(ALSkiaEngine)}
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(-90)); // matrix.setRotate(-90);
-      {$ELSE}
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(90)); // matrix.setRotate(90);
-      {$ENDIF}
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.TRANSPOSE: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(90)); // matrix.setRotate(90);
-      LMatrix := LMatrix * TMatrix.CreateScaling(-1, 1); // matrix.setScale(-1, 1);
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.TRANSVERSE: begin
-      var LMatrixRotationCenter: TpointF;
-      LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
-      LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
-      var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
-      LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(-90)); // matrix.setRotate(-90);
-      LMatrix := LMatrix * TMatrix.CreateScaling(-1, 1); // matrix.setScale(-1, 1);
-      LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
-      Canvas.SetMatrix(LMatrix);
-    end;
-    TalExifOrientationInfo.UNDEFINED:;
-    else
-      Raise Exception.Create('Error 015D39FD-8A61-4F7F-A8AA-639A91FCBC37');
-  end;
-
   // Draw the LDrawable
   ALDrawDrawable(
     Canvas, // const ACanvas: Tcanvas;
@@ -2595,68 +2837,67 @@ constructor TALAnimatedImage.TAnimation.Create(const AOwner: TALAnimatedImage);
 begin
   inherited create;
   fOwner := AOwner;
-  fFloatAnimation := TALFloatAnimation.Create;
-  fFloatAnimation.Loop := True;
-  fFloatAnimation.StopValue := 1.0;
-  fFloatAnimation.Duration := MaxSingle;
-  fFloatAnimation.OnFirstFrame := DoFirstFrame;
-  fFloatAnimation.OnProcess := DoProcess;
-  fFloatAnimation.OnFinish := DoFinish;
-  FSpeed := 1.0;
+  inherited Duration := MaxSingle;
   FDuration := 0.0;
+  FSpeed := 1.0;
+  FStartProgress := 0;
+  FStopProgress := 1.0;
+  fCurrentProgress := 0;
+  FEnabled := True;
 end;
 
-{*********************************************}
-destructor TALAnimatedImage.TAnimation.Destroy;
+{****************************************************************}
+procedure TALAnimatedImage.TAnimation.Assign(Source: TPersistent);
 begin
-  ALFreeAndNil(fFloatAnimation);
-  inherited;
+  if Source is TALAnimatedImage.TAnimation then begin
+    Speed := TALAnimatedImage.TAnimation(Source).Speed;
+    StartProgress := TALAnimatedImage.TAnimation(Source).StartProgress;
+    StopProgress := TALAnimatedImage.TAnimation(Source).StopProgress;
+    inherited Assign(Source);
+    Enabled := TALAnimatedImage.TAnimation(Source).Enabled;
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
 end;
 
-{*****************************************************************}
-procedure TALAnimatedImage.TAnimation.UpdateFloatAnimationDuration;
+{******************************************}
+procedure TALAnimatedImage.TAnimation.Start;
+begin
+  if (Running) then
+    Exit;
+  FEnabled := True;
+  fCurrentProgress := FStartProgress;
+  inherited Start;
+end;
+
+{*********************************************************************}
+procedure TALAnimatedImage.TAnimation.UpdateInheritedAnimationDuration;
 begin
   if not SameValue(FSpeed, 0.0, Single.Epsilon) then
-    FFloatAnimation.Duration := (FDuration / FSpeed) * abs(FFloatAnimation.StopValue - FFloatAnimation.StartValue)
+    inherited Duration := (FDuration / FSpeed) * abs(StopProgress - StartProgress)
   else
-    FFloatAnimation.Duration := maxSingle;
+    inherited Duration := maxSingle;
 end;
 
 {********************************************}
 procedure TALAnimatedImage.TAnimation.repaint;
 begin
   if Fowner.IsDisplayed then
-    Fowner.Repaint;
+    Fowner.Repaint
+  else if Loop then
+    Pause;
 end;
 
 {***********************************************************}
-function TALAnimatedImage.TAnimation.GetAutoReverse: Boolean;
+function TALAnimatedImage.TAnimation.GetDefaultLoop: Boolean;
 begin
-  Result := FFloatAnimation.AutoReverse;
-end;
-
-{****************************************************}
-function TALAnimatedImage.TAnimation.GetDelay: Single;
-begin
-  Result := FFloatAnimation.Delay;
+  Result := True;
 end;
 
 {*******************************************************}
 function TALAnimatedImage.TAnimation.GetDuration: Single;
 begin
   Result := FDuration;
-end;
-
-{*******************************************************}
-function TALAnimatedImage.TAnimation.GetInverse: Boolean;
-begin
-  Result := FFloatAnimation.Inverse;
-end;
-
-{****************************************************}
-function TALAnimatedImage.TAnimation.GetLoop: Boolean;
-begin
-  Result := FFloatAnimation.Loop;
 end;
 
 {**********************************************************}
@@ -2675,94 +2916,10 @@ begin
   end;
 end;
 
-{*****************************************************}
-function TALAnimatedImage.TAnimation.GetPause: Boolean;
-begin
-  Result := FFloatAnimation.Pause;
-end;
-
-{*******************************************************}
-function TALAnimatedImage.TAnimation.GetRunning: Boolean;
-begin
-  Result := FFloatAnimation.Running;
-end;
-
-{************************************************************}
-function TALAnimatedImage.TAnimation.GetStartProgress: Single;
-begin
-  Result := FFloatAnimation.StartValue;
-end;
-
-{***********************************************************}
-function TALAnimatedImage.TAnimation.GetStopProgress: Single;
-begin
-  Result := FFloatAnimation.StopValue;
-end;
-
-{**************************************************************}
-function TALAnimatedImage.TAnimation.GetCurrentProgress: Single;
-begin
-  Result := FFloatAnimation.CurrentValue;
-end;
-
 {****************************************************}
 function TALAnimatedImage.TAnimation.GetSpeed: Single;
 begin
   Result := FSpeed;
-end;
-
-{*************************************************************************}
-procedure TALAnimatedImage.TAnimation.SetAutoReverse(const Value: Boolean);
-begin
-  FFloatAnimation.AutoReverse := Value;
-end;
-
-{******************************************************************}
-procedure TALAnimatedImage.TAnimation.SetDelay(const Value: Single);
-begin
-  FFloatAnimation.Delay := Value;
-end;
-
-{*********************************************************************}
-procedure TALAnimatedImage.TAnimation.SetDuration(const Value: Single);
-begin
-  FDuration := Value;
-  UpdateFloatAnimationDuration;
-end;
-
-{*********************************************************************}
-procedure TALAnimatedImage.TAnimation.SetInverse(const Value: Boolean);
-begin
-  FFloatAnimation.Inverse := Value;
-  Repaint;
-end;
-
-{******************************************************************}
-procedure TALAnimatedImage.TAnimation.SetLoop(const Value: Boolean);
-begin
-  FFloatAnimation.Loop := Value;
-end;
-
-{*******************************************************************}
-procedure TALAnimatedImage.TAnimation.SetPause(const Value: Boolean);
-begin
-  FFloatAnimation.Pause := Value;
-end;
-
-{**************************************************************************}
-procedure TALAnimatedImage.TAnimation.SetStartProgress(const Value: Single);
-begin
-  FFloatAnimation.StartValue := Min(Max(Value, 0), 1);
-  UpdateFloatAnimationDuration;
-  Repaint;
-end;
-
-{*************************************************************************}
-procedure TALAnimatedImage.TAnimation.SetStopProgress(const Value: Single);
-begin
-  FFloatAnimation.StopValue := Min(Max(Value, 0), 1);
-  UpdateFloatAnimationDuration;
-  Repaint;
 end;
 
 {******************************************************************}
@@ -2770,14 +2927,49 @@ procedure TALAnimatedImage.TAnimation.SetSpeed(const Value: Single);
 begin
   if not SameValue(FSpeed, Value, Single.Epsilon) then begin
     FSpeed := Value;
-    UpdateFloatAnimationDuration;
+    UpdateInheritedAnimationDuration;
   end;
+end;
+
+{****************************}
+{$IF defined(ALSkiaAvailable)}
+procedure TALAnimatedImage.TAnimation.SetDuration(const Value: Single);
+begin
+  FDuration := Value;
+  UpdateInheritedAnimationDuration;
+end;
+{$ENDIF}
+
+{*********************************************************************}
+procedure TALAnimatedImage.TAnimation.SetEnabled(const Value: Boolean);
+begin
+  if Value <> FEnabled then begin
+    FEnabled := Value;
+    if not FEnabled then
+      inherited Enabled := False;
+  end;
+end;
+
+{**************************************************************************}
+procedure TALAnimatedImage.TAnimation.SetStartProgress(const Value: Single);
+begin
+  FStartProgress := Min(Max(Value, 0), 1);
+  UpdateInheritedAnimationDuration;
+  Repaint;
+end;
+
+{*************************************************************************}
+procedure TALAnimatedImage.TAnimation.SetStopProgress(const Value: Single);
+begin
+  FStopProgress := Min(Max(Value, 0), 1);
+  UpdateInheritedAnimationDuration;
+  Repaint;
 end;
 
 {*****************************************************************}
 function TALAnimatedImage.TAnimation.IsStopProgressStored: Boolean;
 begin
-  Result := Not SameValue(FFloatAnimation.StopValue, 1.0, Single.Epsilon);
+  Result := Not SameValue(FStopProgress, 1.0, Single.Epsilon);
 end;
 
 {**********************************************************}
@@ -2786,58 +2978,43 @@ begin
   Result := Not SameValue(FSpeed, 1.0, Single.Epsilon);
 end;
 
-{*******************************************************}
-function TALAnimatedImage.TAnimation.getEnabled: Boolean;
+{*****************************************************}
+procedure TALAnimatedImage.TAnimation.ProcessAnimation;
 begin
-  Result := FFloatAnimation.Enabled;
+  fCurrentProgress := FStartProgress + (FStopProgress - FStartProgress) * NormalizedTime;
 end;
 
-{*********************************************************************}
-procedure TALAnimatedImage.TAnimation.SetEnabled(const Value: Boolean);
+{*************************************************}
+procedure TALAnimatedImage.TAnimation.DoFirstFrame;
 begin
-  FFloatAnimation.Enabled := Value;
+  inherited;
+  if Enabled then begin
+    if assigned(FOwner.FOnAnimationFirstFrame) then
+      FOwner.FOnAnimationFirstFrame(FOwner);
+    Repaint;
+  end;
 end;
 
-{******************************************************************}
-procedure TALAnimatedImage.TAnimation.doFirstFrame(Sender: TObject);
+{**********************************************}
+procedure TALAnimatedImage.TAnimation.DoProcess;
 begin
-  if assigned(FOwner.FOnAnimationFirstFrame) then
-    FOwner.FOnAnimationFirstFrame(FOwner);
-  Repaint;
+  inherited;
+  if Enabled then begin
+    if assigned(FOwner.FOnAnimationProcess) then
+      FOwner.FOnAnimationProcess(FOwner);
+    Repaint;
+  end;
 end;
 
-{***************************************************************}
-procedure TALAnimatedImage.TAnimation.doProcess(Sender: TObject);
+{*********************************************}
+procedure TALAnimatedImage.TAnimation.DoFinish;
 begin
-  if assigned(FOwner.FOnAnimationProcess) then
-    FOwner.FOnAnimationProcess(FOwner);
-  Repaint;
-end;
-
-{**************************************************************}
-procedure TALAnimatedImage.TAnimation.doFinish(Sender: TObject);
-begin
-  if assigned(FOwner.FOnAnimationFinish) then
-    FOwner.FOnAnimationFinish(FOwner);
-  Repaint;
-end;
-
-{******************************************}
-procedure TALAnimatedImage.TAnimation.Start;
-begin
-  FFloatAnimation.Start;
-end;
-
-{*****************************************}
-procedure TALAnimatedImage.TAnimation.Stop;
-begin
-  FFloatAnimation.Stop;
-end;
-
-{**************************************************}
-procedure TALAnimatedImage.TAnimation.StopAtCurrent;
-begin
-  FFloatAnimation.StopAtCurrent;
+  inherited;
+  if Enabled then begin
+    if assigned(FOwner.FOnAnimationFinish) then
+      FOwner.FOnAnimationFinish(FOwner);
+    Repaint;
+  end;
 end;
 
 {******************************************************}
@@ -2859,8 +3036,12 @@ begin
       {$ENDIF}
     {$ENDIF}
   {$ENDIF}
-  fResourceName := '';
+  FResourceName := '';
+  FResourceStream := nil;
+  FTintColor := DefaultTintColor;
+  FTintColorKey := DefaultTintColorKey;
   FWrapMode := TALImageWrapMode.Fit;
+  FOwnsResourceStream := True;
   FOnAnimationFirstFrame := nil;
   FOnAnimationProcess := nil;
   FOnAnimationFinish := nil;
@@ -2871,8 +3052,84 @@ end;
 destructor TALAnimatedImage.Destroy;
 begin
   ReleaseCodec;
+  if FOwnsResourceStream then
+    ALFreeAndNil(FResourceStream);
   AlFreeAndNil(FAnimation);
   inherited;
+end;
+
+{*******************************************}
+procedure TALAnimatedImage.BeforeDestruction;
+begin
+  if BeforeDestructionExecuted then exit;
+  // Necessary if the control is destroyed using
+  // AlFreeAndNil with the delayed flag
+  FAnimation.Enabled := False;
+  inherited;
+end;
+
+{*****************************************************************}
+procedure TALAnimatedImage.Assign(Source: TPersistent{TALControl});
+begin
+  BeginUpdate;
+  Try
+    if Source is TALAnimatedImage then begin
+      Animation.Assign(TALAnimatedImage(Source).Animation);
+      ResourceName := TALAnimatedImage(Source).ResourceName;
+      if (TALAnimatedImage(Source).OwnsResourceStream) and
+         (TALAnimatedImage(Source).ResourceStream <> nil) then begin
+        var LStream := TMemoryStream.Create;
+        try
+          LStream.CopyFrom(TALAnimatedImage(Source).ResourceStream);
+          ResourceStream := LStream;
+          OwnsResourceStream := True;
+        except
+          ALFreeAndNil(LStream);
+          raise;
+        end;
+      end
+      else begin
+        ResourceStream := TALAnimatedImage(Source).ResourceStream;
+        OwnsResourceStream := TALAnimatedImage(Source).OwnsResourceStream;
+      end;
+      TintColor := TALAnimatedImage(Source).TintColor;
+      TintColorKey := TALAnimatedImage(Source).TintColorKey;
+      WrapMode := TALAnimatedImage(Source).WrapMode;
+      OnAnimationFirstFrame := TALAnimatedImage(Source).OnAnimationFirstFrame;
+      OnAnimationProcess := TALAnimatedImage(Source).OnAnimationProcess;
+      OnAnimationFinish := TALAnimatedImage(Source).OnAnimationFinish;
+    end
+    else
+      ALAssignError(Source{ASource}, Self{ADest});
+    inherited Assign(Source);
+  Finally
+    EndUpdate;
+  End;
+end;
+
+{**********************************************}
+procedure TALAnimatedImage.ApplyTintColorScheme;
+begin
+  if FTintColorKey <> '' then begin
+    var LTintColor := TALStyleManager.Instance.GetColor(FTintColorKey);
+    if FTintColor <> LTintColor then begin
+      FTintColor := LTintColor;
+      releaseCodec;
+      Repaint;
+    end;
+  end;
+end;
+
+{******************************************}
+procedure TALAnimatedImage.ApplyColorScheme;
+begin
+  beginUpdate;
+  try
+    inherited;
+    ApplyTintColorScheme;
+  finally
+    EndUpdate;
+  end;
 end;
 
 {*************************************}
@@ -2882,8 +3139,8 @@ begin
 
   if //--- Do not create Codec if the size is 0
      (Size.Size.IsZero) or
-     //--- Do not create Codec if fResourceName is empty
-     (fResourceName = '')
+     //--- Do not create Codec if FResourceName and FResourceStream are empty
+     ((FResourceName = '') and (FResourceStream = nil))
   then begin
     ReleaseCodec;
     exit;
@@ -2893,16 +3150,96 @@ begin
 
   var LFileName := ALGetResourceFilename(FResourceName);
 
-  if LFileName <> '' then begin
+  if (LFileName <> '') and (FResourceStream = nil) and (FTintColor = TAlphaColors.Null) then begin
     fSkottieAnimation := sk4d_skottieanimation_make_from_file(MarshaledAString(UTF8String(LFileName)), TSkDefaultProviders.TypefaceFont.Handle)
   end
   else begin
     {$IFDEF ALDPK}
     fSkottieAnimation := 0
     {$ELSE}
-    var LResourceStream := TResourceStream.Create(HInstance, fResourceName, RT_RCDATA);
+    var LStream: TStream;
+    if FResourceStream <> nil then LStream := FResourceStream
+    else if (FTintColor <> TAlphaColors.Null) then begin
+      LStream := TALStringStreamA.Create('');
+      try
+        if (LFileName <> '') then TALStringStreamA(LStream).LoadFromFile(LFileName)
+        else begin
+          var LResourceStream := ALCreateResourceStream(FResourceName);
+          try
+            TALStringStreamA(LStream).LoadFromStream(LResourceStream);
+          finally
+            ALFreeAndNil(LResourceStream);
+          end;
+        end;
+        var LDataString := TALStringStreamA(LStream).DataString;
+        // Note: The pattern '{"ty":"fl","c":{"a":0,"k":[' is likely too restrictive.
+        // It currently matches our needs, but may fail in future cases.
+        // If issues arise, the code below should be updated accordingly.
+        var P1 := ALPosA('{"ty":"fl","c":{"a":0,"k":[', LDataString); // ...{"ty":"fl","c":{"a":0,"k":[0.544964001225,0.42151740579,0.713083424288,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Fill 1","mn":"ADBE Vector Graphic - Fill","hd":false}
+        //                                                                  ^P1
+        While P1 > 0 do begin
+          inc(P1, 27{length('{"ty":"fl","c":{"a":0,"k":[')}); // ...{"ty":"fl","c":{"a":0,"k":[0.544964001225,0.42151740579,0.713083424288,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Fill 1","mn":"ADBE Vector Graphic - Fill","hd":false}
+          //                                                                                   ^P1
+          var P2 := ALPosA(']', LDataString, P1); // ...{"ty":"fl","c":{"a":0,"k":[0.544964001225,0.42151740579,0.713083424288,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Fill 1","mn":"ADBE Vector Graphic - Fill","hd":false}
+          //                                                                       ^P1                                          ^P2
+          if P2 <= 0 then raise Exception.Create('Error 3D3E0DFB-E8E3-4A11-A91F-83A66F0F63FB');
+          var LAlphaColorRec := TAlphacolorRec.Create(FTintColor);
+          var LTotalAvailableLength := P2 - P1; // = length of 0.544964001225,0.42151740579,0.713083424288,1
+          var LAvailablePrecisionByChannel: Integer;
+          if LAlphaColorRec.A = 255 then
+            LAvailablePrecisionByChannel := (LTotalAvailableLength - 10{'0.' - ',0.' - ',0.' - ',1'}) div 3
+          else
+            LAvailablePrecisionByChannel := (LTotalAvailableLength - 11{'0.' - ',0.' - ',0.' - ',0.'}) div 4;
+          if LAvailablePrecisionByChannel >= 3 then begin
+            var LNewColorsStr: AnsiString;
+            if LAlphaColorRec.A = 255 then
+              LNewColorsStr := ALFormatA(
+                                 '%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f,%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f,%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f,1',
+                                 [LAlphaColorRec.R / 255,
+                                  LAlphaColorRec.G / 255,
+                                  LAlphaColorRec.B / 255])
+            else
+              LNewColorsStr := ALFormatA(
+                                 '%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f,%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f,%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f,%.'+ALInttostrA(LAvailablePrecisionByChannel)+'f',
+                                 [LAlphaColorRec.R / 255,
+                                  LAlphaColorRec.G / 255,
+                                  LAlphaColorRec.B / 255,
+                                  LAlphaColorRec.A / 255]);
+            {$IF defined(debug)}
+            if Length(LNewColorsStr) > P2 - P1 then
+             raise Exception.Create('Error DED1DB9C-A723-4240-AE50-4FBF02293B2F');
+            {$ENDIF}
+            if Length(LNewColorsStr) < P2 - P1 then begin
+              var LOldLength := Length(LNewColorsStr);
+              SetLength(LNewColorsStr, P2 - P1);
+              FillChar(PAnsiChar(LNewColorsStr)[LOldLength], (P2 - P1) - LOldLength, Ord(' '));
+            end;
+            ALMove(PAnsiChar(LNewColorsStr)^, PAnsiChar(LDataString)[P1-1], length(LNewColorsStr));
+          end
+          else begin
+            var LNewColorsStr := ALFormatA(
+                                   '%.6f,%.6f,%.6f,%.6f',
+                                   [LAlphaColorRec.R / 255,
+                                    LAlphaColorRec.G / 255,
+                                    LAlphaColorRec.B / 255,
+                                    LAlphaColorRec.A / 255]);
+            delete(LDataString,P1, P2-P1);
+            insert(LNewColorsStr, LDataString, P1);
+          end;
+          P1 := ALPosA('{"ty":"fl","c":{"a":0,"k":[', LDataString, P1);
+        end;
+        TALStringStreamA(LStream).DataString := LDataString;
+      except
+        ALFreeAndNil(LStream);
+        Raise;
+      end;
+    end
+    else LStream := ALCreateResourceStream(FResourceName);
+
     try
-      var LSkStream := ALSkCheckHandle(sk4d_streamadapter_create(LResourceStream));
+
+      LStream.Position := 0;
+      var LSkStream := ALSkCheckHandle(sk4d_streamadapter_create(LStream));
       try
         var LStreamadapterProcs: sk_streamadapter_procs_t;
         LStreamadapterProcs.get_length := ALSkStreamAdapterGetLengthProc;
@@ -2917,23 +3254,30 @@ begin
       finally
         sk4d_streamadapter_destroy(LSKStream);
       end;
+
     finally
-      ALfreeandNil(LResourceStream);
+      If LStream <> FResourceStream then
+        ALfreeandNil(LStream);
     end;
     {$ENDIF}
   end;
 
   if fSkottieAnimation = 0 then begin
-    if LFileName <> '' then begin
+    if (LFileName <> '') and (FResourceStream = nil) then begin
       fAnimCodecPlayer := sk4d_animcodecplayer_make_from_file(MarshaledAString(UTF8String(LFileName)))
     end
     else begin
       {$IFDEF ALDPK}
       fAnimCodecPlayer := 0
       {$ELSE}
-      var LResourceStream := TResourceStream.Create(HInstance, fResourceName, RT_RCDATA);
+      var LStream: TStream;
+      if FResourceStream <> nil then LStream := FResourceStream
+      else LStream := ALCreateResourceStream(FResourceName);
+
       try
-        var LSkStream := ALSkCheckHandle(sk4d_streamadapter_create(LResourceStream));
+
+        LStream.Position := 0;
+        var LSkStream := ALSkCheckHandle(sk4d_streamadapter_create(LStream));
         try
           var LStreamadapterProcs: sk_streamadapter_procs_t;
           LStreamadapterProcs.get_length := ALSkStreamAdapterGetLengthProc;
@@ -2945,19 +3289,25 @@ begin
         finally
           sk4d_streamadapter_destroy(LSKStream);
         end;
+
       finally
-        ALfreeandNil(LResourceStream);
+        If LStream <> FResourceStream then
+          ALfreeandNil(LStream);
       end;
       {$ENDIF}
     end;
   end;
 
-  if (fSkottieAnimation = 0) and (fAnimCodecPlayer = 0) then
+  if (fSkottieAnimation = 0) and (fAnimCodecPlayer = 0) then begin
     {$IF not defined(ALDPK)}
-    Raise Exception.CreateFmt('Failed to create the animation codec for resource "%s". Please ensure the resource exists and is in a valid format', [fResourceName]);
+    if FResourceName <> '' then
+      Raise Exception.CreateFmt('Failed to create the animation codec for resource "%s". Please ensure the resource exists and is in a valid format', [FResourceName])
+    else
+      Raise Exception.Create('Failed to create the animation codec. Please ensure the resource is in a valid format');
     {$ELSE}
     Exit;
     {$ENDIF}
+  end;
 
   var LSize: TSizeF;
   if fSkottieAnimation <> 0 then begin
@@ -2975,7 +3325,10 @@ begin
   if SameValue(LSize.width, 0, Tepsilon.Position) or
      SameValue(LSize.Height, 0, Tepsilon.Position) then begin
     {$IF not defined(ALDPK)}
-    Raise Exception.CreateFmt('The animation "%s" has invalid dimensions (width or height is zero)', [fResourceName]);
+    if FResourceName <> '' then
+      Raise Exception.CreateFmt('The animation "%s" has invalid dimensions (width or height is zero)', [FResourceName])
+    else
+      Raise Exception.Create('The animation has invalid dimensions (width or height is zero)');
     {$ELSE}
     ReleaseCodec;
     Exit;
@@ -3023,9 +3376,10 @@ begin
   ALLog(
     'TALAnimatedImage.CreateCodec',
     'ResourceName: '+ FResourceName + ' | '+
-    'Duration: '+ALFloatTostrW(LDuration, ALDefaultFormatSettingsW) + ' | '+
-    'Width: ' + ALFloatTostrW(LSize.Width, ALDefaultFormatSettingsW) + ' | '+
-    'Height: ' + ALFloatTostrW(LSize.Height, ALDefaultFormatSettingsW),
+    'ResourceStream: '+ ALIntToStrW(Integer(FResourceStream)) + ' | '+
+    'Duration: '+ALFloatTostrW(LDuration) + ' | '+
+    'Width: ' + ALFloatTostrW(LSize.Width) + ' | '+
+    'Height: ' + ALFloatTostrW(LSize.Height),
     TalLogType.debug);
   {$ENDIF}
 
@@ -3070,6 +3424,13 @@ end;
 {*******************************}
 procedure TALAnimatedImage.Paint;
 begin
+
+  if FAnimation.Enabled then begin
+    if not TALFloatAnimation(FAnimation).Enabled then
+      TALFloatAnimation(FAnimation).Enabled := True
+    else
+      FAnimation.Resume;
+  end;
 
   if (csDesigning in ComponentState) and not Locked and not FInPaintTo then
   begin
@@ -3172,6 +3533,18 @@ begin
 
 end;
 
+{*********************************************************}
+function TALAnimatedImage.GetDefaultTintColor: TAlphaColor;
+begin
+  Result := TAlphaColors.null;
+end;
+
+{*******************************************************}
+function TALAnimatedImage.GetDefaulttintColorKey: String;
+begin
+  Result := '';
+end;
+
 {********************************************************************}
 procedure TALAnimatedImage.SetWrapMode(const Value: TALImageWrapMode);
 begin
@@ -3192,10 +3565,54 @@ begin
   end;
 end;
 
+{*****************************************************************}
+procedure TALAnimatedImage.setResourceStream(const Value: TStream);
+begin
+  if FResourceStream <> Value then begin
+    if FOwnsResourceStream then
+      ALFreeAndNil(FResourceStream);
+    ClearBufDrawable;
+    FResourceStream := Value;
+    Repaint;
+  end;
+end;
+
 {***************************************************************}
 procedure TALAnimatedImage.SetAnimation(const Value: TAnimation);
 begin
   FAnimation.Assign(Value);
+end;
+
+{****************************************************************}
+procedure TALAnimatedImage.setTintColor(const Value: TAlphaColor);
+begin
+  if FTintColor <> Value then begin
+    FTintColor := Value;
+    FTintColorKey := '';
+    releaseCodec;
+    Repaint;
+  end;
+end;
+
+{**************************************************************}
+procedure TALAnimatedImage.setTintColorKey(const Value: String);
+begin
+  if FTintColorKey <> Value then begin
+    FTintColorKey := Value;
+    ApplyTintColorScheme;
+  end;
+end;
+
+{***************************************************}
+function TALAnimatedImage.IsTintColorStored: Boolean;
+begin
+  Result := FTintColor <> DefaultTintColor;
+end;
+
+{******************************************************}
+function TALAnimatedImage.IsTintColorKeyStored: Boolean;
+begin
+  Result := FTintColorKey <> DefaultTintColorKey;
 end;
 
 {******************************************************}
@@ -3205,8 +3622,8 @@ begin
   fDoubleBuffered := true;
   FXRadius := DefaultXRadius;
   FYRadius := DefaultYRadius;
-  FCorners := AllCorners;
-  FSides := AllSides;
+  FCorners := DefaultCorners;
+  FSides := DefaultSides;
   FCacheIndex := 0;
   FCacheEngine := nil;
   {$IF NOT DEFINED(ALSkiaCanvas)}
@@ -3224,6 +3641,27 @@ begin
   ClearRenderTargets;
   {$ENDIF}
   inherited;
+end;
+
+{*****************************************************************}
+procedure TALBaseRectangle.Assign(Source: TPersistent{TALControl});
+begin
+  BeginUpdate;
+  Try
+    if Source is TALBaseRectangle then begin
+      XRadius := TALBaseRectangle(Source).XRadius;
+      YRadius := TALBaseRectangle(Source).YRadius;
+      Corners := TALBaseRectangle(Source).Corners;
+      Sides := TALBaseRectangle(Source).Sides;
+      CacheIndex := TALBaseRectangle(Source).CacheIndex;
+      CacheEngine := TALBaseRectangle(Source).CacheEngine;
+    end
+    else
+      ALAssignError(Source{ASource}, Self{ADest});
+    inherited Assign(Source);
+  Finally
+    EndUpdate;
+  End;
 end;
 
 {***********************************}
@@ -3247,13 +3685,13 @@ end;
 {*************************************************}
 function TALBaseRectangle.IsCornersStored: Boolean;
 begin
-  Result := FCorners <> AllCorners;
+  Result := FCorners <> DefaultCorners;
 end;
 
 {***********************************************}
 function TALBaseRectangle.IsSidesStored: Boolean;
 begin
-  Result := FSides <> AllSides
+  Result := FSides <> DefaultSides;
 end;
 
 {*************************************************}
@@ -3296,6 +3734,18 @@ begin
     else ClearRenderTargets;
     {$ENDIF}
   end;
+end;
+
+{****************************************************}
+function TALBaseRectangle.GetDefaultCorners: TCorners;
+begin
+  Result := AllCorners;
+end;
+
+{************************************************}
+function TALBaseRectangle.GetDefaultSides: TSides;
+begin
+  Result := AllSides;
 end;
 
 {**************************************************}
@@ -3409,8 +3859,8 @@ begin
   ABufDrawableRect := LocalRect;
   var LSurfaceRect := ALGetShapeSurfaceRect(
                         ABufDrawableRect, // const ARect: TRectF;
+                        AutoAlignToPixel, // const AAlignToPixel: Boolean;
                         AFill, // const AFill: TALBrush;
-                        nil, // const AFillResourceStream: TStream;
                         AStateLayer, // const AStateLayer: TALStateLayer;
                         AShadow); // const AShadow: TALShadow): TRectF;
   ABufDrawableRect.Offset(-LSurfaceRect.Left, -LSurfaceRect.Top);
@@ -3430,7 +3880,7 @@ begin
 
       TALDrawRectangleHelper.Create(LCanvas)
         .SetScale(AScale)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(ABufDrawableRect)
         .SetFill(AFill)
         .SetStateLayer(AStateLayer, AStateLayerContentColor)
@@ -3479,7 +3929,7 @@ begin
      (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   CreateBufDrawable(
@@ -3501,8 +3951,8 @@ function TALBaseRectangle.GetRenderTargetRect(const ARect: TrectF): TRectF;
 begin
   Result := ALGetShapeSurfaceRect(
               ARect, // const ARect: TRectF;
+              AutoAlignToPixel, // const AAlignToPixel: Boolean;
               Fill, // const AFill: TALBrush;
-              nil, // const AFillResourceStream: TStream;
               nil, // const AStateLayer: TALStateLayer;
               Shadow); // const AShadow: TALShadow): TRectF;
 end;
@@ -3556,7 +4006,7 @@ begin
   if ALIsDrawableNull(LDrawable) then begin
     {$IF DEFINED(ALSkiaCanvas)}
     TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-      .SetAlignToPixel(IsPixelAlignmentEnabled)
+      .SetAlignToPixel(AutoAlignToPixel)
       .SetDstRect(LocalRect)
       .SetOpacity(AbsoluteOpacity)
       .SetFill(Fill)
@@ -3583,7 +4033,7 @@ begin
         ALClearCanvas(FRenderTargetCanvas, TAlphaColors.Null);
         TALDrawRectangleHelper.Create(FRenderTargetCanvas)
           .SetScale(ALGetScreenScale)
-          .SetAlignToPixel(IsPixelAlignmentEnabled)
+          .SetAlignToPixel(AutoAlignToPixel)
           .SetDstRect(LRect)
           .SetFill(Fill)
           .SetStroke(Stroke)
@@ -3716,8 +4166,8 @@ begin
   ABufDrawableRect := LocalRect;
   var LSurfaceRect := ALGetShapeSurfaceRect(
                         ABufDrawableRect, // const ARect: TRectF;
+                        AutoAlignToPixel, // const AAlignToPixel: Boolean;
                         AFill, // const AFill: TALBrush;
-                        nil, // const AFillResourceStream: TStream;
                         AStateLayer, // const AStateLayer: TALStateLayer;
                         AShadow); // const AShadow: TALShadow): TRectF;
   ABufDrawableRect.Offset(-LSurfaceRect.Left, -LSurfaceRect.Top);
@@ -3737,7 +4187,7 @@ begin
 
       TALDrawRectangleHelper.Create(LCanvas)
         .SetScale(AScale)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(ABufDrawableRect)
         .SetFill(AFill)
         .SetStateLayer(AStateLayer, AStateLayerContentColor)
@@ -3782,7 +4232,7 @@ begin
      (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   CreateBufDrawable(
@@ -3804,8 +4254,8 @@ function TALEllipse.GetRenderTargetRect(const ARect: TrectF): TRectF;
 begin
   Result := ALGetShapeSurfaceRect(
               ARect, // const ARect: TRectF;
+              AutoAlignToPixel, // const AAlignToPixel: Boolean;
               Fill, // const AFill: TALBrush;
-              nil, // const AFillResourceStream: TStream;
               nil, // const AStateLayer: TALStateLayer;
               Shadow); // const AShadow: TALShadow): TRectF;
 end;
@@ -3859,7 +4309,7 @@ begin
   if ALIsDrawableNull(LDrawable) then begin
     {$IF DEFINED(ALSkiaCanvas)}
     TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-      .SetAlignToPixel(IsPixelAlignmentEnabled)
+      .SetAlignToPixel(AutoAlignToPixel)
       .SetDstRect(LocalRect)
       .SetOpacity(AbsoluteOpacity)
       .SetFill(Fill)
@@ -3876,7 +4326,7 @@ begin
       ALClearCanvas(FRenderTargetCanvas, TAlphaColors.Null);
       TALDrawRectangleHelper.Create(FRenderTargetCanvas)
         .SetScale(ALGetScreenScale)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(LRect)
         .SetFill(Fill)
         .SetStroke(Stroke)
@@ -4024,8 +4474,8 @@ begin
   ABufDrawableRect := LocalRect;
   var LSurfaceRect := ALGetShapeSurfaceRect(
                         ABufDrawableRect, // const ARect: TRectF;
+                        AutoAlignToPixel, // const AAlignToPixel: Boolean;
                         AFill, // const AFill: TALBrush;
-                        nil, // const AFillResourceStream: TStream;
                         AStateLayer, // const AStateLayer: TALStateLayer;
                         AShadow); // const AShadow: TALShadow): TRectF;
   ABufDrawableRect.Offset(-LSurfaceRect.Left, -LSurfaceRect.Top);
@@ -4045,7 +4495,7 @@ begin
 
       TALDrawRectangleHelper.Create(LCanvas)
         .SetScale(AScale)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(TRectF.Create(0, 0, 1, 1).FitInto(ABufDrawableRect))
         .SetFill(AFill)
         .SetStateLayer(AStateLayer, AStateLayerContentColor)
@@ -4090,7 +4540,7 @@ begin
      (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   CreateBufDrawable(
@@ -4112,8 +4562,8 @@ function TALCircle.GetRenderTargetRect(const ARect: TrectF): TRectF;
 begin
   Result := ALGetShapeSurfaceRect(
               ARect, // const ARect: TRectF;
+              AutoAlignToPixel, // const AAlignToPixel: Boolean;
               Fill, // const AFill: TALBrush;
-              nil, // const AFillResourceStream: TStream;
               nil, // const AStateLayer: TALStateLayer;
               Shadow); // const AShadow: TALShadow): TRectF;
 end;
@@ -4167,7 +4617,7 @@ begin
   if ALIsDrawableNull(LDrawable) then begin
     {$IF DEFINED(ALSkiaCanvas)}
     TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-      .SetAlignToPixel(IsPixelAlignmentEnabled)
+      .SetAlignToPixel(AutoAlignToPixel)
       .SetDstRect(TRectF.Create(0, 0, 1, 1).FitInto(LocalRect))
       .SetOpacity(AbsoluteOpacity)
       .SetFill(Fill)
@@ -4184,7 +4634,7 @@ begin
       ALClearCanvas(FRenderTargetCanvas, TAlphaColors.Null);
       TALDrawRectangleHelper.Create(FRenderTargetCanvas)
         .SetScale(ALGetScreenScale)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(TRectF.Create(0, 0, 1, 1).FitInto(LRect))
         .SetFill(Fill)
         .SetStroke(Stroke)
@@ -4314,7 +4764,7 @@ begin
      (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   //init fBufDrawableRect / LRect
@@ -4661,6 +5111,8 @@ begin
   fDoubleBuffered := true;
   FMultiLineTextOptions := TALMultiLineTextOptions.Create;
   //-----
+  FMaxContainedSize := TSizeF.Create(-1,-1);
+  //-----
   FOnElementClick := nil;
   FOnElementMouseDown := nil;
   FOnElementMouseMove := nil;
@@ -4686,20 +5138,22 @@ begin
   fAllTextDrawn := False;
   SetLength(fElements, 0);
   //-----
-  FCorners := AllCorners;
   FXRadius := DefaultXRadius;
   FYRadius := DefaultYRadius;
-  FSides := AllSides;
+  FCorners := DefaultCorners;
+  FSides := DefaultSides;
   //-----
   HitTest := False;
   //-----
   FAutoTranslate := true;
-  FMaxWidth := 65535;
-  FMaxHeight := 65535;
+  FMaxWidth := DefaultMaxWidth;
+  FMaxHeight := DefaultMaxHeight;
   FText := '';
   //-----
   FTextSettings := CreateTextSettings;
   FTextSettings.OnChanged := TextSettingsChanged;
+  //-----
+  FAutosize := TALAutoSizeMode.Both;
 end;
 
 {*****************************}
@@ -4756,15 +5210,39 @@ begin
      (not (csDesigning in ComponentState)) then
     Text := ALTranslate(Text);
 
-  if (TextSettings.Font.Family <> '') and
-     (not (csDesigning in ComponentState)) then
-    TextSettings.Font.Family := ALConvertFontFamily(TextSettings.Font.Family);
-
-  if (TextSettings.EllipsisSettings.Font.Family <> '') and
-     (not (csDesigning in ComponentState)) then
-    TextSettings.EllipsisSettings.Font.Family := ALConvertFontFamily(TextSettings.EllipsisSettings.Font.Family);
-
   inherited Loaded;
+end;
+
+{************************************************************}
+procedure TALBaseText.Assign(Source: TPersistent{TALControl});
+begin
+  BeginUpdate;
+  Try
+    if Source is TALBaseText then begin
+      OnElementClick := TALBaseText(Source).OnElementClick;
+      OnElementMouseDown := TALBaseText(Source).OnElementMouseDown;
+      OnElementMouseMove := TALBaseText(Source).OnElementMouseMove;
+      OnElementMouseUp := TALBaseText(Source).OnElementMouseUp;
+      OnElementMouseEnter := TALBaseText(Source).OnElementMouseEnter;
+      OnElementMouseLeave := TALBaseText(Source).OnElementMouseLeave;
+      CacheIndex := TALBaseText(Source).CacheIndex;
+      CacheEngine := TALBaseText(Source).CacheEngine;
+      AutoTranslate := TALBaseText(Source).AutoTranslate;
+      Text := TALBaseText(Source).Text;
+      TextSettings.Assign(TALBaseText(Source).TextSettings);
+      MaxWidth := TALBaseText(Source).MaxWidth;
+      MaxHeight := TALBaseText(Source).MaxHeight;
+      YRadius := TALBaseText(Source).YRadius;
+      XRadius := TALBaseText(Source).XRadius;
+      Corners := TALBaseText(Source).Corners;
+      Sides := TALBaseText(Source).Sides;
+    end
+    else
+      ALAssignError(Source{ASource}, Self{ADest});
+    inherited Assign(Source);
+  Finally
+    EndUpdate;
+  End;
 end;
 
 {*********************************}
@@ -4781,6 +5259,18 @@ begin
   end;
 end;
 
+{*************************************}
+procedure TALBaseText.ApplyColorScheme;
+begin
+  beginUpdate;
+  try
+    inherited;
+    TextSettings.ApplyColorScheme;
+  finally
+    EndUpdate;
+  end;
+end;
+
 {******************************}
 procedure TALBaseText.DoResized;
 begin
@@ -4792,14 +5282,75 @@ begin
     inherited;
 end;
 
+{*************************************}
+procedure TALBaseText.ParentRealigning;
+begin
+  var LAutosize := GetAutoSize;
+  var LMaxWidthIsZero := SameValue(MaxWidth, 0, TEpsilon.Position);
+  var LMaxHeightIsZero := SameValue(MaxHeight, 0, TEpsilon.Position);
+  if (LAutosize = TALAutoSizeMode.None) or
+     ((not LMaxWidthIsZero) and (not LMaxHeightIsZero)) then begin
+    FMaxContainedSize.Width := -1;
+    FMaxContainedSize.Height := -1;
+    exit;
+  end;
+
+  var LMaxContainedSize := GetMaxContainedSize;
+  if ((LAutoSize in [TALAutoSizeMode.Both, TALAutoSizeMode.Height]) and
+      (Align in [TALAlignLayout.Top,
+                 TALAlignLayout.TopCenter,
+                 TALAlignLayout.TopLeft,
+                 TALAlignLayout.TopRight,
+                 TALAlignLayout.Bottom,
+                 TALAlignLayout.BottomCenter,
+                 TALAlignLayout.BottomLeft,
+                 TALAlignLayout.BottomRight,
+                 TALAlignLayout.MostTop,
+                 TALAlignLayout.MostTopCenter,
+                 TALAlignLayout.MostTopLeft,
+                 TALAlignLayout.MostTopRight,
+                 TALAlignLayout.MostBottom,
+                 TALAlignLayout.MostBottomCenter,
+                 TALAlignLayout.MostBottomLeft,
+                 TALAlignLayout.MostBottomRight]) and
+      (not sameValue(LMaxContainedSize.Height, FMaxContainedSize.Height, TEpsilon.Position)) and
+      (LMaxHeightIsZero)) or
+     ((LAutoSize in [TALAutoSizeMode.Both, TALAutoSizeMode.Width]) and
+      (Align in [TALAlignLayout.Left,
+                 TALAlignLayout.LeftCenter,
+                 TALAlignLayout.LeftTop,
+                 TALAlignLayout.LeftBottom,
+                 TALAlignLayout.Right,
+                 TALAlignLayout.RightCenter,
+                 TALAlignLayout.RightTop,
+                 TALAlignLayout.RightBottom,
+                 TALAlignLayout.MostLeft,
+                 TALAlignLayout.MostLeftCenter,
+                 TALAlignLayout.MostLeftTop,
+                 TALAlignLayout.MostLeftBottom,
+                 TALAlignLayout.MostRight,
+                 TALAlignLayout.MostRightCenter,
+                 TALAlignLayout.MostRightTop,
+                 TALAlignLayout.MostRightBottom]) and
+      (not sameValue(LMaxContainedSize.Width, FMaxContainedSize.Width, TEpsilon.Position)) and
+      (LMaxWidthIsZero)) then begin
+    FMaxContainedSize := LMaxContainedSize;
+    ClearBufDrawable;
+    AdjustSize;
+  end
+  else
+    FMaxContainedSize := LMaxContainedSize;
+end;
+
 {*******************************}
 procedure TALBaseText.AdjustSize;
 begin
+  var LHasUnconstrainedAutosizeWidth := HasUnconstrainedAutosizeWidth;
+  var LHasUnconstrainedAutosizeHeight := HasUnconstrainedAutosizeHeight;
   if (not (csLoading in ComponentState)) and // loaded will call again AdjustSize
      (not (csDestroying in ComponentState)) and // if csDestroying do not do autosize
-     (HasUnconstrainedAutosizeX or HasUnconstrainedAutosizeY) and // if AutoSize is false nothing to adjust
      (Text <> '') and // if Text is empty do not do autosize
-     (scene <> nil) and // SetNewScene will call again AdjustSize
+     (LHasUnconstrainedAutosizeWidth or LHasUnconstrainedAutosizeHeight) and // if AutoSize is false nothing to adjust
      (TNonReentrantHelper.EnterSection(FIsAdjustingSize)) then begin // non-reantrant
     try
 
@@ -4811,18 +5362,14 @@ begin
         FAdjustSizeOnEndUpdate := False;
 
       {$IF defined(debug)}
-      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeX)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeY));
+      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(LHasUnconstrainedAutosizeWidth)+'/'+ALBoolToStrW(LHasUnconstrainedAutosizeHeight));
       {$ENDIF}
 
       var R: TrectF;
       If {$IF not DEFINED(ALDPK)}DoubleBuffered{$ELSE}True{$ENDIF} then begin
-        if (CacheIndex > 0) and (CacheEngine <> nil) then begin
-          if not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, R{ARect}) then begin
-            MakeBufDrawable;
-            R := FBufDrawableRect;
-          end;
-        end
-        else begin
+        if (CacheIndex <= 0) or
+           (CacheEngine = nil) or
+           (not CacheEngine.TryGetEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex}, R{ARect})) then begin
           MakeBufDrawable;
           R := FBufDrawableRect;
         end;
@@ -4842,14 +5389,16 @@ begin
           Fill, // const AFill: TALBrush;
           nil, // const AStateLayer: TALStateLayer;
           Stroke, // const AStroke: TALStrokeBrush;
-          Shadow); // const AShadow: TALShadow);
+          Shadow, // const AShadow: TALShadow;
+          XRadius, // const AXRadius: Single;
+          YRadius); // const AYRadius: Single
       end;
 
-      if not HasUnconstrainedAutosizeX then begin
+      if not LHasUnconstrainedAutosizeWidth then begin
         r.Left := 0;
         r.Width := Width;
       end;
-      if not HasUnconstrainedAutosizeY then begin
+      if not LHasUnconstrainedAutosizeHeight then begin
         r.Top := 0;
         r.height := height;
       end;
@@ -4938,6 +5487,16 @@ begin
   FHoveredElement := TALTextElement.Empty;
 end;
 
+{*********************************}
+procedure TALBaseText.DoClickSound;
+begin
+  if (ClickSound=TALClickSoundMode.Always) or
+     ((assigned(OnClick) or (assigned(FOnElementClick) and (FPressedElement.ID <> ''))) and
+      (ClickSound=TALClickSoundMode.Default) and
+      (ALGlobalClickSoundEnabled)) then
+    ALPlayClickSound;
+end;
+
 {**************************}
 procedure TALBaseText.Click;
 begin
@@ -4975,16 +5534,28 @@ begin
   inherited;
 end;
 
+{***********************************************}
+function TALBaseText.GetDefaultCorners: TCorners;
+begin
+  Result := AllCorners;
+end;
+
+{*******************************************}
+function TALBaseText.GetDefaultSides: TSides;
+begin
+  Result := AllSides;
+end;
+
 {********************************************}
 function TALBaseText.IsCornersStored: Boolean;
 begin
-  Result := FCorners <> AllCorners;
+  Result := FCorners <> DefaultCorners;
 end;
 
 {******************************************}
 function TALBaseText.IsSidesStored: Boolean;
 begin
-  Result := FSides <> AllSides
+  Result := FSides <> DefaultSides;
 end;
 
 {******************************************************}
@@ -5059,8 +5630,8 @@ function TALBaseText.GetRenderTargetRect(const ARect: TrectF): TRectF;
 begin
   Result := ALGetShapeSurfaceRect(
               ARect, // const ARect: TRectF;
+              AutoAlignToPixel, // const AAlignToPixel: Boolean;
               Fill, // const AFill: TALBrush;
-              nil, // const AFillResourceStream: TStream;
               nil, // const AStateLayer: TALStateLayer;
               Shadow); // const AShadow: TALShadow): TRectF;
 end;
@@ -5130,7 +5701,9 @@ begin
       Fill, // const AFill: TALBrush;
       nil, // const AStateLayer: TALStateLayer;
       Stroke, // const AStroke: TALStrokeBrush;
-      Shadow); // const AShadow: TALShadow);
+      Shadow, // const AShadow: TALShadow;
+      XRadius, // const AXRadius: Single;
+      YRadius); // const AYRadius: Single
     {$ELSE}
     var LRect := LocalRect;
     InitRenderTargets(LRect);
@@ -5153,7 +5726,9 @@ begin
         Fill, // const AFill: TALBrush;
         nil, // const AStateLayer: TALStateLayer;
         Stroke, // const AStroke: TALStrokeBrush;
-        Shadow); // const AShadow: TALShadow);
+        Shadow, // const AShadow: TALShadow;
+        XRadius, // const AXRadius: Single;
+        YRadius); // const AYRadius: Single
     finally
       ALCanvasEndScene(FRenderTargetCanvas)
     end;
@@ -5212,8 +5787,8 @@ begin
   inherited SetAlign(Value);
 end;
 
-{******************************************************}
-procedure TALBaseText.SetAutoSize(const Value: Boolean);
+{**************************************************************}
+procedure TALBaseText.SetAutoSize(const Value: TALAutoSizeMode);
 begin
   if FAutoSize <> Value then
   begin
@@ -5221,6 +5796,22 @@ begin
     Repaint;
     inherited;
   end;
+end;
+
+{***********************************************}
+function TALBaseText.GetEffectiveMaxSize: TSizeF;
+begin
+  Result := TSizeF.Create(MaxWidth, MaxHeight);
+  var LMaxWidthIsZero := SameValue(Result.Width, 0, TEpsilon.Position);
+  var LMaxHeightIsZero := SameValue(Result.Height, 0, TEpsilon.Position);
+  if LMaxWidthIsZero or LMaxHeightIsZero then begin
+    if (FMaxContainedSize.Width < 0) or
+       (FMaxContainedSize.Height < 0) then FMaxContainedSize := GetMaxContainedSize;
+    if LMaxWidthIsZero then Result.Width := FMaxContainedSize.Width;
+    if LMaxHeightIsZero then Result.Height := FMaxContainedSize.Height;
+  end;
+  Result.Width := Max(Result.Width, 0);
+  Result.Height := Max(Result.Height, 0);
 end;
 
 {*************************************************}
@@ -5256,51 +5847,88 @@ function TALBaseText.GetMultiLineTextOptions(
            const AFill: TALBrush;
            const AStateLayer: TALStateLayer;
            const AStroke: TALStrokeBrush;
-           const AShadow: TALShadow): TALMultiLineTextOptions;
+           const AShadow: TALShadow;
+           const AXRadius: Single;
+           const AYRadius: Single): TALMultiLineTextOptions;
 begin
   Result := FMultiLineTextOptions;
   Result.Scale := AScale;
-  Result.AlignToPixel := IsPixelAlignmentEnabled;
+  Result.AlignToPixel := AutoAlignToPixel;
   Result.Opacity := AOpacity;
   //--
-  Result.FontFamily := Afont.Family;
-  Result.FontSize := Afont.Size;
-  Result.FontWeight := Afont.Weight;
-  Result.FontSlant := Afont.Slant;
-  Result.FontStretch := Afont.Stretch;
-  Result.FontColor := AFont.Color;
+  if Afont <> nil then begin
+    Result.FontFamily := Afont.Family;
+    Result.FontSize := Afont.Size;
+    Result.FontWeight := Afont.Weight;
+    Result.FontSlant := Afont.Slant;
+    Result.FontStretch := Afont.Stretch;
+    Result.FontColor := AFont.Color;
+  end
+  else begin
+    Result.FontFamily := '';
+    Result.FontSize := 14;
+    Result.FontWeight := TfontWeight.Regular;
+    Result.FontSlant := TFontSlant.Regular;
+    Result.FontStretch := TfontStretch.Regular;
+    Result.FontColor := TAlphaColors.Black;
+  end;
   //--
-  Result.DecorationKinds := ADecoration.Kinds;
-  Result.DecorationStyle := ADecoration.Style;
-  Result.DecorationThicknessMultiplier := ADecoration.ThicknessMultiplier;
-  Result.DecorationColor := ADecoration.Color;
+  if ADecoration <> nil then begin
+    Result.DecorationKinds := ADecoration.Kinds;
+    Result.DecorationStyle := ADecoration.Style;
+    Result.DecorationThicknessMultiplier := ADecoration.ThicknessMultiplier;
+    Result.DecorationColor := ADecoration.Color;
+  end
+  else begin
+    Result.DecorationKinds := [];
+    Result.DecorationStyle := TALTextDecorationStyle.Solid;
+    Result.DecorationThicknessMultiplier := 1;
+    Result.DecorationColor := Talphacolors.Null;
+  end;
   //--
   Result.EllipsisText := TextSettings.Ellipsis;
   Result.EllipsisInheritSettings := TextSettings.EllipsisSettings.inherit;
   //--
-  Result.EllipsisFontFamily := AEllipsisfont.Family;
-  Result.EllipsisFontSize := AEllipsisfont.Size;
-  Result.EllipsisFontWeight := AEllipsisfont.Weight;
-  Result.EllipsisFontSlant := AEllipsisfont.Slant;
-  Result.EllipsisFontStretch := AEllipsisfont.Stretch;
-  Result.EllipsisFontColor := AEllipsisFont.Color;
+  if AEllipsisfont <> nil then begin
+    Result.EllipsisFontFamily := AEllipsisfont.Family;
+    Result.EllipsisFontSize := AEllipsisfont.Size;
+    Result.EllipsisFontWeight := AEllipsisfont.Weight;
+    Result.EllipsisFontSlant := AEllipsisfont.Slant;
+    Result.EllipsisFontStretch := AEllipsisfont.Stretch;
+    Result.EllipsisFontColor := AEllipsisFont.Color;
+  end
+  else begin
+    Result.EllipsisFontFamily := '';
+    Result.EllipsisFontSize := 14;
+    Result.EllipsisFontWeight := TfontWeight.Regular;
+    Result.EllipsisFontSlant := TfontSlant.Regular;
+    Result.EllipsisFontStretch := TfontStretch.Regular;
+    Result.EllipsisFontColor := TAlphaColors.black;
+  end;
   //--
-  Result.EllipsisDecorationKinds := AEllipsisDecoration.Kinds;
-  Result.EllipsisDecorationStyle := AEllipsisDecoration.Style;
-  Result.EllipsisDecorationThicknessMultiplier := AEllipsisDecoration.ThicknessMultiplier;
-  Result.EllipsisDecorationColor := AEllipsisDecoration.Color;
+  if AEllipsisDecoration <> nil then begin
+    Result.EllipsisDecorationKinds := AEllipsisDecoration.Kinds;
+    Result.EllipsisDecorationStyle := AEllipsisDecoration.Style;
+    Result.EllipsisDecorationThicknessMultiplier := AEllipsisDecoration.ThicknessMultiplier;
+    Result.EllipsisDecorationColor := AEllipsisDecoration.Color;
+  end
+  else begin
+    Result.EllipsisDecorationKinds := [];
+    Result.EllipsisDecorationStyle := TALTextDecorationStyle.Solid;
+    Result.EllipsisDecorationThicknessMultiplier := 1;
+    Result.EllipsisDecorationColor := TAlphaColors.Null;
+  end;
   //--
-  Result.AutoSize := False;
-  Result.AutoSizeX := False;
-  Result.AutoSizeY := False;
-  if HasUnconstrainedAutosizeX and HasUnconstrainedAutosizeY then Result.AutoSize := True
-  else if HasUnconstrainedAutosizeX then Result.AutoSizeX := True
-  else if HasUnconstrainedAutosizeY then Result.AutoSizeY := True;
+  Result.AutoSize := TALAutoSizeMode.None;
+  var LHasUnconstrainedAutosizeWidth := HasUnconstrainedAutosizeWidth;
+  var LHasUnconstrainedAutosizeHeight := HasUnconstrainedAutosizeHeight;
+  if LHasUnconstrainedAutosizeWidth and LHasUnconstrainedAutosizeHeight then Result.AutoSize := TALAutoSizeMode.Both
+  else if LHasUnconstrainedAutosizeWidth then Result.Autosize := TALAutoSizeMode.Width
+  else if LHasUnconstrainedAutosizeHeight then Result.Autosize := TALAutoSizeMode.Height;
   //--
   Result.MaxLines := TextSettings.MaxLines;
   Result.LineHeightMultiplier := TextSettings.LineHeightMultiplier;
   Result.LetterSpacing := TextSettings.LetterSpacing;
-  Result.Trimming := TextSettings.Trimming;
   Result.FailIfTextBroken := false;
   //--
   if TFillTextFlag.RightToLeft in FillTextFlags then Result.Direction := TALTextDirection.RightToLeft
@@ -5308,20 +5936,40 @@ begin
   Result.HTextAlign := TextSettings.HorzAlign;
   Result.VTextAlign := TextSettings.VertAlign;
   //--
-  Result.FillColor := AFill.Color;
-  Result.FillGradientStyle := AFill.Gradient.Style;
-  Result.FillGradientAngle := AFill.Gradient.Angle;
-  Result.FillGradientColors := AFill.Gradient.Colors;
-  Result.FillGradientOffsets := AFill.Gradient.Offsets;
-  Result.FillResourceName := AFill.ResourceName;
-  Result.FillMaskResourceName := '';
-  Result.FillMaskBitmap := ALNullBitmap;
-  Result.FillBackgroundMargins := AFill.BackgroundMargins.Rect;
-  Result.FillImageMargins := AFill.ImageMargins.Rect;
-  Result.FillImageNoRadius := AFill.ImageNoRadius;
-  Result.FillWrapMode := AFill.WrapMode;
-  Result.FillCropCenter := TPointF.create(-50,-50);
-  Result.FillBlurRadius := 0;
+  if AFill <> nil then begin
+    Result.FillColor := AFill.Color;
+    Result.FillGradientStyle := AFill.Gradient.Style;
+    Result.FillGradientAngle := AFill.Gradient.Angle;
+    Result.FillGradientColors := AFill.Gradient.Colors;
+    Result.FillGradientOffsets := AFill.Gradient.Offsets;
+    Result.FillResourceName := AFill.ResourceName;
+    Result.FillResourceStream := AFill.ResourceStream;
+    Result.FillMaskResourceName := '';
+    Result.FillBackgroundMargins := AFill.BackgroundMargins.Rect;
+    Result.FillImageMargins := AFill.ImageMargins.Rect;
+    Result.FillImageNoRadius := AFill.ImageNoRadius;
+    Result.FillImageTintColor := AFill.ImageTintColor;
+    Result.FillWrapMode := AFill.WrapMode;
+    Result.FillCropCenter := TPointF.create(0.5,0.5);
+    Result.FillBlurRadius := 0;
+  end
+  else begin
+    Result.FillColor := TAlphaColors.null;
+    Result.FillGradientStyle := TGradientStyle.Linear;
+    Result.FillGradientAngle := 180;
+    Result.FillGradientColors := [];
+    Result.FillGradientOffsets := [];
+    Result.FillResourceName := '';
+    Result.FillResourceStream := nil;
+    Result.FillMaskResourceName := '';
+    Result.FillBackgroundMargins := TRectF.Empty;
+    Result.FillImageMargins := TRectF.Empty;
+    Result.FillImageNoRadius := False;
+    Result.FillImageTintColor := TAlphaColors.null;
+    Result.FillWrapMode := TALImageWrapMode.Fit;
+    Result.FillCropCenter := TPointF.create(0.5,0.5);
+    Result.FillBlurRadius := 0;
+  end;
   //--
   if AStateLayer <> nil then begin
     Result.StateLayerOpacity := AStateLayer.Opacity;
@@ -5335,21 +5983,35 @@ begin
     Result.StateLayerOpacity := 0;
     Result.StateLayerColor := TalphaColors.Null;
     Result.StateLayerMargins := TRectF.Empty;
-    Result.StateLayerXRadius := 0;
-    Result.StateLayerYRadius := 0;
+    Result.StateLayerXRadius := NaN;
+    Result.StateLayerYRadius := NaN;
   end;
   //--
-  Result.StrokeColor := AStroke.Color;
-  Result.StrokeThickness := AStroke.Thickness;
+  if AStroke <> nil then begin
+    Result.StrokeColor := AStroke.Color;
+    Result.StrokeThickness := AStroke.Thickness;
+  end
+  else begin
+    Result.StrokeColor := TalphaColors.Null;
+    Result.StrokeThickness := 1;
+  end;
   //--
-  Result.ShadowColor := AShadow.Color;
-  Result.ShadowBlur := AShadow.Blur;
-  Result.ShadowOffsetX := AShadow.OffsetX;
-  Result.ShadowOffsetY := AShadow.OffsetY;
+  if AShadow <> nil then begin
+    Result.ShadowColor := AShadow.Color;
+    Result.ShadowBlur := AShadow.Blur;
+    Result.ShadowOffsetX := AShadow.OffsetX;
+    Result.ShadowOffsetY := AShadow.OffsetY;
+  end
+  else begin
+    Result.ShadowColor := TalphaColors.Null;
+    Result.ShadowBlur := 12;
+    Result.ShadowOffsetX := 0;
+    Result.ShadowOffsetY := 0;
+  end;
   //--
   Result.Sides := Sides;
-  Result.XRadius := XRadius;
-  Result.YRadius := YRadius;
+  Result.XRadius := AXRadius;
+  Result.YRadius := AYRadius;
   Result.Corners := Corners;
   Result.Padding := padding.Rect;
   //--
@@ -5395,7 +6057,9 @@ Procedure TALBaseText.DrawMultilineText(
             const AFill: TALBrush;
             const AStateLayer: TALStateLayer;
             const AStroke: TALStrokeBrush;
-            const AShadow: TALShadow);
+            const AShadow: TALShadow;
+            const AXRadius: Single;
+            const AYRadius: Single);
 begin
 
   if ALIsCanvasNull(ACanvas) then
@@ -5411,14 +6075,18 @@ begin
                                  AFill,
                                  AStateLayer,
                                  AStroke,
-                                 AShadow);
+                                 AShadow,
+                                 AXRadius,
+                                 AYRadius);
 
   if (AText <> '') then begin
 
     var LMaxSize: TSizeF;
-    if HasUnconstrainedAutosizeX and HasUnconstrainedAutosizeY then LMaxSize := TSizeF.Create(maxWidth, maxHeight)
-    else if HasUnconstrainedAutosizeX then LMaxSize := TSizeF.Create(maxWidth, Height)
-    else if HasUnconstrainedAutosizeY then LMaxSize := TSizeF.Create(Width, maxHeight)
+    var LHasUnconstrainedAutosizeWidth := HasUnconstrainedAutosizeWidth;
+    var LHasUnconstrainedAutosizeHeight := HasUnconstrainedAutosizeHeight;
+    if LHasUnconstrainedAutosizeWidth and LHasUnconstrainedAutosizeHeight then LMaxSize := GetEffectiveMaxSize
+    else if LHasUnconstrainedAutosizeWidth then LMaxSize := TSizeF.Create(GetEffectiveMaxSize.Width, Height)
+    else if LHasUnconstrainedAutosizeHeight then LMaxSize := TSizeF.Create(Width, GetEffectiveMaxSize.Height)
     else LMaxSize := TSizeF.Create(width, height);
 
     ARect.Width := LMaxSize.cX;
@@ -5439,8 +6107,9 @@ begin
   end
   else begin
 
-    ARect.Width := Min(MaxWidth, ARect.Width);
-    ARect.Height := Min(MaxHeight, ARect.Height);
+    var LEffectiveMaxSize := GetEffectiveMaxSize;
+    ARect.Width := Min(LEffectiveMaxSize.Width, ARect.Width);
+    ARect.Height := Min(LEffectiveMaxSize.Height, ARect.Height);
 
     Var LSurfaceSize := ARect.Size;
     DrawMultilineTextAdjustRect(
@@ -5456,18 +6125,18 @@ begin
 
     TALDrawRectangleHelper.Create(ACanvas)
       .SetScale(AScale)
-      .SetAlignToPixel(IsPixelAlignmentEnabled)
+      .SetAlignToPixel(AutoAlignToPixel)
       .SetDstRect(ARect)
       .SetOpacity(AOpacity)
       .SetFill(AFill)
-      .SetStateLayer(AStateLayer, AFont.color)
+      .SetStateLayer(AStateLayer, LMultiLineTextOptions.Fontcolor)
       .SetDrawStateLayerOnTop(AText <> '')
       .SetStroke(AStroke)
       .SetShadow(AShadow)
       .SetSides(Sides)
       .SetCorners(Corners)
-      .SetXRadius(XRadius)
-      .SetYRadius(YRadius)
+      .SetXRadius(AXRadius)
+      .SetYRadius(AYRadius)
       .Draw;
 
     DrawMultilineTextBeforeDrawParagraph(
@@ -5494,12 +6163,16 @@ Procedure TALBaseText.MeasureMultilineText(
             const AFill: TALBrush;
             const AStateLayer: TALStateLayer;
             const AStroke: TALStrokeBrush;
-            const AShadow: TALShadow);
+            const AShadow: TALShadow;
+            const AXRadius: Single;
+            const AYRadius: Single);
 begin
   var LMaxSize: TSizeF;
-  if HasUnconstrainedAutosizeX and HasUnconstrainedAutosizeY then LMaxSize := TSizeF.Create(maxWidth, maxHeight)
-  else if HasUnconstrainedAutosizeX then LMaxSize := TSizeF.Create(maxWidth, Height)
-  else if HasUnconstrainedAutosizeY then LMaxSize := TSizeF.Create(Width, maxHeight)
+  var LHasUnconstrainedAutosizeWidth := HasUnconstrainedAutosizeWidth;
+  var LHasUnconstrainedAutosizeHeight := HasUnconstrainedAutosizeHeight;
+  if LHasUnconstrainedAutosizeWidth and LHasUnconstrainedAutosizeHeight then LMaxSize := GetEffectiveMaxSize
+  else if LHasUnconstrainedAutosizeWidth then LMaxSize := TSizeF.Create(GetEffectiveMaxSize.Width, Height)
+  else if LHasUnconstrainedAutosizeHeight then LMaxSize := TSizeF.Create(Width, GetEffectiveMaxSize.Height)
   else LMaxSize := TSizeF.Create(width, height);
 
   ARect := TRectF.Create(0, 0, LMaxSize.cX, LMaxSize.cY);
@@ -5520,7 +6193,9 @@ begin
       AFill,
       AStateLayer,
       AStroke,
-      AShadow));
+      AShadow,
+      AXRadius,
+      AYRadius));
 end;
 
 {**************************************}
@@ -5539,7 +6214,9 @@ Procedure TALBaseText.CreateBufDrawable(
             const AFill: TALBrush;
             const AStateLayer: TALStateLayer;
             const AStroke: TALStrokeBrush;
-            const AShadow: TALShadow);
+            const AShadow: TALShadow;
+            const AXRadius: Single;
+            const AYRadius: Single);
 begin
 
   if (not ALIsDrawableNull(ABufDrawable)) then exit;
@@ -5554,14 +6231,18 @@ begin
                                  AFill,
                                  AStateLayer,
                                  AStroke,
-                                 AShadow);
+                                 AShadow,
+                                 AXRadius,
+                                 AYRadius);
 
   if (AText <> '') then begin
 
     var LMaxSize: TSizeF;
-    if HasUnconstrainedAutosizeX and HasUnconstrainedAutosizeY then LMaxSize := TSizeF.Create(maxWidth, maxHeight)
-    else if HasUnconstrainedAutosizeX then LMaxSize := TSizeF.Create(maxWidth, Height)
-    else if HasUnconstrainedAutosizeY then LMaxSize := TSizeF.Create(Width, maxHeight)
+    var LHasUnconstrainedAutosizeWidth := HasUnconstrainedAutosizeWidth;
+    var LHasUnconstrainedAutosizeHeight := HasUnconstrainedAutosizeHeight;
+    if LHasUnconstrainedAutosizeWidth and LHasUnconstrainedAutosizeHeight then LMaxSize := GetEffectiveMaxSize
+    else if LHasUnconstrainedAutosizeWidth then LMaxSize := TSizeF.Create(GetEffectiveMaxSize.Width, Height)
+    else if LHasUnconstrainedAutosizeHeight then LMaxSize := TSizeF.Create(Width, GetEffectiveMaxSize.Height)
     else LMaxSize := TSizeF.Create(width, height);
 
     ABufDrawableRect := TRectF.Create(0, 0, LMaxSize.cX, LMaxSize.cY);
@@ -5590,12 +6271,13 @@ begin
     ABufDrawableRect := LocalRect;
     var LSurfaceRect := ALGetShapeSurfaceRect(
                           ABufDrawableRect, // const ARect: TRectF;
+                          AutoAlignToPixel, // const AAlignToPixel: Boolean;
                           AFill, // const AFill: TALBrush;
-                          nil, // const AFillResourceStream: TStream;
                           AStateLayer, // const AStateLayer: TALStateLayer;
                           AShadow); // const AShadow: TALShadow): TRectF;
-    LSurfaceRect.Width := Min(MaxWidth, LSurfaceRect.Width);
-    LSurfaceRect.Height := Min(MaxHeight, LSurfaceRect.Height);
+    var LEffectiveMaxSize := GetEffectiveMaxSize;
+    LSurfaceRect.Width := Min(LEffectiveMaxSize.Width, LSurfaceRect.Width);
+    LSurfaceRect.Height := Min(LEffectiveMaxSize.Height, LSurfaceRect.Height);
     ABufDrawableRect.Offset(-LSurfaceRect.Left, -LSurfaceRect.Top);
 
     Var LSurfaceSize := LSurfaceRect.Size;
@@ -5627,7 +6309,7 @@ begin
 
           TALDrawRectangleHelper.Create(LCanvas)
             .SetScale(AScale)
-            .SetAlignToPixel(IsPixelAlignmentEnabled)
+            .SetAlignToPixel(AutoAlignToPixel)
             .SetDstRect(ABufDrawableRect)
             .SetFill(AFill)
             .SetStateLayer(AStateLayer, AFont.color)
@@ -5636,8 +6318,8 @@ begin
             .SetShadow(AShadow)
             .SetSides(Sides)
             .SetCorners(Corners)
-            .SetXRadius(XRadius)
-            .SetYRadius(YRadius)
+            .SetXRadius(AXRadius)
+            .SetYRadius(AYRadius)
             .Draw;
 
         DrawMultilineTextBeforeDrawParagraph(
@@ -5679,7 +6361,7 @@ begin
      (CacheEngine.HasEntry(CacheIndex{AIndex}, GetCacheSubIndex{ASubIndex})) then Exit;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   CreateBufDrawable(
@@ -5697,7 +6379,9 @@ begin
     Fill, // const AFill: TALBrush;
     nil, // const AStateLayer: TALStateLayer;
     Stroke, // const AStroke: TALStrokeBrush;
-    Shadow); // const AShadow: TALShadow);
+    Shadow, // const AShadow: TALShadow;
+    XRadius, // const AXRadius: Single;
+    YRadius); // const AYRadius: Single
 
 end;
 
@@ -5730,13 +6414,13 @@ end;
 {*********************************************}
 function TALBaseText.IsMaxWidthStored: Boolean;
 begin
-  result := compareValue(fMaxWidth, 65535, Tepsilon.position) <> 0;
+  result := compareValue(fMaxWidth, DefaultMaxWidth, Tepsilon.position) <> 0;
 end;
 
 {**********************************************}
 function TALBaseText.IsMaxHeightStored: Boolean;
 begin
-  result := compareValue(fMaxHeight, 65535, Tepsilon.position) <> 0;
+  result := compareValue(fMaxHeight, DefaultMaxHeight, Tepsilon.position) <> 0;
 end;
 
 {********************************************}
@@ -5804,7 +6488,7 @@ begin
     if LFontWeight = TFontWeight.Bold then LFontWeight := TFontWeight.UltraBlack
     else LFontWeight := TFontWeight.black;
   end
-  else LFontFamily := ALConvertFontFamily(LFontFamily);
+  else LFontFamily := ALResolveFontFamily(LFontFamily);
   var LFontMetrics := ALGetFontMetrics(
                         LFontFamily, // TextSettings const AFontFamily: String;
                         TextSettings.Font.Size, // const AFontSize: single;
@@ -5871,6 +6555,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Objects','initialization');
+  {$ENDIF}
   RegisterFmxClasses([TALImage, TALRectangle, TALEllipse, TALCircle, TALLine, TALText]);
 
 end.

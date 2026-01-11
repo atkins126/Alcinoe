@@ -7,7 +7,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   //Please run <Alcinoe>\Tools\NativeBridgeFileGenerator\NativeBridgeFileGeneratorAndroid.bat
   //with the library identifiers com.vk:android-sdk-core:xx.xx.xx where xx.xx.xx
   //is the last version of the VKontakte (You can find this version at
@@ -158,6 +158,9 @@ type
 
 implementation
 
+uses
+  Alcinoe.Common;
+
 {**********************}
 procedure RegisterTypes;
 begin
@@ -170,6 +173,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.AndroidApi.VKontakte','initialization');
+  {$ENDIF}
   RegisterTypes;
 
 end.

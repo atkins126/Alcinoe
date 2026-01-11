@@ -2,6 +2,8 @@ unit Alcinoe.AndroidApi.Google;
 
 interface
 
+{$I Alcinoe.inc}
+
 uses
   Androidapi.JNI.Os,
   Androidapi.JNI.GraphicsContentViewText,
@@ -9,8 +11,7 @@ uses
   Androidapi.JNI.JavaTypes,
   Androidapi.JNI.Net,
   Androidapi.JNI.App,
-  Androidapi.JNI.Location,
-  Alcinoe.AndroidApi.Common;
+  Androidapi.JNI.Location;
 
 type
 
@@ -137,7 +138,11 @@ type
   end;
   TJGoogleSignIn = class(TJavaGenericImport<JGoogleSignInClass, JGoogleSignIn>) end;
 
-  {*******************************************************************************}
+  {******************************************************}
+  JAdvertisingIdClient_InfoClass = interface(JObjectClass)
+    ['{529C749E-D08F-441A-A319-2CFA4FA253BD}']
+    //{class} function init(advertisingId: JString; limitAdTrackingEnabled: boolean): JAdvertisingIdClient_InfoClass; cdecl;
+  end;
   [JavaSignature('com/google/android/gms/ads/identifier/AdvertisingIdClient$Info')]
   JAdvertisingIdClient_Info = interface(JObject)
     ['{B54B273F-529D-45AA-989C-4C8197BC6563}']
@@ -257,6 +262,9 @@ type
 
 implementation
 
+uses
+  Alcinoe.Common;
+
 {**********************}
 procedure RegisterTypes;
 begin
@@ -278,6 +286,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.AndroidApi.Google','initialization');
+  {$ENDIF}
   RegisterTypes;
 
 end.

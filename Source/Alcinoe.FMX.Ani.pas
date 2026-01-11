@@ -31,7 +31,7 @@ specific nuances of different applications.
 DEMO :
 ------
 
-https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALAnimation
+https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxAnimation
 
 *******************************************************************************}
 unit Alcinoe.FMX.Ani;
@@ -40,7 +40,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Ani.pas was not updated and adjust the IFDEF'}
 {$ENDIF}
 
@@ -50,6 +50,7 @@ uses
   System.Generics.Collections,
   System.UITypes,
   System.TypInfo,
+  System.Types,
   {$IFDEF IOS}
   Macapi.ObjectiveC,
   iOSapi.Foundation,
@@ -70,6 +71,36 @@ var
   ALPreferredFramesPerSecond: Integer = 120;
 
 type
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  // Converted from Chromium's source code:
+  // https://github.com/chromium/chrome/browser/resources/lens/overlay/cubic_bezier.ts
+  // - JavaScript "ease-in" corresponds to: cubic-bezier(0.42, 0, 1, 1)
+  // - JavaScript "ease-out" corresponds to: cubic-bezier(0, 0, 0.58, 1)
+  // - JavaScript "ease-in-out" corresponds to: cubic-bezier(0.42, 0, 0.58, 1)
+  TALCubicBezier = class
+  private
+    const
+      BEZIER_EPSILON = 1e-7;
+      CUBIC_BEZIER_SPLINE_SAMPLES = 11;
+      MAX_NEWTON_METHOD_ITERATIONS = 4;
+  private
+    P1, P2: TALPointD;
+    A, B, C: TALPointD;
+    SplineSamples: array[0..CUBIC_BEZIER_SPLINE_SAMPLES - 1] of Double;
+    procedure InitCoefficients(const P1, P2: TALPointD);
+    procedure InitSpline;
+    function SampleCurveX(T: Double): Double;
+    function SampleCurveDerivativeX(T: Double): Double;
+    function SampleCurveY(T: Double): Double;
+    function ToFinite(N: Double): Double;
+  public
+    constructor Create(X1, Y1, X2, Y2: Double);
+    // Determines the Y value of the cubic Bezier curve for a given X value.
+    function SolveForY(X: Double): Double;
+    // Finds the parameter T (a value between 0 and 1) for a given X value on the curve.
+    function SolveCurveX(X: Double): Double;
+  end;
 
   {~~~~~~~~~~~~~~~~~~~}
   TALAnimation = Class;
@@ -134,7 +165,6 @@ type
   TALAniThread = class({$IF defined(ANDROID)}TALChoreographerThread{$ELSEIF defined(IOS)}TALDisplayLinkThread{$ELSE}TTimer{$ENDIF})
   private
     FAniList: TList<TALAnimation>;
-    FTime: Double;
     procedure DoSyncTimer(Sender: TObject);
   public
     constructor Create; reintroduce;
@@ -143,10 +173,11 @@ type
     procedure RemoveAnimation(const Ani: TALAnimation);
   end;
 
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  TALAnimation = class(TObject)
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  TALAnimation = class(TPersistent)
   public const
     DefaultAniFrameRate = 60;
+    TimeEpsilon = 1E-3;
   public class var
     // The AniFrameRate property is unnecessary on Android and iOS since
     // the animation is synchronized with the system's Choreographer (Android)
@@ -161,12 +192,13 @@ type
     FDelay: Single;
     FDelayTimeLeft: Single;
     FTime: Double;
+    FCurrentTime: Double;
     FLoop: Boolean;
     FAutoReverse: Boolean;
     FDidAutoReverse: Boolean;
     FInverse: Boolean;
     FSavedInverse: Boolean;
-    FPause: Boolean;
+    FPaused: Boolean;
     FRunning: Boolean;
     FOnFirstFrame: TNotifyEvent;
     FOnProcess: TNotifyEvent;
@@ -174,39 +206,93 @@ type
     FEnabled: Boolean;
     procedure SetEnabled(const Value: Boolean);
     class procedure Uninitialize;
+    function IsDelayStored: Boolean;
+    function IsLoopStored: Boolean;
+    function IsAutoReverseStored: Boolean;
+    function IsInverseStored: Boolean;
+    function IsEnabledStored: Boolean;
   protected
-    procedure ProcessTick(const ATime, ADeltaTime: Double); virtual; abstract;
-    procedure FirstFrame; virtual;
+    procedure ProcessTick(const ADeltaTime: Double); virtual; abstract;
     procedure ProcessAnimation; virtual; abstract;
+    procedure DoFirstFrame; virtual;
     procedure DoProcess; virtual;
     procedure DoFinish; virtual;
     class property AniThread: TALAniThread read FAniThread;
+    function GetDefaultDelay: Single; virtual;
+    function GetDefaultLoop: Boolean; virtual;
+    function GetDefaultAutoReverse: Boolean; virtual;
+    function GetDefaultInverse: Boolean; virtual;
+    function GetDefaultEnabled: Boolean; virtual;
+  public
+    property DefaultDelay: Single read GetDefaultDelay;
+    property DefaultLoop: Boolean read GetDefaultLoop;
+    property DefaultAutoReverse: Boolean read GetDefaultAutoReverse;
+    property DefaultInverse: Boolean read GetDefaultInverse;
+    property DefaultEnabled: Boolean read GetDefaultEnabled;
   public
     constructor Create; Virtual;
     destructor Destroy; override;
-    procedure Start; virtual; abstract;
-    procedure Stop; virtual; abstract;
-    procedure StopAtCurrent; virtual; abstract;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; virtual;
+    /// <summary>
+    ///   Moves the animation to its start and executes the OnFirstFrame and OnProcess events.
+    /// </summary>
+    procedure Start; virtual;
+    /// <summary>
+    ///   Moves the animation to its end and executes the OnProcess and OnFinish events.
+    /// </summary>
+    procedure Stop; virtual;
+    /// <summary>
+    ///   Stops the animation at its current position and executes the OnFinish event.
+    /// </summary>
+    procedure StopAtCurrent; virtual;
+    /// <summary>
+    ///   Pauses the animation at its current position.
+    /// </summary>
+    procedure Pause; virtual;
+    /// <summary>
+    ///   Resumes the animation from its current position.
+    /// </summary>
+    procedure Resume; virtual;
+    /// <summary>
+    ///   Continues to return True even when the animation is paused.
+    /// </summary>
     property Running: Boolean read FRunning;
-    property Pause: Boolean read FPause write FPause;
-    property Enabled: Boolean read FEnabled write SetEnabled;
-    property Delay: Single read FDelay write FDelay;
-    property Loop: Boolean read FLoop write FLoop;
-    property AutoReverse: Boolean read FAutoReverse write FAutoReverse;
-    property Inverse: Boolean read FInverse write FInverse;
-    property CurrentTime: Double read FTime;
+    property Paused: Boolean read FPaused;
+    property Delay: Single read FDelay write FDelay stored IsDelayStored nodefault;
+    property Loop: Boolean read FLoop write FLoop stored IsLoopStored;
+    /// <summary>
+    ///   Set AutoReverse to True to animate the controlled property backwards,
+    ///   from the StopValue to the StartValue, after the completion of the
+    ///   regular animation. The forward and backward animations each take a
+    ///   Duration number of seconds. If Loop is True, the forward and backward
+    ///   animations are alternated. OnFinish gets called after the backward
+    ///   animation has completed.
+    /// </summary>
+    property AutoReverse: Boolean read FAutoReverse write FAutoReverse stored IsAutoReverseStored;
+    /// <summary>
+    ///   Set Inverse to True to animate the controlled property backwards
+    ///   from the StopValue to the StartValue. The backward animation takes
+    ///   a Duration number of seconds. OnFinish gets called after the backward
+    ///   animation has completed.
+    /// </summary>
+    property Inverse: Boolean read FInverse write FInverse stored IsInverseStored;
+    property CurrentTime: Double read FCurrentTime;
     property OnFirstFrame: TNotifyEvent read FOnFirstFrame write FOnFirstFrame;
     property OnProcess: TNotifyEvent read FOnProcess write FOnProcess;
     property OnFinish: TNotifyEvent read FOnFinish write FOnFinish;
     property Tag: int64 read FTag write FTag;
     property TagObject: TObject read FTagObject write FTagObject;
     property TagFloat: Double read FTagFloat write FTagFloat;
+    // This property must be declared last to ensure that the animation
+    // starts only after all other properties have been fully loaded.
+    property Enabled: Boolean read FEnabled write SetEnabled stored IsEnabledStored;
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALDisplayAnimation = class(TALAnimation)
   protected
-    procedure ProcessTick(const ATime, ADeltaTime: Double); override;
+    procedure ProcessTick(const ADeltaTime: Double); override;
     procedure ProcessAnimation; override;
   public
     procedure Start; override;
@@ -219,18 +305,24 @@ type
   private
     FInterval: Single;
     FIntervalTimeLeft: Single;
+    function IsIntervalStored: Boolean;
   protected
-    procedure ProcessTick(const ATime, ADeltaTime: Double); override;
+    procedure ProcessTick(const ADeltaTime: Double); override;
+    function GetDefaultInterval: Single; virtual;
+  public
+    property DefaultInterval: Single read GetDefaultInterval;
   public
     constructor Create; override;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; override;
     procedure Start; override;
-    property Interval: Single read FInterval write FInterval;
+    property Interval: Single read FInterval write FInterval stored IsIntervalStored nodefault;
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~}
   TALInterpolationType = (
     Linear,
-    Quadratic,
+    Quadratic, // similar to css ease-in-out
     Cubic,
     Quartic,
     Quintic,
@@ -240,33 +332,110 @@ type
     Elastic,
     Back,
     Bounce,
+    Bezier,
+    //--
+    // https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+    Material3ExpressiveFastSpatial, // Duration = 350ms                   | TALCubicBezier.Create(0.42, 1.67, 0.21, 0.90);
+    Material3ExpressiveDefaultSpatial, // Duration = 500ms                | TALCubicBezier.Create(0.38, 1.21, 0.22, 1.00);
+    Material3ExpressiveSlowSpatial, // Duration = 650ms                   | TALCubicBezier.Create(0.39, 1.29, 0.35, 0.98);
+    //--
+    // https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+    Material3ExpressiveFastEffects, // Duration = 150ms                   | TALCubicBezier.Create(0.31, 0.94, 0.34, 1.00); | SAME as Material3StandardFastEffects
+    Material3ExpressiveDefaultEffects, // Duration = 200ms                | TALCubicBezier.Create(0.34, 0.80, 0.34, 1.00); | SAME as Material3StandardDefaultEffects
+    Material3ExpressiveSlowEffects, // Duration = 300ms                   | TALCubicBezier.Create(0.34, 0.88, 0.34, 1.00); | SAME as Material3StandardSlowEffects
+    //--
+    // https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+    Material3StandardFastSpatial, // Duration = 350ms                     | TALCubicBezier.Create(0.27, 1.06, 0.18, 1.00); |
+    Material3StandardDefaultSpatial, // Duration = 500ms                  | TALCubicBezier.Create(0.27, 1.06, 0.18, 1.00); | SAME
+    Material3StandardSlowSpatial, // Duration = 750ms                     | TALCubicBezier.Create(0.27, 1.06, 0.18, 1.00); |
+    //--
+    // https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+    Material3StandardFastEffects, // Duration = 150ms                     | TALCubicBezier.Create(0.31, 0.94, 0.34, 1.00); | SAME as Material3ExpressiveFastEffects
+    Material3StandardDefaultEffects, // Duration = 200ms                  | TALCubicBezier.Create(0.34, 0.80, 0.34, 1.00); | SAME as Material3ExpressiveDefaultEffects
+    Material3StandardSlowEffects, // Duration = 300ms                     | TALCubicBezier.Create(0.34, 0.88, 0.34, 1.00); | SAME as Material3ExpressiveSlowEffects
+    //--
+    // https://m3.material.io/styles/motion/easing-and-duration/applying-easing-and-duration#6409707e-1253-449c-b588-d27fe53bd025
+    Material3Emphasized, // Duration = 500ms | Begin and end on screen    | SVG
+    Material3EmphasizedDecelerate, // Duration = 400ms | Enter the screen | TALCubicBezier.Create(0.05, 0.70, 0.10, 1.00);
+    Material3EmphasizedAccelerate, // Duration = 200ms | Exit the screen  | TALCubicBezier.Create(0.30, 0.00, 0.80, 0.15);
+    //--
     Custom);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  TALInterpolationMode = (&In, Out, InOut);
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALCustomInterpolationEvent = function(Sender: TObject): Single of object;
 
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  TALInterpolationParams = class(TPersistent)
+  private
+    FCubicBezier: TALCubicBezier;
+    FBezierX1: Single;
+    FBezierY1: Single;
+    FBezierX2: Single;
+    FBezierY2: Single;
+    FOvershoot: Single;
+    procedure SetBezierX1(const AValue: Single);
+    procedure SetBezierY1(const AValue: Single);
+    procedure SetBezierX2(const AValue: Single);
+    procedure SetBezierY2(const AValue: Single);
+  public
+    constructor Create; virtual;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; virtual;
+  published
+    property BezierX1: Single read FBezierX1 write SetBezierX1;
+    property BezierY1: Single read FBezierY1 write SetBezierY1;
+    property BezierX2: Single read FBezierX2 write SetBezierX2;
+    property BezierY2: Single read FBezierY2 write SetBezierY2;
+    property Overshoot: Single read FOvershoot write FOvershoot;
+  end;
+
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALInterpolatedAnimation = class(TALAnimation)
   private
-    FOvershoot: Single;
     FDuration: Single;
     FOnCustomInterpolation: TALCustomInterpolationEvent;
-    FInterpolation: TALInterpolationType;
-    FAnimationType: TAnimationType;
+    FInterpolationType: TALInterpolationType;
+    FInterpolationMode: TALInterpolationMode;
+    FInterpolationParams: TALInterpolationParams;
+    procedure SetInterpolationParams(const AValue: TALInterpolationParams);
+    function IsDurationStored: Boolean;
+    function IsInterpolationTypeStored: Boolean;
+    function IsInterpolationModeStored: Boolean;
+  {$IF defined(ALBackwardCompatible)}
+  private
+    procedure ReadAnimationType(Reader: TReader);
+    procedure ReadInterpolation(Reader: TReader);
   protected
-    procedure ProcessTick(const ATime, ADeltaTime: Double); override;
+    procedure DefineProperties(Filer: TFiler); override;
+  {$ENDIF}
+  protected
+    procedure ProcessTick(const ADeltaTime: Double); override;
     function GetNormalizedTime: Single; virtual;
     function DoCustomInterpolation: Single; virtual;
+    function GetDefaultDuration: Single; virtual;
+    function GetDefaultInterpolationType: TALInterpolationType; virtual;
+    function GetDefaultInterpolationMode: TALInterpolationMode; virtual;
+  public
+    property DefaultDuration: Single read GetDefaultDuration;
+    property DefaultInterpolationType: TALInterpolationType read GetDefaultInterpolationType;
+    property DefaultInterpolationMode: TALInterpolationMode read GetDefaultInterpolationMode;
   public
     constructor Create; override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; override;
     procedure Start; override;
     procedure Stop; override;
     procedure StopAtCurrent; override;
-    property AnimationType: TAnimationType read FAnimationType write FAnimationType;
-    property Duration: Single read FDuration write FDuration;
-    property Interpolation: TALInterpolationType read FInterpolation write FInterpolation;
+    property Duration: Single read FDuration write FDuration stored IsDurationStored nodefault;
+    property InterpolationType: TALInterpolationType read FInterpolationType write FInterpolationType stored IsInterpolationTypeStored;
+    property InterpolationMode: TALInterpolationMode read FInterpolationMode write FInterpolationMode stored IsInterpolationModeStored;
+    property InterpolationParams: TALInterpolationParams read FInterpolationParams write SetInterpolationParams;
     property OnCustomInterpolation: TALCustomInterpolationEvent read FOnCustomInterpolation write FOnCustomInterpolation;
-    property Overshoot: Single read fOvershoot write fOvershoot;
     // Given the current time, NormalizedTime returns a number in the range from
     // 0 through 1, indicating how far the controlled property value has changed
     // from the StartValue to the StopValue
@@ -279,14 +448,23 @@ type
   private
     FStartValue: Single;
     FStopValue: Single;
-    fCurrentValue: Single;
+    function IsStartValueStored: Boolean;
+    function IsStopValueStored: Boolean;
   protected
+    FCurrentValue: Single;
     procedure ProcessAnimation; override;
+    function GetDefaultStartValue: Single; virtual;
+    function GetDefaultStopValue: Single; virtual;
+  public
+    property DefaultStartValue: Single read GetDefaultStartValue;
+    property DefaultStopValue: Single read GetDefaultStopValue;
   public
     constructor Create; override;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; override;
     procedure Start; override;
-    property StartValue: Single read FStartValue write FStartValue;
-    property StopValue: Single read FStopValue write FStopValue;
+    property StartValue: Single read FStartValue write FStartValue stored IsStartValueStored nodefault;
+    property StopValue: Single read FStopValue write FStopValue stored IsStopValueStored nodefault;
     property CurrentValue: Single read fCurrentValue;
   end;
 
@@ -296,14 +474,23 @@ type
   private
     FStartValue: TAlphaColor;
     FStopValue: TAlphaColor;
-    fCurrentValue: TAlphaColor;
+    function IsStartValueStored: Boolean;
+    function IsStopValueStored: Boolean;
   protected
+    FCurrentValue: TAlphaColor;
     procedure ProcessAnimation; override;
+    function GetDefaultStartValue: TAlphaColor; virtual;
+    function GetDefaultStopValue: TAlphaColor; virtual;
+  public
+    property DefaultStartValue: TAlphaColor read GetDefaultStartValue;
+    property DefaultStopValue: TAlphaColor read GetDefaultStopValue;
   public
     constructor Create; override;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; override;
     procedure Start; override;
-    property StartValue: TAlphaColor read FStartValue write FStartValue;
-    property StopValue: TAlphaColor read FStopValue write FStopValue;
+    property StartValue: TAlphaColor read FStartValue write FStartValue stored IsStartValueStored;
+    property StopValue: TAlphaColor read FStopValue write FStopValue stored IsStopValueStored;
     property CurrentValue: TAlphaColor read fCurrentValue;
   end;
 
@@ -340,30 +527,28 @@ type
     FOnProcess: TNotifyEvent;
     FOnFinish: TNotifyEvent;
     FOnCustomInterpolation: TALCustomInterpolationEvent;
-    function getAnimationType: TAnimationType;
     function getAutoReverse: Boolean;
     function getDelay: Single;
     function getDuration: Single;
-    function getInterpolation: TALInterpolationType;
+    function getInterpolationType: TALInterpolationType;
+    function getInterpolationMode: TALInterpolationMode;
+    function getInterpolationParams: TALInterpolationParams;
     function getInverse: Boolean;
     function getLoop: Boolean;
     function GetCurrentTime: Single;
-    function getOvershoot: Single;
-    function getPause: Boolean;
+    function getPaused: Boolean;
     function getRunning: Boolean;
     function GetStartValue: Single;
     function GetStopValue: Single;
     function GetCurrentValue: Single;
-    function OvershootStored: Boolean;
-    procedure setAnimationType(const Value: TAnimationType);
     procedure setAutoReverse(const Value: Boolean);
     procedure setDelay(const Value: Single);
     procedure setDuration(const Value: Single);
-    procedure setInterpolation(const Value: TALInterpolationType);
+    procedure setInterpolationType(const Value: TALInterpolationType);
+    procedure setInterpolationMode(const Value: TALInterpolationMode);
+    procedure setInterpolationParams(const Value: TALInterpolationParams);
     procedure setInverse(const Value: Boolean);
     procedure setLoop(const Value: Boolean);
-    procedure setOvershoot(const Value: Single);
-    procedure setPause(const Value: Boolean);
     procedure SetStartValue(const Value: Single);
     procedure setStopValue(const Value: Single);
   protected
@@ -380,15 +565,16 @@ type
     procedure Stop; override;
     procedure StopAtCurrent; virtual;
     property Running: Boolean read getRunning;
-    property Pause: Boolean read getPause write setPause;
+    property Paused: Boolean read getPaused;
     property CurrentValue: Single read GetCurrentValue;
     property CurrentTime: Single read GetCurrentTime;
   published
-    property AnimationType: TAnimationType read getAnimationType write setAnimationType default TAnimationType.In;
     property AutoReverse: Boolean read getAutoReverse write setAutoReverse default False;
     property Delay: Single read getDelay write setDelay;
     property Duration: Single read getDuration write setDuration nodefault;
-    property Interpolation: TALInterpolationType read getInterpolation write setInterpolation default TALInterpolationType.Linear;
+    property InterpolationType: TALInterpolationType read getInterpolationType write setInterpolationType default TALInterpolationType.Linear;
+    property InterpolationMode: TALInterpolationMode read getInterpolationMode write setInterpolationMode default TALInterpolationMode.In;
+    property InterpolationParams: TALInterpolationParams read GetInterpolationParams write SetInterpolationParams;
     property Inverse: Boolean read getInverse write setInverse default False;
     property Loop: Boolean read getLoop write setLoop default False;
     property OnFirstFrame: TNotifyEvent read fOnFirstFrame write fOnFirstFrame;
@@ -399,7 +585,6 @@ type
     property StartValue: Single read GetStartValue write SetStartValue stored True nodefault;
     property StartFromCurrent: Boolean read FStartFromCurrent write FStartFromCurrent default False;
     property StopValue: Single read GetStopValue write setStopValue stored True nodefault;
-    property Overshoot: Single read getOvershoot write setOvershoot Stored OvershootStored nodefault;
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
@@ -413,30 +598,28 @@ type
     FOnProcess: TNotifyEvent;
     FOnFinish: TNotifyEvent;
     FOnCustomInterpolation: TALCustomInterpolationEvent;
-    function getAnimationType: TAnimationType;
     function getAutoReverse: Boolean;
     function getDelay: Single;
     function getDuration: Single;
-    function getInterpolation: TALInterpolationType;
+    function getInterpolationType: TALInterpolationType;
+    function getInterpolationMode: TALInterpolationMode;
+    function getInterpolationParams: TALInterpolationParams;
     function getInverse: Boolean;
     function getLoop: Boolean;
     function GetCurrentTime: Single;
-    function getOvershoot: Single;
-    function getPause: Boolean;
+    function getPaused: Boolean;
     function getRunning: Boolean;
     function GetStartValue: TAlphaColor;
     function GetStopValue: TAlphaColor;
     function GetCurrentValue: TAlphaColor;
-    function OvershootStored: Boolean;
-    procedure setAnimationType(const Value: TAnimationType);
     procedure setAutoReverse(const Value: Boolean);
     procedure setDelay(const Value: Single);
     procedure setDuration(const Value: Single);
-    procedure setInterpolation(const Value: TALInterpolationType);
+    procedure setInterpolationType(const Value: TALInterpolationType);
+    procedure setInterpolationMode(const Value: TALInterpolationMode);
+    procedure setInterpolationParams(const Value: TALInterpolationParams);
     procedure setInverse(const Value: Boolean);
     procedure setLoop(const Value: Boolean);
-    procedure setOvershoot(const Value: Single);
-    procedure setPause(const Value: Boolean);
     procedure SetStartValue(const Value: TAlphaColor);
     procedure setStopValue(const Value: TAlphaColor);
   protected
@@ -453,15 +636,16 @@ type
     procedure Stop; override;
     procedure StopAtCurrent; virtual;
     property Running: Boolean read getRunning;
-    property Pause: Boolean read getPause write setPause;
+    property Paused: Boolean read getPaused;
     property CurrentValue: TAlphaColor read GetCurrentValue;
     property CurrentTime: Single read GetCurrentTime;
   published
-    property AnimationType: TAnimationType read getAnimationType write setAnimationType default TAnimationType.In;
     property AutoReverse: Boolean read getAutoReverse write setAutoReverse default False;
     property Delay: Single read getDelay write setDelay;
     property Duration: Single read getDuration write setDuration nodefault;
-    property Interpolation: TALInterpolationType read getInterpolation write setInterpolation default TALInterpolationType.Linear;
+    property InterpolationType: TALInterpolationType read getInterpolationType write setInterpolationType default TALInterpolationType.Linear;
+    property InterpolationMode: TALInterpolationMode read getInterpolationMode write setInterpolationMode default TALInterpolationMode.In;
+    property InterpolationParams: TALInterpolationParams read GetInterpolationParams write SetInterpolationParams;
     property Inverse: Boolean read getInverse write setInverse default False;
     property Loop: Boolean read getLoop write setLoop default False;
     property OnFirstFrame: TNotifyEvent read fOnFirstFrame write fOnFirstFrame;
@@ -472,20 +656,34 @@ type
     property StartValue: TAlphaColor read GetStartValue write SetStartValue stored True nodefault;
     property StartFromCurrent: Boolean read FStartFromCurrent write FStartFromCurrent default False;
     property StopValue: TAlphaColor read GetStopValue write setStopValue stored True nodefault;
-    property Overshoot: Single read getOvershoot write setOvershoot Stored OvershootStored nodefault;
   end;
 
 //function ALInterpolateLinear(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single): Single; => function FMX.Ani.InterpolateLinear(t, B, C, D: Single): Single;
-//function ALInterpolateSinusoidal(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateSine(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateQuintic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateQuint(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateQuartic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateQuart(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateQuadratic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateQuad(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateExponential(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateExpo(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateElastic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration, AAmplitude, AOscillationPeriod: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateElastic(t, B, C, D, A, P: Single; AType: TAnimationType): Single;
-//function ALInterpolateCubic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateCubic(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateCircular(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateCirc(t, B, C, D: Single; AType: TAnimationType): Single;
-//function ALInterpolateBack(AElapsedTime, AStartOfRange, ARangeSpan, ADuration, AOvershoot: Single; AType: TAnimationType): Single; => function FMX.Ani.InterpolateBack(t, B, C, D, S: Single; AType: TAnimationType): Single;
-function ALInterpolateBounce(AElapsedTime, ADuration: Single; AType: TAnimationType): Single;
+//function ALInterpolateSinusoidal(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateSine(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateQuintic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateQuint(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateQuartic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateQuart(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateQuadratic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateQuad(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateExponential(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateExpo(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateElastic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration, AAmplitude, AOscillationPeriod: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateElastic(t, B, C, D, A, P: Single; AType: TAnimationType): Single;
+//function ALInterpolateCubic(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateCubic(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateCircular(AElapsedTime, AStartOfRange, ARangeSpan, ADuration: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateCirc(t, B, C, D: Single; AType: TAnimationType): Single;
+//function ALInterpolateBack(AElapsedTime, AStartOfRange, ARangeSpan, ADuration, AOvershoot: Single; AMode: TALInterpolationMode): Single; => function FMX.Ani.InterpolateBack(t, B, C, D, S: Single; AType: TAnimationType): Single;
+function ALInterpolateBounce(AElapsedTime, ADuration: Single; AMode: TALInterpolationMode): Single;
+function ALInterpolateMaterial3ExpressiveFastSpatial(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3ExpressiveDefaultSpatial(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3ExpressiveSlowSpatial(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3ExpressiveFastEffects(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3ExpressiveDefaultEffects(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3ExpressiveSlowEffects(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3StandardFastSpatial(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3StandardDefaultSpatial(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3StandardSlowSpatial(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3StandardFastEffects(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3StandardDefaultEffects(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3StandardSlowEffects(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3Emphasized(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3EmphasizedDecelerate(AElapsedTime, ADuration: Single): Single;
+function ALInterpolateMaterial3EmphasizedAccelerate(AElapsedTime, ADuration: Single): Single;
 function ALInterpolateDecelerate(input: Single; const factor: Single = 1.0): Single;
 function ALInterpolateViscousFluid(input: Single): Single;
 function ALInterpolateColor(Start, Stop: TAlphaColor; T: Single): TAlphaColor;
@@ -504,7 +702,7 @@ type
   // (i.e. under-damped), the mass tends to overshoot, and return, and overshoot again. Without any
   // damping (i.e. damping ratio := 0), the mass will oscillate forever.
   // Taken from Android SpringForce
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if android SpringForce.java was not updated and adjust the IFDEF'}
     //Compare <Alcinoe>\References\Android\SpringForce.java with https://android.googlesource.com/platform/frameworks/support/dynamicanimation/dynamicanimation/src/main/java/androidx/dynamicanimation/animation/SpringForce.java
   {$ENDIF}
@@ -601,7 +799,6 @@ type
     FInitialVelocity: Single;
     FCurrentVelocity: Single;
     FStartValue: Single;
-    fCurrentValue: Single;
     FDeltaTime: Double;
     procedure setStiffness(stiffness: Single);
     function getStiffness: Single;
@@ -611,23 +808,45 @@ type
     function GetStopValue: Single;
     procedure SetValueThreshold(const Value: Single);
     function GetValueThreshold: Single;
+    function IsInitialVelocityStored: Boolean;
+    function IsStartValueStored: Boolean;
+    function IsStopValueStored: Boolean;
+    function IsStiffnessStored: Boolean;
+    function IsDampingRatioStored: Boolean;
+    function IsValueThresholdStored: Boolean;
   protected
-    procedure ProcessTick(const ATime, ADeltaTime: Double); override;
+    FCurrentValue: Single;
+    procedure ProcessTick(const ADeltaTime: Double); override;
     procedure ProcessAnimation; override;
     property SpringForce: TALSpringForce read FSpringForce;
+    function GetDefaultInitialVelocity: Single; virtual;
+    function GetDefaultStartValue: Single; virtual;
+    function GetDefaultStopValue: Single; virtual;
+    function GetDefaultStiffness: Single; virtual;
+    function GetDefaultDampingRatio: Single; virtual;
+    function GetDefaultValueThreshold: Single; virtual;
+  public
+    property DefaultInitialVelocity: Single read GetDefaultInitialVelocity;
+    property DefaultStartValue: Single read GetDefaultStartValue;
+    property DefaultStopValue: Single read GetDefaultStopValue;
+    property DefaultStiffness: Single read GetDefaultStiffness;
+    property DefaultDampingRatio: Single read GetDefaultDampingRatio;
+    property DefaultValueThreshold: Single read GetDefaultValueThreshold;
   public
     constructor Create; override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
+    procedure Reset; override;
     procedure Start; override;
     procedure Stop; override;
     procedure StopAtCurrent; override;
-    property Stiffness: Single read getStiffness write setStiffness;
-    property DampingRatio: Single read getDampingRatio write setDampingRatio;
-    property ValueThreshold: Single read getValueThreshold write setValueThreshold;
-    property InitialVelocity: Single read FInitialVelocity write FInitialVelocity;
+    property Stiffness: Single read getStiffness write setStiffness stored IsStiffnessStored nodefault;
+    property DampingRatio: Single read getDampingRatio write setDampingRatio stored IsDampingRatioStored nodefault;
+    property ValueThreshold: Single read getValueThreshold write setValueThreshold stored IsValueThresholdStored nodefault;
+    property InitialVelocity: Single read FInitialVelocity write FInitialVelocity stored IsInitialVelocityStored nodefault;
     property CurrentVelocity: Single read FCurrentVelocity;
-    property StartValue: Single read FStartValue write FStartValue;
-    property StopValue: Single read GetStopValue write SetStopValue;
+    property StartValue: Single read FStartValue write FStartValue stored IsStartValueStored nodefault;
+    property StopValue: Single read GetStopValue write SetStopValue stored IsStopValueStored nodefault;
     property CurrentValue: Single read fCurrentValue;
   end;
 
@@ -646,7 +865,7 @@ type
     function getInverse: Boolean;
     function getLoop: Boolean;
     function GetCurrentTime: Single;
-    function getPause: Boolean;
+    function getPaused: Boolean;
     function getRunning: Boolean;
     function GetStartValue: Single;
     function GetStopValue: Single;
@@ -660,7 +879,6 @@ type
     procedure setDelay(const Value: Single);
     procedure setInverse(const Value: Boolean);
     procedure setLoop(const Value: Boolean);
-    procedure setPause(const Value: Boolean);
     procedure SetStartValue(const Value: Single);
     procedure setStopValue(const Value: Single);
     procedure setStiffness(const Value: Single);
@@ -684,7 +902,7 @@ type
     procedure Stop; override;
     procedure StopAtCurrent; virtual;
     property Running: Boolean read getRunning;
-    property Pause: Boolean read getPause write setPause;
+    property Paused: Boolean read getPaused;
     property CurrentValue: Single read GetCurrentValue;
     property CurrentVelocity: Single read GetCurrentVelocity;
     property CurrentTime: Single read GetCurrentTime;
@@ -707,36 +925,6 @@ type
     property InitialVelocity: Single read GetInitialVelocity write SetInitialVelocity stored InitialVelocityStored nodefault;
   end;
 
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  // Converted from Chromium's source code:
-  // https://github.com/chromium/chrome/browser/resources/lens/overlay/cubic_bezier.ts
-  // - JavaScript "ease-in" corresponds to: cubic-bezier(0.42, 0, 1, 1)
-  // - JavaScript "ease-out" corresponds to: cubic-bezier(0, 0, 0.58, 1)
-  // - JavaScript "ease-in-out" corresponds to: cubic-bezier(0.42, 0, 0.58, 1)
-  TALCubicBezier = class
-  private
-    const
-      BEZIER_EPSILON = 1e-7;
-      CUBIC_BEZIER_SPLINE_SAMPLES = 11;
-      MAX_NEWTON_METHOD_ITERATIONS = 4;
-  private
-    P1, P2: TALPointD;
-    A, B, C: TALPointD;
-    SplineSamples: array[0..CUBIC_BEZIER_SPLINE_SAMPLES - 1] of Double;
-    procedure InitCoefficients(const P1, P2: TALPointD);
-    procedure InitSpline;
-    function SampleCurveX(T: Double): Double;
-    function SampleCurveDerivativeX(T: Double): Double;
-    function SampleCurveY(T: Double): Double;
-    function ToFinite(N: Double): Double;
-  public
-    constructor Create(X1, Y1, X2, Y2: Double);
-    // Determines the Y value of the cubic Bezier curve for a given X value.
-    function SolveForY(X: Double): Double;
-    // Finds the parameter T (a value between 0 and 1) for a given X value on the curve.
-    function SolveCurveX(X: Double): Double;
-  end;
-
 procedure Register;
 
 implementation
@@ -751,14 +939,139 @@ uses
   {$IFDEF IOS}
   Macapi.Helpers,
   Macapi.ObjCRuntime,
-  Alcinoe.iOSapi.QuartzCore,
   {$ENDIF}
   FMX.Ani,
+  FMX.Forms,
   FMX.Utils;
+
+{********************************************************}
+constructor TALCubicBezier.Create(X1, Y1, X2, Y2: Double);
+begin
+  P1 := TALPointD.Create(X1, Y1);
+  P2 := TALPointD.Create(X2, Y2);
+  InitCoefficients(P1, P2);
+  InitSpline;
+end;
+
+{*****************************************************************}
+procedure TALCubicBezier.InitCoefficients(const P1, P2: TALPointD);
+begin
+  // Calculate the polynomial coefficients, implicit first and last control
+  // points are (0,0) and (1,1). First, for x.
+  c.x := 3 * p1.x;
+  b.x := 3 * (p2.x - p1.x) - c.x;
+  a.x := 1 - c.x - b.x;
+
+  // Now for y.
+  c.y := toFinite(3 * p1.y);
+  b.y := toFinite(3 * (p2.y - p1.y) - c.y);
+  a.y := toFinite(1 - c.y - b.y);
+end;
+
+{**********************************}
+procedure TALCubicBezier.InitSpline;
+begin
+  const deltaT = 1 / (CUBIC_BEZIER_SPLINE_SAMPLES - 1);
+  for var i := 0 to CUBIC_BEZIER_SPLINE_SAMPLES - 1 do
+    splineSamples[i] := sampleCurveX(i * deltaT);
+end;
+
+{******************************************************}
+function TALCubicBezier.SampleCurveX(T: Double): Double;
+begin
+  // `ax t^3 + bx t^2 + cx t' expanded using Horner's rule.
+  // The x values are in the range [0, 1]. So it isn't needed toFinite
+  // clamping.
+  // https://drafts.csswg.org/css-easing-1/#funcdef-cubic-bezier-easing-function-cubic-bezier
+  result := ((a.x * t + b.x) * t + c.x) * t;
+end;
+
+{****************************************************************}
+function TALCubicBezier.SampleCurveDerivativeX(T: Double): Double;
+begin
+  Result := (3 * a.x * t + 2 * b.x) * t + c.x;
+end;
+
+{******************************************************}
+function TALCubicBezier.SampleCurveY(T: Double): Double;
+begin
+  Result := toFinite(((a.y * t + b.y) * t + c.y) * t);
+end;
+
+{**************************************************}
+function TALCubicBezier.ToFinite(N: Double): Double;
+begin
+  if IsInfinite(N) then
+    Result := IfThen(N > 0, MaxInt, -MaxInt)
+  else
+    Result := N;
+end;
+
+{*****************************************************}
+function TALCubicBezier.SolveCurveX(X: Double): Double;
+begin
+  var t0: Double := NAN;
+  var t1: Double := NAN;
+  var x2: Double{ := NAN};
+  var d2: Double;
+
+  var t2: Double := x;
+
+  // Linear interpolation of spline curve for initial guess.
+  const deltaT = 1 / (CUBIC_BEZIER_SPLINE_SAMPLES - 1);
+  for var i := 1 to CUBIC_BEZIER_SPLINE_SAMPLES - 1 do begin
+    if (x <= splineSamples[i]) then begin
+      t1 := deltaT * i;
+      t0 := t1 - deltaT;
+      t2 := t0 + (t1 - t0) * (x - splineSamples[i - 1]) / (splineSamples[i] - splineSamples[i - 1]);
+      break;
+    end;
+  end;
+
+  // Perform a few iterations of Newton's method -- normally very fast.
+  // See https://en.wikipedia.org/wiki/Newton%27s_method.
+  for var i := 0 to MAX_NEWTON_METHOD_ITERATIONS - 1 do begin
+    x2 := sampleCurveX(t2) - x;
+    if (abs(x2) < BEZIER_EPSILON) then
+      exit(t2);
+    d2 := sampleCurveDerivativeX(t2);
+    if (abs(d2) < BEZIER_EPSILON) then
+      break;
+    t2 := t2 - x2 / d2;
+  end;
+  if ((not IsNan(x2)) and (abs(x2) < BEZIER_EPSILON)) then
+    exit(t2);
+
+  // Fall back to the bisection method for reliability.
+  if ((not IsNan(t0)) and (not IsNan(t1))) then begin
+    while (t0 < t1) do begin
+      x2 := sampleCurveX(t2);
+      if (abs(x2 - x) < BEZIER_EPSILON) then
+        exit(t2);
+
+      if (x > x2) then
+        t0 := t2
+      else
+        t1 := t2;
+
+      t2 := (t1 + t0) * 0.5;
+    end;
+  end;
+
+  // Failed to solve.
+  result := t2;
+end;
+
+{***************************************************}
+function TALCubicBezier.SolveForY(X: Double): Double;
+begin
+  x := max(0, min(1, x));
+  Result := sampleCurveY(solveCurveX(x));
+end;
 
 {*****************************************************}
 // Taken from android.view.animation.BounceInterpolator
-function ALInterpolateBounce(AElapsedTime, ADuration: Single; AType: TAnimationType): Single;
+function ALInterpolateBounce(AElapsedTime, ADuration: Single; AMode: TALInterpolationMode): Single;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   function _bounce(t: Single): Single;
@@ -790,19 +1103,19 @@ function ALInterpolateBounce(AElapsedTime, ADuration: Single; AType: TAnimationT
   end;
 
 begin
-  case AType of
+  case AMode of
 
-    TAnimationType.In:
+    TALInterpolationMode.In:
       begin
         Result := _EaseIn(AElapsedTime, ADuration);
       end;
 
-    TAnimationType.Out:
+    TALInterpolationMode.Out:
       begin
         Result := _EaseOut(AElapsedTime, ADuration);
       end;
 
-    TAnimationType.InOut:
+    TALInterpolationMode.InOut:
       begin
         if AElapsedTime < ADuration / 2 then
           Result := _EaseIn(AElapsedTime * 2, ADuration) * 0.5
@@ -813,6 +1126,142 @@ begin
   else
     Result := 0;
   end;
+end;
+
+var
+  ALCubicBezierMaterial3ExpressiveFastSpatial: TALCubicBezier;
+  ALCubicBezierMaterial3ExpressiveDefaultSpatial: TALCubicBezier;
+  ALCubicBezierMaterial3ExpressiveSlowSpatial: TALCubicBezier;
+  ALCubicBezierMaterial3ExpressiveFastEffects: TALCubicBezier;
+  ALCubicBezierMaterial3ExpressiveDefaultEffects: TALCubicBezier;
+  ALCubicBezierMaterial3ExpressiveSlowEffects: TALCubicBezier;
+  ALCubicBezierMaterial3StandardFastSpatial: TALCubicBezier;
+  ALCubicBezierMaterial3StandardDefaultSpatial: TALCubicBezier;
+  ALCubicBezierMaterial3StandardSlowSpatial: TALCubicBezier;
+  ALCubicBezierMaterial3StandardFastEffects: TALCubicBezier;
+  ALCubicBezierMaterial3StandardDefaultEffects: TALCubicBezier;
+  ALCubicBezierMaterial3StandardSlowEffects: TALCubicBezier;
+  ALCubicBezierMaterial3EmphasizedSegment1: TALCubicBezier;
+  ALCubicBezierMaterial3EmphasizedSegment2: TALCubicBezier;
+  ALCubicBezierMaterial3EmphasizedDecelerate: TALCubicBezier;
+  ALCubicBezierMaterial3EmphasizedAccelerate: TALCubicBezier;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3ExpressiveFastSpatial(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3ExpressiveFastSpatial.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3ExpressiveDefaultSpatial(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3ExpressiveDefaultSpatial.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3ExpressiveSlowSpatial(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3ExpressiveSlowSpatial.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3ExpressiveFastEffects(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3ExpressiveFastEffects.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3ExpressiveDefaultEffects(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3ExpressiveDefaultEffects.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3ExpressiveSlowEffects(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3ExpressiveSlowEffects.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3StandardFastSpatial(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3StandardFastSpatial.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3StandardDefaultSpatial(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3StandardDefaultSpatial.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3StandardSlowSpatial(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3StandardSlowSpatial.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3StandardFastEffects(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3StandardFastEffects.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3StandardDefaultEffects(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3StandardDefaultEffects.SolveForY(AElapsedTime / ADuration);
+end;
+
+{****************************************************************************************}
+//https://m3.material.io/styles/motion/overview/specs#1b299695-5822-4738-ae56-ef9389b412d2
+function ALInterpolateMaterial3StandardSlowEffects(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3StandardSlowEffects.SolveForY(AElapsedTime / ADuration);
+end;
+
+{**********************************************************************************************************}
+//https://m3.material.io/styles/motion/easing-and-duration/tokens-specs#ed7ab8eb-9b9a-40a3-806f-a4485558f3df
+function ALInterpolateMaterial3Emphasized(AElapsedTime, ADuration: Single): Single;
+begin
+
+  // Implements exact pathInterpolator(M 0,0 C 0.05, 0, 0.133333, 0.06, 0.166666, 0.4 C 0.208333, 0.82, 0.25, 1, 1, 1)
+  // using two cubic Bezier segments
+
+  var t: Single := AElapsedTime / ADuration; // Normalized time [0..1]
+  if t <= 0.166666 then
+    // First segment: M 0,0 C 0.05, 0, 0.133333, 0.06, 0.166666, 0.4
+    // Maps t from [0..0.166666] to [0..1] for this segment
+    Result := ALCubicBezierMaterial3EmphasizedSegment1.SolveForY(t / 0.166666) * 0.4
+  else
+    // Second segment: C 0.208333, 0.82, 0.25, 1, 1, 1
+    // Maps t from [0.166666..1] to [0..1] for this segment
+    Result := 0.4 + ALCubicBezierMaterial3EmphasizedSegment2.SolveForY((t - 0.166666) / (1 - 0.166666)) * (1 - 0.4);
+
+end;
+
+{**********************************************************************************************************}
+//https://m3.material.io/styles/motion/easing-and-duration/tokens-specs#ed7ab8eb-9b9a-40a3-806f-a4485558f3df
+function ALInterpolateMaterial3EmphasizedDecelerate(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3EmphasizedDecelerate.SolveForY(AElapsedTime / ADuration);
+end;
+
+{**********************************************************************************************************}
+//https://m3.material.io/styles/motion/easing-and-duration/tokens-specs#ed7ab8eb-9b9a-40a3-806f-a4485558f3df
+function ALInterpolateMaterial3EmphasizedAccelerate(AElapsedTime, ADuration: Single): Single;
+begin
+  result := ALCubicBezierMaterial3EmphasizedAccelerate.SolveForY(AElapsedTime / ADuration);
 end;
 
 {*********************************************************************************************}
@@ -865,7 +1314,7 @@ end;
 
 {************************************************************}
 // Taken from android.widget.Scroller.ViscousFluidInterpolator
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if android.widget.Scroller.ViscousFluidInterpolator was not updated and adjust the IFDEF'}
   //Compare <Alcinoe>\References\Android\Scroller.java with <SDKs>c:\SDKs\android\sources\android-33\android\widget\Scroller.java
 {$ENDIF}
@@ -879,6 +1328,7 @@ end;
 {****************************************************************************}
 function ALInterpolateColor(Start, Stop: TAlphaColor; T: Single): TAlphaColor;
 begin
+  T := EnsureRange(T,0,1);
   // If start or stop is null, then perform the animation only on the alpha channel.
   if Start = TALphaColors.Null then begin
     TAlphaColorRec(Start).A := 0;
@@ -992,7 +1442,7 @@ constructor TALDisplayLinkThread.Create(AOwner: TComponent);
 begin
   inherited create;
   fDisplayLinkListener := TDisplayLinkListener.Create(self);
-  fDisplayLink := TCADisplayLink.Wrap(TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated')));
+  fDisplayLink := TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated'));
   fDisplayLink.retain;
   if GlobalUseMetal then begin
     // In OpenGL, the animation appears more jerky when using
@@ -1002,12 +1452,13 @@ begin
       LFrameRateRange.minimum := ALMinimumFramesPerSecond;
       LFrameRateRange.maximum := ALMaximumFramesPerSecond;
       LFrameRateRange.preferred := ALPreferredFramesPerSecond;
-      TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFrameRateRange(LFrameRateRange);
+      fDisplayLink.setPreferredFrameRateRange(LFrameRateRange);
     end
     else
-      TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
+      fDisplayLink.setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
   end;
-  fDisplayLink.addToRunLoop(TNSRunLoop.Wrap(TNSRunLoop.OCClass.mainRunLoop), NSRunLoopCommonModes); // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+  // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+  fDisplayLink.addToRunLoop(TNSRunLoop.OCClass.mainRunLoop, NSRunLoopCommonModes);
   fDisplayLink.setPaused(true);
   FTimerEvent := nil;
   Interval := 1;
@@ -1055,7 +1506,6 @@ begin
 
   OnTimer := DoSyncTimer;
   FAniList := TList<TALAnimation>.Create;
-  FTime := ALElapsedTimeSecondsAsDouble;
 
   Enabled := False;
 end;
@@ -1074,10 +1524,10 @@ begin
   if TThread.Current.ThreadID <> MainThreadID then
     raise Exception.Create('TALAniThread.AddAnimation must only be called from the main thread.');
   {$ENDIF}
-  if FAniList.IndexOf(Ani) < 0 then
+  if FAniList.IndexOf(Ani) < 0 then begin
+    Ani.FTime := ALElapsedTimeSecondsAsDouble;
     FAniList.Add(Ani);
-  if not Enabled and (FAniList.Count > 0) then
-    FTime := ALElapsedTimeSecondsAsDouble;
+  end;
   Enabled := FAniList.Count > 0;
 end;
 
@@ -1096,16 +1546,16 @@ end;
 procedure TALAniThread.DoSyncTimer(Sender: TObject);
 begin
   {$IF not defined(ALDPK)}
-  var NewTime := ALElapsedTimeSecondsAsDouble;
-  var LDeltaTime := NewTime - FTime;
-  FTime := NewTime;
-  if LDeltaTime <= 0 then
-    Exit;
   if FAniList.Count > 0 then begin
     var I := FAniList.Count - 1;
     while I >= 0 do begin
       var Ani := FAniList[I];
-      Ani.ProcessTick(FTime, LDeltaTime);
+      var NewTime := ALElapsedTimeSecondsAsDouble;
+      var LDeltaTime := NewTime - Ani.FTime;
+      Ani.FTime := NewTime;
+      if LDeltaTime <= 0 then
+        Continue;
+      Ani.ProcessTick(LDeltaTime);
       Dec(I);
       if I >= FAniList.Count then
         I := FAniList.Count - 1;
@@ -1118,10 +1568,14 @@ end;
 constructor TALAnimation.Create;
 begin
   inherited Create;
-  FEnabled := False;
-  fTag := 0;
+  FTag := 0;
   FTagObject := nil;
   FTagFloat := 0.0;
+  FDelay := DefaultDelay;
+  FLoop := DefaultLoop;
+  FAutoReverse := DefaultAutoReverse;
+  FInverse := DefaultInverse;
+  FEnabled := DefaultEnabled;
 end;
 
 {******************************}
@@ -1130,6 +1584,158 @@ begin
   if AniThread <> nil then
     AniThread.FAniList.Remove(Self);
   inherited Destroy;
+end;
+
+{*************************************************}
+procedure TALAnimation.Assign(Source: TPersistent);
+begin
+  if Source is TALAnimation then begin
+    Tag := TALAnimation(Source).Tag;
+    TagObject := TALAnimation(Source).TagObject;
+    TagFloat := TALAnimation(Source).TagFloat;
+    Delay := TALAnimation(Source).Delay;
+    Loop := TALAnimation(Source).Loop;
+    AutoReverse := TALAnimation(Source).AutoReverse;
+    Inverse := TALAnimation(Source).Inverse;
+    OnFirstFrame := TALAnimation(Source).OnFirstFrame;
+    OnProcess := TALAnimation(Source).OnProcess;
+    OnFinish := TALAnimation(Source).OnFinish;
+    Enabled := TALAnimation(Source).Enabled;
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{***************************}
+procedure TALAnimation.Reset;
+begin
+  Tag := 0;
+  TagObject := nil;
+  TagFloat := 0;
+  Delay := DefaultDelay;
+  Loop := DefaultLoop;
+  AutoReverse := DefaultAutoReverse;
+  Inverse := DefaultInverse;
+  OnFirstFrame := nil;
+  OnProcess := nil;
+  OnFinish := nil;
+  Enabled := DefaultEnabled;
+end;
+
+{***************************}
+procedure TALAnimation.Start;
+begin
+  if FRunning then Exit;
+  FEnabled := True;
+  FRunning := True;
+  FPaused := False;
+
+  if AniThread = nil then
+    FAniThread := TALAniThread.Create;
+
+  AniThread.AddAnimation(Self);
+  {$IF defined(DEBUG)}
+  if (not AniThread.Enabled) and (not Application.Terminated) then
+    Raise Exception.Create('Internal error: AniThread.Enabled is False. This should never happen!');
+  {$ENDIF}
+end;
+
+{**************************}
+procedure TALAnimation.Stop;
+begin
+  if not FRunning then Exit;
+  if AniThread <> nil then AniThread.RemoveAnimation(Self);
+end;
+
+{***********************************}
+procedure TALAnimation.StopAtCurrent;
+begin
+  if not FRunning then Exit;
+  if AniThread <> nil then AniThread.RemoveAnimation(Self);
+end;
+
+{***************************}
+procedure TALAnimation.Pause;
+begin
+  if (not FRunning) or (FPaused) then Exit;
+  FPaused := True;
+  if AniThread <> nil then AniThread.RemoveAnimation(Self);
+end;
+
+{****************************}
+procedure TALAnimation.Resume;
+begin
+  if (not FRunning) or (not FPaused) then Exit;
+  FPaused := False;
+
+  if AniThread = nil then
+    FAniThread := TALAniThread.Create;
+
+  AniThread.AddAnimation(Self);
+  {$IF defined(DEBUG)}
+  if (not AniThread.Enabled) and (not Application.Terminated) then
+    Raise Exception.Create('Internal error: AniThread.Enabled is False. This should never happen!');
+  {$ENDIF}
+end;
+
+{*******************************************}
+function TALAnimation.IsDelayStored: Boolean;
+begin
+  result := not SameValue(fDelay, DefaultDelay, TimeEpsilon);
+end;
+
+{******************************************}
+function TALAnimation.IsLoopStored: Boolean;
+begin
+  result := fLoop <> DefaultLoop;
+end;
+
+{*************************************************}
+function TALAnimation.IsAutoReverseStored: Boolean;
+begin
+  result := fAutoReverse <> DefaultAutoReverse;
+end;
+
+{*********************************************}
+function TALAnimation.IsInverseStored: Boolean;
+begin
+  result := fInverse <> DefaultInverse;
+end;
+
+{*********************************************}
+function TALAnimation.IsEnabledStored: Boolean;
+begin
+  result := fEnabled <> DefaultEnabled;
+end;
+
+{********************************************}
+function TALAnimation.GetDefaultDelay: Single;
+Begin
+  Result := 0;
+end;
+
+{********************************************}
+function TALAnimation.GetDefaultLoop: Boolean;
+Begin
+  Result := False;
+end;
+
+{***************************************************}
+function TALAnimation.GetDefaultAutoReverse: Boolean;
+Begin
+  Result := False;
+end;
+
+{***********************************************}
+function TALAnimation.GetDefaultInverse: Boolean;
+Begin
+  Result := False;
+end;
+
+{***********************************************}
+function TALAnimation.GetDefaultEnabled: Boolean;
+Begin
+  Result := False;
 end;
 
 {******************************************************}
@@ -1145,8 +1751,8 @@ begin
   end;
 end;
 
-{********************************}
-procedure TALAnimation.FirstFrame;
+{**********************************}
+procedure TALAnimation.DoFirstFrame;
 begin
   // Do not call fOnFirstFrame if enabled is false
   if fEnabled and assigned(fOnFirstFrame) then
@@ -1164,6 +1770,8 @@ end;
 {******************************}
 procedure TALAnimation.DoFinish;
 begin
+  FRunning := False;
+  FPaused := False;
   // Do not call FOnFinish if enabled is false
   if fEnabled and Assigned(FOnFinish) then
     FOnFinish(Self);
@@ -1175,24 +1783,24 @@ begin
   ALFreeAndNil(FAniThread);
 end;
 
-{*************************************************************************}
-procedure TALDisplayAnimation.ProcessTick(const ATime, ADeltaTime: Double);
+{******************************************************************}
+procedure TALDisplayAnimation.ProcessTick(const ADeltaTime: Double);
 begin
-  if (not FRunning) or FPause then
+  if (not FRunning) or FPaused then
     Exit;
 
   if (FDelay > 0) and (FDelayTimeLeft <> 0) then begin
     FDelayTimeLeft := FDelayTimeLeft - ADeltaTime;
     if FDelayTimeLeft <= 0 then begin
       FDelayTimeLeft := 0;
-      FirstFrame;
+      DoFirstFrame;
       ProcessAnimation;
       DoProcess;
     end;
     Exit;
   end;
 
-  FTime := FTime + ADeltaTime;
+  FCurrentTime := FCurrentTime + ADeltaTime;
 
   ProcessAnimation;
   DoProcess;
@@ -1213,24 +1821,16 @@ end;
 {**********************************}
 procedure TALDisplayAnimation.Start;
 begin
-  if (FRunning) then
-    Exit;
-  FEnabled := True;
-  FRunning := True;
-  FTime := 0;
+  If FPaused then Resume;
+  if FRunning then Exit;
+  inherited;
+  FCurrentTime := 0;
   FDelayTimeLeft := FDelay;
   if FDelay = 0 then begin
-    FirstFrame;
+    DoFirstFrame;
     ProcessAnimation;
     DoProcess;
   end;
-
-  if AniThread = nil then
-    FAniThread := TALAniThread.Create;
-
-  AniThread.AddAnimation(Self);
-  if not AniThread.Enabled then
-    Stop;
 end;
 
 {*********************************}
@@ -1242,13 +1842,8 @@ end;
 {******************************************}
 procedure TALDisplayAnimation.StopAtCurrent;
 begin
-  if not FRunning then
-    Exit;
-
-  if AniThread <> nil then
-    AniThread.RemoveAnimation(Self);
-
-  FRunning := False;
+  if not FRunning then Exit;
+  inherited;
   DoFinish;
 end;
 
@@ -1256,20 +1851,38 @@ end;
 constructor TALDisplayTimer.Create;
 begin
   inherited Create;
-  FInterval := 0.05;
+  FInterval := DefaultInterval;
 end;
 
-{*********************************************************************}
-procedure TALDisplayTimer.ProcessTick(const ATime, ADeltaTime: Double);
+{****************************************************}
+procedure TALDisplayTimer.Assign(Source: TPersistent);
 begin
-  if (not FRunning) or FPause then
+  if Source is TALDisplayTimer then begin
+    Interval := TALDisplayTimer(Source).Interval;
+    inherited Assign(Source);
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{******************************}
+procedure TALDisplayTimer.Reset;
+begin
+  Interval := DefaultInterval;
+  inherited;
+end;
+
+{**************************************************************}
+procedure TALDisplayTimer.ProcessTick(const ADeltaTime: Double);
+begin
+  if (not FRunning) or FPaused then
     Exit;
 
   if (FDelay > 0) and (FDelayTimeLeft <> 0) then begin
     FDelayTimeLeft := FDelayTimeLeft - ADeltaTime;
     if FDelayTimeLeft <= 0 then begin
       FDelayTimeLeft := 0;
-      FirstFrame;
+      DoFirstFrame;
       ProcessAnimation;
       DoProcess;
     end;
@@ -1280,7 +1893,7 @@ begin
   if CompareValue(FIntervalTimeLeft, 0, 0.001) > 0 then exit;
   FIntervalTimeLeft := FInterval;
 
-  FTime := FTime + ADeltaTime;
+  FCurrentTime := FCurrentTime + ADeltaTime;
 
   ProcessAnimation;
   DoProcess;
@@ -1295,39 +1908,176 @@ end;
 {******************************}
 procedure TALDisplayTimer.Start;
 begin
-  if (FRunning) then
-    Exit;
-  FEnabled := True;
-  FRunning := True;
-  FTime := 0;
+  If FPaused then Resume;
+  if FRunning then Exit;
   FIntervalTimeLeft := FInterval;
-  FDelayTimeLeft := FDelay;
-  if FDelay = 0 then begin
-    FirstFrame;
-    ProcessAnimation;
-    DoProcess;
+  inherited;
+end;
+
+{*************************************************}
+function TALDisplayTimer.IsIntervalStored: Boolean;
+begin
+  result := not SameValue(fInterval, DefaultInterval, TimeEpsilon);
+end;
+
+{**************************************************}
+function TALDisplayTimer.GetDefaultInterval: Single;
+Begin
+  Result := 0.05;
+end;
+
+{****************************************}
+constructor TALInterpolationParams.Create;
+begin
+  inherited;
+  FCubicBezier := nil;
+  FBezierX1 := 0;
+  FBezierY1 := 0;
+  FBezierX2 := 0;
+  FBezierY2 := 0;
+  FOvershoot := 0;
+end;
+
+{****************************************}
+destructor TALInterpolationParams.Destroy;
+begin
+  ALFreeAndNil(FCubicBezier);
+  inherited;
+end;
+
+{***********************************************************}
+procedure TALInterpolationParams.Assign(Source: TPersistent);
+begin
+  if Source is TALInterpolationParams then begin
+    BezierX1 := TALInterpolationParams(Source).BezierX1;
+    BezierY1 := TALInterpolationParams(Source).BezierY1;
+    BezierX2 := TALInterpolationParams(Source).BezierX2;
+    BezierY2 := TALInterpolationParams(Source).BezierY2;
+    Overshoot := TALInterpolationParams(Source).Overshoot;
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{*************************************}
+procedure TALInterpolationParams.Reset;
+begin
+  BezierX1 := 0;
+  BezierY1 := 0;
+  BezierX2 := 0;
+  BezierY2 := 0;
+  Overshoot := 0;
+end;
+
+{*****************************************************************}
+procedure TALInterpolationParams.SetBezierX1(const AValue: Single);
+begin
+  if not SameValue(AValue, FBezierX1, TEpsilon.Vector) then begin
+    FBezierX1 := AValue;
+    ALFreeAndNil(FCubicBezier);
   end;
+end;
 
-  if AniThread = nil then
-    FAniThread := TALAniThread.Create;
+{*****************************************************************}
+procedure TALInterpolationParams.SetBezierY1(const AValue: Single);
+begin
+  if not SameValue(AValue, FBezierY1, TEpsilon.Vector) then begin
+    FBezierY1 := AValue;
+    ALFreeAndNil(FCubicBezier);
+  end;
+end;
 
-  AniThread.AddAnimation(Self);
-  if not AniThread.Enabled then
-    Stop;
+{*****************************************************************}
+procedure TALInterpolationParams.SetBezierX2(const AValue: Single);
+begin
+  if not SameValue(AValue, FBezierX2, TEpsilon.Vector) then begin
+    FBezierX2 := AValue;
+    ALFreeAndNil(FCubicBezier);
+  end;
+end;
+
+{*****************************************************************}
+procedure TALInterpolationParams.SetBezierY2(const AValue: Single);
+begin
+  if not SameValue(AValue, FBezierY2, TEpsilon.Vector) then begin
+    FBezierY2 := AValue;
+    ALFreeAndNil(FCubicBezier);
+  end;
 end;
 
 {******************************************}
 constructor TALInterpolatedAnimation.Create;
 begin
   inherited Create;
-  FDuration := 0.2;
-  FOvershoot := 0.0;
+  FDuration := DefaultDuration;
+  FInterpolationType := DefaultInterpolationType;
+  FInterpolationMode := DefaultInterpolationMode;
+  FInterpolationParams := TALInterpolationParams.Create;
 end;
 
-{******************************************************************************}
-procedure TALInterpolatedAnimation.ProcessTick(const ATime, ADeltaTime: Double);
+{******************************************}
+destructor TALInterpolatedAnimation.Destroy;
 begin
-  if (not FRunning) or FPause then
+  ALFreeAndNil(FInterpolationParams);
+  inherited;
+end;
+
+{*************************************************************}
+procedure TALInterpolatedAnimation.Assign(Source: TPersistent);
+begin
+  if Source is TALInterpolatedAnimation then begin
+    Duration := TALInterpolatedAnimation(Source).Duration;
+    OnCustomInterpolation := TALInterpolatedAnimation(Source).OnCustomInterpolation;
+    InterpolationType := TALInterpolatedAnimation(Source).InterpolationType;
+    InterpolationMode := TALInterpolatedAnimation(Source).InterpolationMode;
+    InterpolationParams.Assign(TALInterpolatedAnimation(Source).InterpolationParams);
+    inherited Assign(Source);
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{***************************************}
+procedure TALInterpolatedAnimation.Reset;
+begin
+  Duration := DefaultDuration;
+  OnCustomInterpolation := nil;
+  InterpolationType := DefaultInterpolationType;
+  InterpolationMode := DefaultInterpolationMode;
+  InterpolationParams.reset;
+  inherited;
+end;
+
+{*********************************}
+{$IF defined(ALBackwardCompatible)}
+procedure TALInterpolatedAnimation.DefineProperties(Filer: TFiler);
+begin
+  inherited;
+  Filer.DefineProperty('AnimationType', ReadAnimationType, nil{WriteData}, false{hasdata});
+  Filer.DefineProperty('Interpolation', ReadInterpolation, nil{WriteData}, false{hasdata});
+end;
+{$ENDIF}
+
+{*********************************}
+{$IF defined(ALBackwardCompatible)}
+procedure TALInterpolatedAnimation.ReadAnimationType(Reader: TReader);
+begin
+  InterpolationMode := TALInterpolationMode(GetEnumValue(TypeInfo(TALInterpolationMode), Reader.ReadIdent));
+end;
+{$ENDIF}
+
+{*********************************}
+{$IF defined(ALBackwardCompatible)}
+procedure TALInterpolatedAnimation.ReadInterpolation(Reader: TReader);
+begin
+  InterpolationType := TALInterpolationType(GetEnumValue(TypeInfo(TALInterpolationType), Reader.ReadIdent));
+end;
+{$ENDIF}
+
+{***********************************************************************}
+procedure TALInterpolatedAnimation.ProcessTick(const ADeltaTime: Double);
+begin
+  if (not FRunning) or FPaused then
     Exit;
 
   var LContinueRunning := FRunning;
@@ -1336,48 +2086,48 @@ begin
     FDelayTimeLeft := FDelayTimeLeft - ADeltaTime;
     if FDelayTimeLeft <= 0 then begin
       FDelayTimeLeft := 0;
-      FirstFrame;
+      DoFirstFrame;
       ProcessAnimation;
       DoProcess;
     end;
     Exit;
   end;
 
-  if FInverse then FTime := FTime - ADeltaTime
-  else FTime := FTime + ADeltaTime;
+  if FInverse then FCurrentTime := FCurrentTime - ADeltaTime
+  else FCurrentTime := FCurrentTime + ADeltaTime;
 
-  if FTime >= FDuration then begin
-    FTime := FDuration;
+  if FCurrentTime >= FDuration then begin
+    FCurrentTime := FDuration;
     if FLoop then begin
       if FAutoReverse then begin
         FInverse := True;
-        FTime := FDuration;
+        FCurrentTime := FDuration;
       end
-      else FTime := 0;
+      else FCurrentTime := 0;
     end
     else begin
       if FAutoReverse and (not FDidAutoReverse) then begin
         FDidAutoReverse := true;
         FInverse := True;
-        FTime := FDuration;
+        FCurrentTime := FDuration;
       end
       else LContinueRunning := False;
     end;
   end
-  else if FTime <= 0 then begin
-    FTime := 0;
+  else if FCurrentTime <= 0 then begin
+    FCurrentTime := 0;
     if FLoop then begin
       if FAutoReverse then begin
         FInverse := False;
-        FTime := 0;
+        FCurrentTime := 0;
       end
-      else FTime := FDuration;
+      else FCurrentTime := FDuration;
     end
     else begin
       if FAutoReverse and (not FDidAutoReverse) then begin
         FDidAutoReverse := True;
         FInverse := False;
-        FTime := 0;
+        FCurrentTime := 0;
       end
       else LContinueRunning := False;
     end;
@@ -1398,58 +2148,40 @@ end;
 {***************************************}
 procedure TALInterpolatedAnimation.Start;
 begin
-  if (FRunning) then
-    Exit;
-  FEnabled := True;
-  FRunning := True;
+  If FPaused then Resume;
+  if FRunning then Exit;
+  inherited;
   FDidAutoReverse := False;
   FSavedInverse := FInverse;
-  if FInverse then FTime := FDuration
-  else FTime := 0;
+  if FInverse then FCurrentTime := FDuration
+  else FCurrentTime := 0;
   FDelayTimeLeft := FDelay;
   if FDelay = 0 then begin
-    FirstFrame;
+    DoFirstFrame;
     ProcessAnimation;
     DoProcess;
   end;
-
-  if AniThread = nil then
-    FAniThread := TALAniThread.Create;
-
-  AniThread.AddAnimation(Self);
-  if not AniThread.Enabled then
-    Stop;
 end;
 
 {**************************************}
 procedure TALInterpolatedAnimation.Stop;
 begin
-  if not FRunning then
-    Exit;
-
-  if AniThread <> nil then
-    AniThread.RemoveAnimation(Self);
-
+  if not FRunning then Exit;
+  inherited;
   FInverse := FSavedInverse;
-  if FInverse then FTime := 0
-  else FTime := FDuration;
+  if FInverse then FCurrentTime := 0
+  else FCurrentTime := FDuration;
   ProcessAnimation;
   DoProcess;
-  FRunning := False;
   DoFinish;
 end;
 
 {***********************************************}
 procedure TALInterpolatedAnimation.StopAtCurrent;
 begin
-  if not FRunning then
-    Exit;
-
-  if AniThread <> nil then
-    AniThread.RemoveAnimation(Self);
-
+  if not FRunning then Exit;
+  inherited;
   FInverse := FSavedInverse;
-  FRunning := False;
   DoFinish;
 end;
 
@@ -1459,33 +2191,45 @@ begin
   Result := 0;
   if (FDuration > 0) and (FDelayTimeLeft <= 0) then
   begin
-    case FInterpolation of
-      TALInterpolationType.Linear:
-        Result := InterpolateLinear(FTime, 0, 1, FDuration);
-      TALInterpolationType.Quadratic:
-        Result := InterpolateQuad(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Cubic:
-        Result := InterpolateCubic(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Quartic:
-        Result := InterpolateQuart(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Quintic:
-        Result := InterpolateQuint(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Sinusoidal:
-        Result := InterpolateSine(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Exponential:
-        Result := InterpolateExpo(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Circular:
-        Result := InterpolateCirc(FTime, 0, 1, FDuration, FAnimationType);
-      TALInterpolationType.Elastic:
-        Result := InterpolateElastic(FTime, 0, 1, FDuration, 0, 0, FAnimationType);
-      TALInterpolationType.Back:
-        Result := InterpolateBack(FTime, 0, 1, FDuration, fOvershoot, FAnimationType);
-      TALInterpolationType.Bounce:
-        //the InterpolateBounce is a little buggy
-        //Result := InterpolateBounce(FTime, 0, 1, FDuration, FAnimationType);
-        Result := ALInterpolateBounce(FTime, FDuration, FAnimationType);
-      TALInterpolationType.Custom:
-        Result := DoCustomInterpolation;
+    case FInterpolationType of
+      TALInterpolationType.Linear: Result := InterpolateLinear(FCurrentTime, 0, 1, FDuration);
+      TALInterpolationType.Quadratic: Result := InterpolateQuad(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Cubic: Result := InterpolateCubic(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Quartic: Result := InterpolateQuart(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Quintic: Result := InterpolateQuint(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Sinusoidal: Result := InterpolateSine(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Exponential: Result := InterpolateExpo(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Circular: Result := InterpolateCirc(FCurrentTime, 0, 1, FDuration, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Elastic: Result := InterpolateElastic(FCurrentTime, 0, 1, FDuration, 0, 0, TAnimationType(FInterpolationMode));
+      TALInterpolationType.Back: Result := InterpolateBack(FCurrentTime, 0, 1, FDuration, FInterpolationParams.Overshoot{Overshoot}, TAnimationType(FInterpolationMode));
+      //the InterpolateBounce is a little buggy
+      //Result := InterpolateBounce(FCurrentTime, 0, 1, FDuration, FInterpolationMode);
+      TALInterpolationType.Bounce: Result := ALInterpolateBounce(FCurrentTime, FDuration, FInterpolationMode);
+      TALInterpolationType.Bezier: begin
+        if FInterpolationParams.FCubicBezier = nil then
+          FInterpolationParams.FCubicBezier := TALCubicBezier.Create(
+                                                 FInterpolationParams.BezierX1,
+                                                 FInterpolationParams.BezierY1,
+                                                 FInterpolationParams.BezierX2,
+                                                 FInterpolationParams.BezierY2);
+        result := FInterpolationParams.FCubicBezier.SolveForY(FCurrentTime / FDuration);
+      end;
+      TALInterpolationType.Material3ExpressiveFastSpatial: Result := ALInterpolateMaterial3ExpressiveFastSpatial(FCurrentTime, FDuration);
+      TALInterpolationType.Material3ExpressiveDefaultSpatial: Result := ALInterpolateMaterial3ExpressiveDefaultSpatial(FCurrentTime, FDuration);
+      TALInterpolationType.Material3ExpressiveSlowSpatial: Result := ALInterpolateMaterial3ExpressiveSlowSpatial(FCurrentTime, FDuration);
+      TALInterpolationType.Material3ExpressiveFastEffects: Result := ALInterpolateMaterial3ExpressiveFastEffects(FCurrentTime, FDuration);
+      TALInterpolationType.Material3ExpressiveDefaultEffects: Result := ALInterpolateMaterial3ExpressiveDefaultEffects(FCurrentTime, FDuration);
+      TALInterpolationType.Material3ExpressiveSlowEffects: Result := ALInterpolateMaterial3ExpressiveSlowEffects(FCurrentTime, FDuration);
+      TALInterpolationType.Material3StandardFastSpatial: Result := ALInterpolateMaterial3StandardFastSpatial(FCurrentTime, FDuration);
+      TALInterpolationType.Material3StandardDefaultSpatial: Result := ALInterpolateMaterial3StandardDefaultSpatial(FCurrentTime, FDuration);
+      TALInterpolationType.Material3StandardSlowSpatial: Result := ALInterpolateMaterial3StandardSlowSpatial(FCurrentTime, FDuration);
+      TALInterpolationType.Material3StandardFastEffects: Result := ALInterpolateMaterial3StandardFastEffects(FCurrentTime, FDuration);
+      TALInterpolationType.Material3StandardDefaultEffects: Result := ALInterpolateMaterial3StandardDefaultEffects(FCurrentTime, FDuration);
+      TALInterpolationType.Material3StandardSlowEffects: Result := ALInterpolateMaterial3StandardSlowEffects(FCurrentTime, FDuration);
+      TALInterpolationType.Material3Emphasized: Result := ALInterpolateMaterial3Emphasized(FCurrentTime, FDuration);
+      TALInterpolationType.Material3EmphasizedDecelerate: Result := ALInterpolateMaterial3EmphasizedDecelerate(FCurrentTime, FDuration);
+      TALInterpolationType.Material3EmphasizedAccelerate: Result := ALInterpolateMaterial3EmphasizedAccelerate(FCurrentTime, FDuration);
+      TALInterpolationType.Custom: Result := DoCustomInterpolation;
     end;
   end;
 end;
@@ -1499,13 +2243,75 @@ begin
     result := 0;
 end;
 
+{**********************************************************}
+function TALInterpolatedAnimation.IsDurationStored: Boolean;
+begin
+  result := not SameValue(fDuration, DefaultDuration, TimeEpsilon);
+end;
+
+{*******************************************************************}
+function TALInterpolatedAnimation.IsInterpolationTypeStored: Boolean;
+begin
+  result := fInterpolationType <> DefaultInterpolationType;
+end;
+
+{*******************************************************************}
+function TALInterpolatedAnimation.IsInterpolationModeStored: Boolean;
+begin
+  result := fInterpolationMode <> DefaultInterpolationMode;
+end;
+
+{***********************************************************}
+function TALInterpolatedAnimation.GetDefaultDuration: Single;
+Begin
+  Result := 0.2;
+end;
+
+{**********************************************************************************}
+function TALInterpolatedAnimation.GetDefaultInterpolationType: TALInterpolationType;
+Begin
+  Result := TALInterpolationType.Linear;
+end;
+
+{**********************************************************************************}
+function TALInterpolatedAnimation.GetDefaultInterpolationMode: TALInterpolationMode;
+Begin
+  Result := TALInterpolationMode.In;
+end;
+
+{**********************************************************************************************}
+procedure TALInterpolatedAnimation.SetInterpolationParams(const AValue: TALInterpolationParams);
+begin
+  FInterpolationParams.Assign(AValue);
+end;
+
 {***********************************}
 constructor TALFloatAnimation.Create;
 begin
   inherited;
-  FStartValue := 0;
-  FStopValue := 0;
-  fCurrentValue := 0;
+  FStartValue := DefaultStartValue;
+  FStopValue := DefaultStopValue;
+  fCurrentValue := FStartValue;
+end;
+
+{******************************************************}
+procedure TALFloatAnimation.Assign(Source: TPersistent);
+begin
+  if Source is TALFloatAnimation then begin
+    StartValue := TALFloatAnimation(Source).StartValue;
+    StopValue := TALFloatAnimation(Source).StopValue;
+    inherited Assign(Source);
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{********************************}
+procedure TALFloatAnimation.Reset;
+begin
+  StartValue := DefaultStartValue;
+  StopValue := DefaultStopValue;
+  inherited;
 end;
 
 {********************************}
@@ -1523,13 +2329,57 @@ begin
   fCurrentValue := FStartValue + (FStopValue - FStartValue) * NormalizedTime;
 end;
 
+{*****************************************************}
+function TALFloatAnimation.IsStartValueStored: Boolean;
+begin
+  result := not SameValue(fStartValue, DefaultStartValue);
+end;
+
+{****************************************************}
+function TALFloatAnimation.IsStopValueStored: Boolean;
+begin
+  result := not SameValue(fStopValue, DefaultStopValue);
+end;
+
+{******************************************************}
+function TALFloatAnimation.GetDefaultStartValue: Single;
+Begin
+  Result := 0;
+end;
+
+{*****************************************************}
+function TALFloatAnimation.GetDefaultStopValue: Single;
+Begin
+  Result := 0;
+end;
+
 {***********************************}
 constructor TALColorAnimation.Create;
 begin
   inherited;
-  FStartValue := $FFFFFFFF;
-  FStopValue := $FFFFFFFF;
-  fCurrentValue := $FFFFFFFF;
+  FStartValue := DefaultStartValue;
+  FStopValue := DefaultStopValue;
+  fCurrentValue := FStartValue;
+end;
+
+{******************************************************}
+procedure TALColorAnimation.Assign(Source: TPersistent);
+begin
+  if Source is TALColorAnimation then begin
+    StartValue := TALColorAnimation(Source).StartValue;
+    StopValue := TALColorAnimation(Source).StopValue;
+    inherited Assign(Source);
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{********************************}
+procedure TALColorAnimation.Reset;
+begin
+  StartValue := DefaultStartValue;
+  StopValue := DefaultStopValue;
+  inherited;
 end;
 
 {********************************}
@@ -1545,6 +2395,30 @@ end;
 procedure TALColorAnimation.ProcessAnimation;
 begin
   fCurrentValue := ALInterpolateColor(FStartValue, FStopValue, NormalizedTime);
+end;
+
+{*****************************************************}
+function TALColorAnimation.IsStartValueStored: Boolean;
+begin
+  result := fStartValue <> DefaultStartValue;
+end;
+
+{****************************************************}
+function TALColorAnimation.IsStopValueStored: Boolean;
+begin
+  result := fStopValue <> DefaultStopValue;
+end;
+
+{***********************************************************}
+function TALColorAnimation.GetDefaultStartValue: TAlphaColor;
+Begin
+  Result := $FFFFFFFF;
+end;
+
+{**********************************************************}
+function TALColorAnimation.GetDefaultStopValue: TAlphaColor;
+Begin
+  Result := $FFFFFFFF;
 end;
 
 {********************************************************}
@@ -1743,12 +2617,6 @@ begin
     result := 0;
 end;
 
-{******************************************************************}
-function TALFloatPropertyAnimation.getAnimationType: TAnimationType;
-begin
-  result := fFloatAnimation.AnimationType;
-end;
-
 {*********************************************************}
 function TALFloatPropertyAnimation.getAutoReverse: Boolean;
 begin
@@ -1773,10 +2641,22 @@ begin
   result := FEnabled;
 end;
 
-{************************************************************************}
-function TALFloatPropertyAnimation.getInterpolation: TALInterpolationType;
+{****************************************************************************}
+function TALFloatPropertyAnimation.getInterpolationType: TALInterpolationType;
 begin
-  result := fFloatAnimation.Interpolation;
+  result := fFloatAnimation.InterpolationType;
+end;
+
+{****************************************************************************}
+function TALFloatPropertyAnimation.getInterpolationMode: TALInterpolationMode;
+begin
+  result := fFloatAnimation.InterpolationMode;
+end;
+
+{********************************************************************************}
+function TALFloatPropertyAnimation.getInterpolationParams: TALInterpolationParams;
+begin
+  Result := fFloatAnimation.InterpolationParams;
 end;
 
 {*****************************************************}
@@ -1797,16 +2677,10 @@ begin
   result := fFloatAnimation.CurrentTime;
 end;
 
-{******************************************************}
-function TALFloatPropertyAnimation.getOvershoot: Single;
+{****************************************************}
+function TALFloatPropertyAnimation.getPaused: Boolean;
 begin
-  result := fFloatAnimation.Overshoot;
-end;
-
-{***************************************************}
-function TALFloatPropertyAnimation.getPause: Boolean;
-begin
-  result := fFloatAnimation.Pause;
+  result := fFloatAnimation.Paused;
 end;
 
 {*****************************************************}
@@ -1831,18 +2705,6 @@ end;
 function TALFloatPropertyAnimation.GetCurrentValue: Single;
 begin
   result := fFloatAnimation.CurrentValue;
-end;
-
-{**********************************************************}
-function TALFloatPropertyAnimation.OvershootStored: Boolean;
-begin
-  result := not sameValue(fFloatAnimation.Overshoot, 0);
-end;
-
-{********************************************************************************}
-procedure TALFloatPropertyAnimation.setAnimationType(const Value: TAnimationType);
-begin
-  fFloatAnimation.AnimationType := Value;
 end;
 
 {***********************************************************************}
@@ -1874,10 +2736,22 @@ begin
   end;
 end;
 
-{**************************************************************************************}
-procedure TALFloatPropertyAnimation.setInterpolation(const Value: TALInterpolationType);
+{******************************************************************************************}
+procedure TALFloatPropertyAnimation.setInterpolationType(const Value: TALInterpolationType);
 begin
-  fFloatAnimation.Interpolation := Value;
+  fFloatAnimation.InterpolationType := Value;
+end;
+
+{******************************************************************************************}
+procedure TALFloatPropertyAnimation.setInterpolationMode(const Value: TALInterpolationMode);
+begin
+  fFloatAnimation.InterpolationMode := Value;
+end;
+
+{**********************************************************************************************}
+procedure TALFloatPropertyAnimation.setInterpolationParams(const Value: TALInterpolationParams);
+begin
+  fFloatAnimation.InterpolationParams := Value;
 end;
 
 {*******************************************************************}
@@ -1890,18 +2764,6 @@ end;
 procedure TALFloatPropertyAnimation.setLoop(const Value: Boolean);
 begin
   fFloatAnimation.Loop := Value;
-end;
-
-{********************************************************************}
-procedure TALFloatPropertyAnimation.setOvershoot(const Value: Single);
-begin
-  fFloatAnimation.Overshoot := Value;
-end;
-
-{*****************************************************************}
-procedure TALFloatPropertyAnimation.setPause(const Value: Boolean);
-begin
-  fFloatAnimation.Pause := Value;
 end;
 
 {*********************************************************************}
@@ -2015,12 +2877,6 @@ begin
     result := 0;
 end;
 
-{******************************************************************}
-function TALColorPropertyAnimation.getAnimationType: TAnimationType;
-begin
-  result := fColorAnimation.AnimationType;
-end;
-
 {*********************************************************}
 function TALColorPropertyAnimation.getAutoReverse: Boolean;
 begin
@@ -2045,10 +2901,22 @@ begin
   result := FEnabled;
 end;
 
-{************************************************************************}
-function TALColorPropertyAnimation.getInterpolation: TALInterpolationType;
+{****************************************************************************}
+function TALColorPropertyAnimation.getInterpolationType: TALInterpolationType;
 begin
-  result := fColorAnimation.Interpolation;
+  result := fColorAnimation.InterpolationType;
+end;
+
+{****************************************************************************}
+function TALColorPropertyAnimation.getInterpolationMode: TALInterpolationMode;
+begin
+  result := fColorAnimation.InterpolationMode;
+end;
+
+{********************************************************************************}
+function TALColorPropertyAnimation.getInterpolationParams: TALInterpolationParams;
+begin
+  Result := fColorAnimation.InterpolationParams;
 end;
 
 {*****************************************************}
@@ -2069,16 +2937,10 @@ begin
   result := fColorAnimation.CurrentTime;
 end;
 
-{******************************************************}
-function TALColorPropertyAnimation.getOvershoot: Single;
+{****************************************************}
+function TALColorPropertyAnimation.getPaused: Boolean;
 begin
-  result := fColorAnimation.Overshoot;
-end;
-
-{***************************************************}
-function TALColorPropertyAnimation.getPause: Boolean;
-begin
-  result := fColorAnimation.Pause;
+  result := fColorAnimation.Paused;
 end;
 
 {*****************************************************}
@@ -2103,18 +2965,6 @@ end;
 function TALColorPropertyAnimation.GetCurrentValue: TAlphaColor;
 begin
   result := fColorAnimation.CurrentValue;
-end;
-
-{**********************************************************}
-function TALColorPropertyAnimation.OvershootStored: Boolean;
-begin
-  result := not sameValue(fColorAnimation.Overshoot, 0);
-end;
-
-{********************************************************************************}
-procedure TALColorPropertyAnimation.setAnimationType(const Value: TAnimationType);
-begin
-  fColorAnimation.AnimationType := Value;
 end;
 
 {***********************************************************************}
@@ -2146,10 +2996,22 @@ begin
   end;
 end;
 
-{**************************************************************************************}
-procedure TALColorPropertyAnimation.setInterpolation(const Value: TALInterpolationType);
+{******************************************************************************************}
+procedure TALColorPropertyAnimation.setInterpolationType(const Value: TALInterpolationType);
 begin
-  fColorAnimation.Interpolation := Value;
+  fColorAnimation.InterpolationType := Value;
+end;
+
+{******************************************************************************************}
+procedure TALColorPropertyAnimation.setInterpolationMode(const Value: TALInterpolationMode);
+begin
+  fColorAnimation.InterpolationMode := Value;
+end;
+
+{**********************************************************************************************}
+procedure TALColorPropertyAnimation.setInterpolationParams(const Value: TALInterpolationParams);
+begin
+  fColorAnimation.InterpolationParams := Value;
 end;
 
 {*******************************************************************}
@@ -2162,18 +3024,6 @@ end;
 procedure TALColorPropertyAnimation.setLoop(const Value: Boolean);
 begin
   fColorAnimation.Loop := Value;
-end;
-
-{********************************************************************}
-procedure TALColorPropertyAnimation.setOvershoot(const Value: Single);
-begin
-  fColorAnimation.Overshoot := Value;
-end;
-
-{*****************************************************************}
-procedure TALColorPropertyAnimation.setPause(const Value: Boolean);
-begin
-  fColorAnimation.Pause := Value;
 end;
 
 {**************************************************************************}
@@ -2399,11 +3249,15 @@ constructor TALSpringForceAnimation.Create;
 begin
   inherited Create;
   FSpringForce := TALSpringForce.Create;
-  FInitialVelocity := 0.0;
+  FInitialVelocity := DefaultInitialVelocity;
   FCurrentVelocity := 0.0;
-  FStartValue := 0.0;
-  fCurrentValue := 0.0;
+  FStartValue := DefaultStartValue;
+  fCurrentValue := FStartValue;
   FDeltaTime := 0.0;
+  StopValue := DefaultStopValue;
+  Stiffness := DefaultStiffness;
+  DampingRatio := DefaultDampingRatio;
+  ValueThreshold := DefaultValueThreshold;
 end;
 
 {*****************************************}
@@ -2411,6 +3265,34 @@ destructor TALSpringForceAnimation.Destroy;
 begin
   ALFreeAndNil(FSpringForce);
   inherited Destroy;
+end;
+
+{************************************************************}
+procedure TALSpringForceAnimation.Assign(Source: TPersistent);
+begin
+  if Source is TALSpringForceAnimation then begin
+    InitialVelocity := TALSpringForceAnimation(Source).InitialVelocity;
+    StartValue := TALSpringForceAnimation(Source).StartValue;
+    StopValue := TALSpringForceAnimation(Source).StopValue;
+    Stiffness := TALSpringForceAnimation(Source).Stiffness;
+    DampingRatio := TALSpringForceAnimation(Source).DampingRatio;
+    ValueThreshold := TALSpringForceAnimation(Source).ValueThreshold;
+    inherited Assign(Source);
+  end
+  else
+    ALAssignError(Source{ASource}, Self{ADest});
+end;
+
+{**************************************}
+procedure TALSpringForceAnimation.Reset;
+begin
+  InitialVelocity := DefaultInitialVelocity;
+  StartValue := DefaultStartValue;
+  StopValue := DefaultStopValue;
+  Stiffness := DefaultStiffness;
+  DampingRatio := DefaultDampingRatio;
+  ValueThreshold := DefaultValueThreshold;
+  inherited;
 end;
 
 {*************************************************}
@@ -2421,10 +3303,10 @@ begin
   FCurrentValue := LMassState.Value;
 end;
 
-{*****************************************************************************}
-procedure TALSpringForceAnimation.ProcessTick(const ATime, ADeltaTime: Double);
+{**********************************************************************}
+procedure TALSpringForceAnimation.ProcessTick(const ADeltaTime: Double);
 begin
-  if (not FRunning) or FPause then
+  if (not FRunning) or FPaused then
     Exit;
 
   var LContinueRunning := FRunning;
@@ -2433,14 +3315,14 @@ begin
     FDelayTimeLeft := FDelayTimeLeft - ADeltaTime;
     if FDelayTimeLeft <= 0 then begin
       FDelayTimeLeft := 0;
-      FirstFrame;
+      DoFirstFrame;
       ProcessAnimation;
       DoProcess;
     end;
     Exit;
   end;
 
-  FTime := FTime + ADeltaTime;
+  FCurrentTime := FCurrentTime + ADeltaTime;
   FDeltaTime := ADeltaTime;
 
   ProcessAnimation;
@@ -2453,7 +3335,7 @@ begin
         FStartValue := GetStopValue;
         SetStopValue(LSavedStartValue);
       end;
-      FTime := 0;
+      FCurrentTime := 0;
       FCurrentValue := FStartValue;
       FCurrentVelocity := FInitialVelocity;
     end
@@ -2464,7 +3346,7 @@ begin
         var LSavedStartValue := FStartValue;
         FStartValue := GetStopValue;
         SetStopValue(LSavedStartValue);
-        FTime := 0;
+        FCurrentTime := 0;
         FCurrentValue := FStartValue;
         FCurrentVelocity := FInitialVelocity;
       end
@@ -2491,10 +3373,9 @@ end;
 {**************************************}
 procedure TALSpringForceAnimation.Start;
 begin
-  if (FRunning) then
-    Exit;
-  FEnabled := True;
-  FRunning := True;
+  If FPaused then Resume;
+  if FRunning then Exit;
+  inherited;
   FDidAutoReverse := False;
   FSavedInverse := FInverse;
   if FInverse then begin
@@ -2502,34 +3383,23 @@ begin
     FStartValue := GetStopValue;
     SetStopValue(LSavedStartValue);
   end;
-  FTime := 0;
+  FCurrentTime := 0;
   FCurrentValue := FStartValue;
   FCurrentVelocity := FInitialVelocity;
   FDelayTimeLeft := FDelay;
   if FDelay = 0 then begin
-    FirstFrame;
+    DoFirstFrame;
     FDeltaTime := 0;
     ProcessAnimation;
     DoProcess;
   end;
-
-  if AniThread = nil then
-    FAniThread := TALAniThread.Create;
-
-  AniThread.AddAnimation(Self);
-  if not AniThread.Enabled then
-    Stop;
 end;
 
 {*************************************}
 procedure TALSpringForceAnimation.Stop;
 begin
-  if not FRunning then
-    Exit;
-
-  if AniThread <> nil then
-    AniThread.RemoveAnimation(Self);
-
+  if not FRunning then Exit;
+  inherited;
   if FInverse then begin
     var LSavedStartValue := FStartValue;
     FStartValue := GetStopValue;
@@ -2541,19 +3411,14 @@ begin
   FDeltaTime := 0;
   ProcessAnimation;
   DoProcess;
-  FRunning := False;
   DoFinish;
 end;
 
 {**********************************************}
 procedure TALSpringForceAnimation.StopAtCurrent;
 begin
-  if not FRunning then
-    Exit;
-
-  if AniThread <> nil then
-    AniThread.RemoveAnimation(Self);
-
+  if not FRunning then Exit;
+  inherited;
   if FInverse then begin
     var LSavedStartValue := FStartValue;
     FStartValue := GetStopValue;
@@ -2561,8 +3426,79 @@ begin
   end;
   FInverse := FSavedInverse;
   FCurrentVelocity := 0;
-  FRunning := False;
   DoFinish;
+end;
+
+{****************************************************************}
+function TALSpringForceAnimation.IsInitialVelocityStored: Boolean;
+begin
+  result := not SameValue(fInitialVelocity, DefaultInitialVelocity);
+end;
+
+{***********************************************************}
+function TALSpringForceAnimation.IsStartValueStored: Boolean;
+begin
+  result := not SameValue(fStartValue, DefaultStartValue);
+end;
+
+{**********************************************************}
+function TALSpringForceAnimation.IsStopValueStored: Boolean;
+begin
+  result := not SameValue(StopValue, DefaultStopValue);
+end;
+
+{**********************************************************}
+function TALSpringForceAnimation.IsStiffnessStored: Boolean;
+begin
+  result := not SameValue(Stiffness, DefaultStiffness);
+end;
+
+{*************************************************************}
+function TALSpringForceAnimation.IsDampingRatioStored: Boolean;
+begin
+  result := not SameValue(DampingRatio, DefaultDampingRatio);
+end;
+
+{***************************************************************}
+function TALSpringForceAnimation.IsValueThresholdStored: Boolean;
+begin
+  result := not SameValue(ValueThreshold, DefaultValueThreshold);
+end;
+
+{*****************************************************************}
+function TALSpringForceAnimation.GetDefaultInitialVelocity: Single;
+Begin
+  Result := 0.0;
+end;
+
+{************************************************************}
+function TALSpringForceAnimation.GetDefaultStartValue: Single;
+Begin
+  Result := 0.0;
+end;
+
+{***********************************************************}
+function TALSpringForceAnimation.GetDefaultStopValue: Single;
+Begin
+  Result := 0.0;
+end;
+
+{***********************************************************}
+function TALSpringForceAnimation.GetDefaultStiffness: Single;
+Begin
+  Result := TALSpringForce.STIFFNESS_MEDIUM;
+end;
+
+{**************************************************************}
+function TALSpringForceAnimation.GetDefaultDampingRatio: Single;
+Begin
+  Result := TALSpringForce.DAMPING_RATIO_MEDIUM_BOUNCY;
+end;
+
+{****************************************************************}
+function TALSpringForceAnimation.GetDefaultValueThreshold: Single;
+Begin
+  Result := TALSpringForce.MIN_VISIBLE_CHANGE_PIXELS * TALSpringForce.THRESHOLD_MULTIPLIER;
 end;
 
 {****************************************************************}
@@ -2718,10 +3654,10 @@ begin
   result := FSpringForceAnimation.CurrentTime;
 end;
 
-{*********************************************************}
-function TALSpringForcePropertyAnimation.getPause: Boolean;
+{**********************************************************}
+function TALSpringForcePropertyAnimation.getPaused: Boolean;
 begin
-  result := FSpringForceAnimation.Pause;
+  result := FSpringForceAnimation.Paused;
 end;
 
 {***********************************************************}
@@ -2813,12 +3749,6 @@ begin
   FSpringForceAnimation.Loop := Value;
 end;
 
-{***********************************************************************}
-procedure TALSpringForcePropertyAnimation.setPause(const Value: Boolean);
-begin
-  FSpringForceAnimation.Pause := Value;
-end;
-
 {***************************************************************************}
 procedure TALSpringForcePropertyAnimation.SetStartValue(const Value: Single);
 begin
@@ -2899,131 +3829,6 @@ begin
   FSpringForceAnimation.StopAtCurrent;
 end;
 
-{********************************************************}
-constructor TALCubicBezier.Create(X1, Y1, X2, Y2: Double);
-begin
-  P1 := TALPointD.Create(X1, Y1);
-  P2 := TALPointD.Create(X2, Y2);
-  InitCoefficients(P1, P2);
-  InitSpline;
-end;
-
-{*****************************************************************}
-procedure TALCubicBezier.InitCoefficients(const P1, P2: TALPointD);
-begin
-  // Calculate the polynomial coefficients, implicit first and last control
-  // points are (0,0) and (1,1). First, for x.
-  c.x := 3 * p1.x;
-  b.x := 3 * (p2.x - p1.x) - c.x;
-  a.x := 1 - c.x - b.x;
-
-  // Now for y.
-  c.y := toFinite(3 * p1.y);
-  b.y := toFinite(3 * (p2.y - p1.y) - c.y);
-  a.y := toFinite(1 - c.y - b.y);
-end;
-
-{**********************************}
-procedure TALCubicBezier.InitSpline;
-begin
-  const deltaT = 1 / (CUBIC_BEZIER_SPLINE_SAMPLES - 1);
-  for var i := 0 to CUBIC_BEZIER_SPLINE_SAMPLES - 1 do
-    splineSamples[i] := sampleCurveX(i * deltaT);
-end;
-
-{******************************************************}
-function TALCubicBezier.SampleCurveX(T: Double): Double;
-begin
-  // `ax t^3 + bx t^2 + cx t' expanded using Horner's rule.
-  // The x values are in the range [0, 1]. So it isn't needed toFinite
-  // clamping.
-  // https://drafts.csswg.org/css-easing-1/#funcdef-cubic-bezier-easing-function-cubic-bezier
-  result := ((a.x * t + b.x) * t + c.x) * t;
-end;
-
-{****************************************************************}
-function TALCubicBezier.SampleCurveDerivativeX(T: Double): Double;
-begin
-  Result := (3 * a.x * t + 2 * b.x) * t + c.x;
-end;
-
-{******************************************************}
-function TALCubicBezier.SampleCurveY(T: Double): Double;
-begin
-  Result := toFinite(((a.y * t + b.y) * t + c.y) * t);
-end;
-
-{**************************************************}
-function TALCubicBezier.ToFinite(N: Double): Double;
-begin
-  if IsInfinite(N) then
-    Result := IfThen(N > 0, MaxInt, -MaxInt)
-  else
-    Result := N;
-end;
-
-{*****************************************************}
-function TALCubicBezier.SolveCurveX(X: Double): Double;
-begin
-  var t0: Double := NAN;
-  var t1: Double := NAN;
-  var x2: Double{ := NAN};
-  var d2: Double;
-
-  var t2: Double := x;
-
-  // Linear interpolation of spline curve for initial guess.
-  const deltaT = 1 / (CUBIC_BEZIER_SPLINE_SAMPLES - 1);
-  for var i := 1 to CUBIC_BEZIER_SPLINE_SAMPLES - 1 do begin
-    if (x <= splineSamples[i]) then begin
-      t1 := deltaT * i;
-      t0 := t1 - deltaT;
-      t2 := t0 + (t1 - t0) * (x - splineSamples[i - 1]) / (splineSamples[i] - splineSamples[i - 1]);
-      break;
-    end;
-  end;
-
-  // Perform a few iterations of Newton's method -- normally very fast.
-  // See https://en.wikipedia.org/wiki/Newton%27s_method.
-  for var i := 0 to MAX_NEWTON_METHOD_ITERATIONS - 1 do begin
-    x2 := sampleCurveX(t2) - x;
-    if (abs(x2) < BEZIER_EPSILON) then
-      exit(t2);
-    d2 := sampleCurveDerivativeX(t2);
-    if (abs(d2) < BEZIER_EPSILON) then
-      break;
-    t2 := t2 - x2 / d2;
-  end;
-  if ((not IsNan(x2)) and (abs(x2) < BEZIER_EPSILON)) then
-    exit(t2);
-
-  // Fall back to the bisection method for reliability.
-  if ((not IsNan(t0)) and (not IsNan(t1))) then begin
-    while (t0 < t1) do begin
-      x2 := sampleCurveX(t2);
-      if (abs(x2 - x) < BEZIER_EPSILON) then
-        exit(t2);
-
-      if (x > x2) then
-        t0 := t2
-      else
-        t1 := t2;
-
-      t2 := (t1 + t0) * 0.5;
-    end;
-  end;
-
-  // Failed to solve.
-  result := t2;
-end;
-
-{***************************************************}
-function TALCubicBezier.SolveForY(X: Double): Double;
-begin
-  x := max(0, min(1, x));
-  Result := sampleCurveY(solveCurveX(x));
-end;
-
 {*****************}
 procedure Register;
 begin
@@ -3035,14 +3840,60 @@ end;
 
 {************}
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Ani','initialization');
+  {$ENDIF}
   RegisterFmxClasses([TALFloatPropertyAnimation]);
   RegisterFmxClasses([TALColorPropertyAnimation]);
   RegisterFmxClasses([TALSpringForcePropertyAnimation]);
   TALAnimation.AniFrameRate := TALAnimation.DefaultAniFrameRate;
   ALInitViscousFluid;
+  ALCubicBezierMaterial3ExpressiveFastSpatial := TALCubicBezier.Create(0.42, 1.67, 0.21, 0.90);
+  ALCubicBezierMaterial3ExpressiveDefaultSpatial := TALCubicBezier.Create(0.38, 1.21, 0.22, 1.00);
+  ALCubicBezierMaterial3ExpressiveSlowSpatial := TALCubicBezier.Create(0.39, 1.29, 0.35, 0.98);
+  ALCubicBezierMaterial3ExpressiveFastEffects := TALCubicBezier.Create(0.31, 0.94, 0.34, 1.00);
+  ALCubicBezierMaterial3ExpressiveDefaultEffects := TALCubicBezier.Create(0.34, 0.80, 0.34, 1.00);
+  ALCubicBezierMaterial3ExpressiveSlowEffects := TALCubicBezier.Create(0.34, 0.88, 0.34, 1.00);
+  ALCubicBezierMaterial3StandardFastSpatial := TALCubicBezier.Create(0.27, 1.06, 0.18, 1.00);
+  ALCubicBezierMaterial3StandardDefaultSpatial := TALCubicBezier.Create(0.27, 1.06, 0.18, 1.00);
+  ALCubicBezierMaterial3StandardSlowSpatial := TALCubicBezier.Create(0.27, 1.06, 0.18, 1.00);
+  ALCubicBezierMaterial3StandardFastEffects := TALCubicBezier.Create(0.31, 0.94, 0.34, 1.00);
+  ALCubicBezierMaterial3StandardDefaultEffects := TALCubicBezier.Create(0.34, 0.80, 0.34, 1.00);
+  ALCubicBezierMaterial3StandardSlowEffects := TALCubicBezier.Create(0.34, 0.88, 0.34, 1.00);
+  ALCubicBezierMaterial3EmphasizedSegment1 := TALCubicBezier.Create(
+                                                0.05/0.166666,
+                                                0.0,
+                                                0.133333/0.166666,
+                                                0.06/0.4);
+  ALCubicBezierMaterial3EmphasizedSegment2 := TALCubicBezier.Create(
+                                                (0.208333 - 0.166666)/(1 - 0.166666),
+                                                (0.82 - 0.4)/(1 - 0.4),
+                                                (0.25 - 0.166666)/(1 - 0.166666),
+                                                (1 - 0.4)/(1 - 0.4));
+  ALCubicBezierMaterial3EmphasizedDecelerate := TALCubicBezier.Create(0.05, 0.7, 0.1, 1.0);
+  ALCubicBezierMaterial3EmphasizedAccelerate := TALCubicBezier.Create(0.3, 0.0, 0.8, 0.15);
 
 {**********}
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Ani','finalization');
+  {$ENDIF}
   TALAnimation.Uninitialize;
+  ALFreeAndNil(ALCubicBezierMaterial3ExpressiveFastSpatial);
+  ALFreeAndNil(ALCubicBezierMaterial3ExpressiveDefaultSpatial);
+  ALFreeAndNil(ALCubicBezierMaterial3ExpressiveSlowSpatial);
+  ALFreeAndNil(ALCubicBezierMaterial3ExpressiveFastEffects);
+  ALFreeAndNil(ALCubicBezierMaterial3ExpressiveDefaultEffects);
+  ALFreeAndNil(ALCubicBezierMaterial3ExpressiveSlowEffects);
+  ALFreeAndNil(ALCubicBezierMaterial3StandardFastSpatial);
+  ALFreeAndNil(ALCubicBezierMaterial3StandardDefaultSpatial);
+  ALFreeAndNil(ALCubicBezierMaterial3StandardSlowSpatial);
+  ALFreeAndNil(ALCubicBezierMaterial3StandardFastEffects);
+  ALFreeAndNil(ALCubicBezierMaterial3StandardDefaultEffects);
+  ALFreeAndNil(ALCubicBezierMaterial3StandardSlowEffects);
+  ALFreeAndNil(ALCubicBezierMaterial3EmphasizedSegment1);
+  ALFreeAndNil(ALCubicBezierMaterial3EmphasizedSegment2);
+  ALFreeAndNil(ALCubicBezierMaterial3EmphasizedDecelerate);
+  ALFreeAndNil(ALCubicBezierMaterial3EmphasizedAccelerate);
 
 end.

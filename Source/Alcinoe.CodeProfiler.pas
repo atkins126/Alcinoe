@@ -1,8 +1,8 @@
 unit Alcinoe.CodeProfiler;
 
-{$I Alcinoe.inc}
-
 interface
+
+{$I Alcinoe.inc}
 
 type
   TALProcMetrics = record
@@ -59,7 +59,9 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.Diagnostics,
-  System.IOUtils;
+  System.IOUtils,
+  Alcinoe.Files,
+  Alcinoe.Common;
 
 {**}
 Type
@@ -246,7 +248,7 @@ begin
     end
     else
     {$ENDIF}
-      ALProcMetricsFilename := TPath.Combine(TPath.GetDocumentsPath, ALCodeProfilerProcMetricsFilename);
+      ALProcMetricsFilename := TPath.Combine(ALGetTempPathW, ALCodeProfilerProcMetricsFilename);
     if TFile.Exists(ALProcMetricsFilename) then TFile.Delete(ALProcMetricsFilename);
   end;
   //--
@@ -363,7 +365,7 @@ end;
 procedure ALCodeProfilerExitProc(const aProcID : Cardinal);
 
   type
-    {$IFNDEF ALCompilerVersionSupported123}
+    {$IFNDEF ALCompilerVersionSupported130}
       {$MESSAGE WARN 'Check if System.Diagnostics.TStopwatch was not updated and adjust the IFDEF'}
     {$ENDIF}
     TStopwatchAccessPrivate = record
@@ -418,7 +420,7 @@ begin
           ParentExecutionID := LProcMetricsStack.FArray[LProcMetricsStackLastIndex].ParentExecutionID;
           ProcID := LProcMetricsStack.FArray[LProcMetricsStackLastIndex].ProcID;
           ThreadID := LProcMetricsStack.FArray[LProcMetricsStackLastIndex].ThreadID;
-          {$IFNDEF ALCompilerVersionSupported123}
+          {$IFNDEF ALCompilerVersionSupported130}
             {$MESSAGE WARN 'Check if System.Diagnostics.TStopwatch.InitStopwatchType was not updated and adjust the IFDEF'}
           {$ENDIF}
           {$IF defined(MSWINDOWS)}
@@ -492,6 +494,9 @@ end;
 {$ENDIF}
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.CodeProfiler','initialization');
+  {$ENDIF}
   ALIsInCodeProfiler := False;
   ALCodeProfilerAppStartTimeStamp := TStopWatch.GetTimeStamp;
   TALStopWatchProcMetrics.ExecutionIDSequence := 0;
@@ -512,6 +517,9 @@ initialization
   {$ENDIF}
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.CodeProfiler','finalization');
+  {$ENDIF}
   {$IF (not defined(IOS)) and (not defined(ANDROID))}
   // At this point, all background threads must have completed.
   ALCodeProfilerPurgeHistories(ALCodeProfilerEnabled{ASaveHistories});

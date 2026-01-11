@@ -11,9 +11,9 @@ if "%ALBaseDir%"=="" (
 set Libraries=%ALBaseDir%\Demos\ALFmxControls\_Source\Android\App\
 set Libraries=%Libraries%;io.magicfoundation.alcinoe:alcinoe-edittext:1.0.0
 set Libraries=%Libraries%;io.magicfoundation.alcinoe:alcinoe-datepicker:1.0.0
-set Libraries=%Libraries%;io.magicfoundation.alcinoe:alcinoe-common:1.0.1
 set Libraries=%Libraries%;androidx.media3:media3-exoplayer:1.5.1
 set Libraries=%Libraries%;androidx.media3:media3-exoplayer-hls:1.5.1
+set Libraries=%Libraries%;androidx.appcompat:appcompat:1.7.0
 
 REM Required by fmx.jar, else the app crash at startup with 
 REM java.lang.NoClassDefFoundError: Failed resolution of: Landroidx/activity/result/contract/ActivityResultContracts$OpenDocument;
@@ -34,6 +34,7 @@ call "%ALBaseDir%\Tools\AndroidMerger\AndroidMerger.exe"^
  -DProj="%ALBaseDir%\Demos\ALFmxControls\_Source\ALFmxControlsDemo.dproj"^
  -AndroidManifest="%ALBaseDir%\Demos\ALFmxControls\_Source\AndroidManifest.template.xml"^
  -DProjNormalizer="%ALBaseDir%\Tools\DProjNormalizer\DProjNormalizer.exe"^
+ -Configurations="Debug;Debug_Skia;Debug_Skia_Vulkan;Debug_Skia_Metal;Debug_ALSkiaEngine;Debug_ALSkiaEngine_Vulkan;Debug_ALSkiaEngine_Metal;Debug_Metal;Debug_OpenGL;Release"^
  -NoInteraction=%NoInteraction%
 IF ERRORLEVEL 1 goto ERROR 
 

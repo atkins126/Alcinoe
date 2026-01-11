@@ -5,10 +5,10 @@
 Setup (ANDROID)
 ---------------
 
-On android you just need to include the library io.magicfoundation.alcinoe:alcinoe-firebase-messaging:1.0.0
+On android you just need to include the library io.magicfoundation.alcinoe:alcinoe-firebase-messaging:1.0.1
 in the project. You also need to include google-services.json. You can do all
 of this with the help of AndroidMerger. you can see an exemple in
-<Alcinoe>\Demos\ALNotificationService\_source\android\MergeLibraries.bat
+<Alcinoe>\Demos\ALFmxNotificationService\_source\android\MergeLibraries.bat
 
 
 Setup (IOS)
@@ -40,12 +40,6 @@ Setup (IOS)
    $(SDKROOT)/../../../../../Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/iphoneos  |  *         |  Library path  |  no
    $(SDKROOT)/../../../../../Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/iphoneos  |  *         |  Library path  |  no
 
-   https://quality.embarcadero.com/browse/RSP-38700
-   You will need to manually copy the content of (assuming c:\SDKs is your BDSPLATFORMSDKSDIR)
-   c:\SDKs\iPhoneOSXXX.sdk\Applications\Xcode.app\Contents\Developer\Toolchains\XcodeDefault.xctoolchain\usr\lib\swift  to  c:\SDKs\iPhoneOSXXX.sdk\usr\lib\swift
-   c:\SDKs\iPhoneOSXXX.sdk\Applications\Xcode.app\Contents\Developer\Toolchains\XcodeDefault.xctoolchain\usr\lib\swift-5.0  to  c:\SDKs\iPhoneOSXXX.sdk\usr\lib\swift-5.0
-   c:\SDKs\iPhoneOSXXX.sdk\Applications\Xcode.app\Contents\Developer\Toolchains\XcodeDefault.xctoolchain\usr\lib\swift-5.5  to  c:\SDKs\iPhoneOSXXX.sdk\usr\lib\swift-5.5
-
    for Ios64 simulator:
    --------------------
 
@@ -54,19 +48,13 @@ Setup (IOS)
    $(SDKROOT)/../../../../../Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/iphonesimulator  |  *         |  Library path  |  no
    $(SDKROOT)/../../../../../Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/iphonesimulator  |  *         |  Library path  |  no
 
-   https://quality.embarcadero.com/browse/RSP-38700
-   You will need to manually copy the content of (assuming c:\SDKs is your BDSPLATFORMSDKSDIR)
-   c:\SDKs\iPhoneSimulatorXXX.sdk\Applications\Xcode.app\Contents\Developer\Toolchains\XcodeDefault.xctoolchain\usr\lib\swift  to  c:\SDKs\iPhoneOSXXX.sdk\usr\lib\swift
-   c:\SDKs\iPhoneSimulatorXXX.sdk\Applications\Xcode.app\Contents\Developer\Toolchains\XcodeDefault.xctoolchain\usr\lib\swift-5.0  to  c:\SDKs\iPhoneOSXXX.sdk\usr\lib\swift-5.0
-   c:\SDKs\iPhoneSimulatorXXX.sdk\Applications\Xcode.app\Contents\Developer\Toolchains\XcodeDefault.xctoolchain\usr\lib\swift-5.5  to  c:\SDKs\iPhoneOSXXX.sdk\usr\lib\swift-5.5
-
 4) In the Project > Option > Building > Delphi Compiler > Linking >
    Options passed to the LD linker add -rpath /usr/lib/swift
    this because of this bug: https://quality.embarcadero.com/browse/RSP-38700
 
 5) You must deploy the GoogleService-Info.plist to the root of the app. You
    can use DeployMan for this. you can see an exemple in
-   <Alcinoe>\Demos\ALNotificationService\_source\ios\DeployMan.bat.
+   <Alcinoe>\Demos\ALFmxNotificationService\_source\ios\DeployMan.bat.
    All info regarding generating the GoogleService-Info.plist can be found at
    https://firebase.google.com/docs/ios/setup
 
@@ -88,16 +76,16 @@ Setup (IOS)
 
    You can use the template of an app extension:
    * Replace in <alcinoe>\References\iOSNotification\iOSNotification.xcodeproj\project.pbxproj
-     all occurences of io.magicfoundation.alcinoe.alnotificationservicedemo by the bundle identifiers
+     all occurences of io.magicfoundation.alcinoe.alfmxnotificationservicedemo by the bundle identifiers
      of your delphi app
-   * copy the content of <alcinoe>\References\iOSNotification\ somewhere in
+   * Copy the content of <alcinoe>\References\iOSNotification\ somewhere in
      the macos. ex: /Users/<username>/Documents/iOSNotification
-   * in the macos run
+   * In the macos run
      xcodebuild -project /Users/<username>/Documents/iOSNotification/iOSNotification.xcodeproj -scheme iOSNotification -configuration Release -sdk iphoneos CONFIGURATION_BUILD_DIR=/Users/<username>/Documents/Compiled
-   * copy the content of /Users/<username>/Documents/Compiled/iOSNotification.app/PlugIns/
+   * Copy the content of /Users/<username>/Documents/Compiled/iOSNotification.app/PlugIns/
      in a local folder to your project and with DeployMan instruct the dproj
      to deploy those file with your app. see an exemple of the DeployMan
-     command in <Alcinoe>\Demos\ALNotificationService\_source\ios\DeployMan.bat
+     command in <Alcinoe>\Demos\ALFmxNotificationService\_source\ios\DeployMan.bat
 
    Or You can create the app extension in the following way:
    * Launch Xcode and select "create a new xcode project"
@@ -106,7 +94,7 @@ Setup (IOS)
      * Select your team (you need one just to be able to compile the
        project)
      * Enter the organization identifier of your project. Ex:
-       io.magicfoundation.alcinoe.alnotificationservicedemo, doesn't matter if not exact you will
+       io.magicfoundation.alcinoe.alfmxnotificationservicedemo, doesn't matter if not exact you will
        change it later
      * Select SwiftUI for the Interface
      * Select Swift for the language
@@ -143,7 +131,7 @@ Setup (IOS)
      * Select the signing & capabilities tab
        * Select "ALL" capabillity
        * Bundle Identifier: the bundle identifier of your delphi app
-         (without the team id) Ex: io.magicfoundation.alcinoe.alnotificationservicedemo
+         (without the team id) Ex: io.magicfoundation.alcinoe.alfmxnotificationservicedemo
    * In target select the service extension. Ex NotificationService
      * Select the General tab
        * Deployment info: iOS 11
@@ -152,7 +140,7 @@ Setup (IOS)
        * then select the signing & capabilities tab
          * Bundle Identifier: the bundle identifier of your delphi app
            (without the team id) + .notificationservice. Ex:
-           io.magicfoundation.alcinoe.alnotificationservicedemo.notificationservice
+           io.magicfoundation.alcinoe.alfmxnotificationservicedemo.notificationservice
    * in the left panel of xcode select the app extension.
      Ex NotificationService
    * Select the file NotificationService.m
@@ -170,7 +158,7 @@ Setup (IOS)
    * copy the content of /Users/<username>/Documents/Compiled/iOSNotification.app/PlugIns/
      in a local folder to your project and with DeployMan instruct the dproj
      to deploy those file with your app. see an exemple of the DeployMan
-     command in <Alcinoe>\Demos\ALNotificationService\_source\ios\DeployMan.bat
+     command in <Alcinoe>\Demos\ALFmxNotificationService\_source\ios\DeployMan.bat
 
 
 Regarding Badge
@@ -249,10 +237,6 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
-  {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-38700 is corrected and if yes update the previous documentation regarding "Setup (IOS)"'}
-{$ENDIF}
-
 uses
   system.Classes,
   system.Messaging,
@@ -278,7 +262,7 @@ type
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALFirebaseMessaging = class(TObject)
 
-    {$REGION ' ANDROID'}
+    {$REGION 'ANDROID'}
     {$IF defined(android)}
 
     //FNewMessageObserver
@@ -340,7 +324,7 @@ type
     {$ENDIF}
     {$ENDREGION}
 
-    {$REGION ' IOS'}
+    {$REGION 'IOS'}
     {$IF defined(IOS)}
 
     //FUserNotificationCenterDelegate
@@ -350,13 +334,10 @@ type
         strict private
           fFirebaseMessaging: TALFirebaseMessaging;
         public
-          constructor Create(const aFirebaseMessaging: TALFirebaseMessaging);
-          [MethodName('userNotificationCenter:openSettingsForNotification:')]
-          procedure userNotificationCenter(center: UNUserNotificationCenter; notification: UNNotification); overload; cdecl;
-          [MethodName('userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:')]
-          procedure userNotificationCenter(center: UNUserNotificationCenter; response: UNNotificationResponse; completionHandler: Pointer); overload; cdecl;
-          [MethodName('userNotificationCenter:willPresentNotification:withCompletionHandler:')]
-          procedure userNotificationCenter(center: UNUserNotificationCenter; notification: UNNotification; completionHandler: Pointer); overload; cdecl;
+          constructor Create(const AFirebaseMessaging: TALFirebaseMessaging);
+          procedure userNotificationCenter(center: UNUserNotificationCenter; openSettingsForNotification: UNNotification); overload; cdecl;
+          procedure userNotificationCenter(center: UNUserNotificationCenter; didReceiveNotificationResponse: UNNotificationResponse; withCompletionHandler: Pointer); overload; cdecl;
+          procedure userNotificationCenter(center: UNUserNotificationCenter; willPresentNotification: UNNotification; withCompletionHandler: Pointer); overload; cdecl;
         end;
     private
       fUserNotificationCenterDelegate: TUserNotificationCenterDelegate;
@@ -387,8 +368,8 @@ type
     Type
       TGetTokenEvent = procedure(const AToken: String; const AErrorMessage: String) of object;
       TDeleteTokenEvent = procedure(const AIsSuccessful: Boolean; const AErrorMessage: String) of object;
-      TTokenRefreshEvent = procedure(const aToken: String) of object;
-      TMessageReceivedEvent = procedure(const aPayload: TALStringListW) of object;
+      TTokenRefreshEvent = procedure(const AToken: String) of object;
+      TMessageReceivedEvent = procedure(const APayload: TALStringListW) of object;
   private
     FDeliveredMessageIDs: TDictionary<String,boolean>;
     FGetTokenTaskIsRunning: Boolean;
@@ -402,10 +383,10 @@ type
     class var CanDeliverStartupNotificationMessages: Boolean;
     class procedure StartupNotificationMessageHandler(const Sender: TObject; const M: TMessage);
     class procedure DeliverStartupNotificationMessages;
-    procedure doTokenRefresh(const aToken: String);
-    procedure doMessageReceived(const aPayload: TALStringListW); overload;
-    procedure doMessageReceived(const aPayload: TALJSONNodeW); overload;
-    procedure doMessageReceived(const aPayload: String); overload;
+    procedure doTokenRefresh(const AToken: String);
+    procedure doMessageReceived(const APayload: TALStringListW); overload;
+    procedure doMessageReceived(const APayload: TALJSONNodeW); overload;
+    procedure doMessageReceived(const APayload: String); overload;
   public
     const MessageIdKeys: Array[0..2] of String = ('google.message_id','gcm.message_id','fcm_options.gcm.message_id');
   public
@@ -429,7 +410,7 @@ uses
   Androidapi.Helpers,
   Androidapi.JNI.Os,
   FMX.platform.Android,
-  Alcinoe.AndroidApi.Firebase,
+  Alcinoe.AndroidApi.Firebase.Messaging,
   {$ENDIF}
   {$IF defined(IOS)}
   Macapi.Helpers,
@@ -457,7 +438,7 @@ begin
   fOnTokenRefresh := nil;
   fOnMessageReceived := nil;
 
-  {$REGION ' ANDROID'}
+  {$REGION 'ANDROID'}
   {$IF defined(android)}
   FNewMessageObserver := TNewMessageObserver.Create(self);
   FNewTokenObserver := TNewTokenObserver.Create(self);
@@ -471,10 +452,13 @@ begin
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   fUserNotificationCenterDelegate := TUserNotificationCenterDelegate.Create(self);
-  TUNUserNotificationCenter.OCClass.currentNotificationCenter.setdelegate(fUserNotificationCenterDelegate);
+  {$IFNDEF ALCompilerVersionSupported130}
+    {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4344 is corrected and if yes remove .GetObjectID below'}
+  {$ENDIF}
+  TUNUserNotificationCenter.OCClass.currentNotificationCenter.setdelegate(fUserNotificationCenterDelegate.GetObjectID);
   //--
   fFIRMessagingDelegate := TFIRMessagingDelegate.Create(self);
   TFIRMessaging.Wrap(TFIRMessaging.OCClass.messaging).setDelegate(fFIRMessagingDelegate);
@@ -513,7 +497,7 @@ begin
 
   TALFirebaseMessaging.CanDeliverStartupNotificationMessages := False;
 
-  {$REGION ' ANDROID'}
+  {$REGION 'ANDROID'}
   {$IF defined(android)}
   TJALFirebaseMessagingService.JavaClass.newMessageDispatcher.removeObserver(FNewMessageObserver);
   TJALFirebaseMessagingService.JavaClass.newTokenDispatcher.removeObserver(FNewTokenObserver);
@@ -525,7 +509,7 @@ begin
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   TUNUserNotificationCenter.OCClass.currentNotificationCenter.setdelegate(nil);
   alfreeAndNil(fUserNotificationCenterDelegate);
@@ -556,7 +540,7 @@ begin
   FGetTokenTaskIsRunning := true;
   if FDeleteTokenTaskIsRunning then exit;
 
-  {$REGION ' android'}
+  {$REGION 'android'}
   {$IF defined(android)}
   ALFreeAndNil(FGetTokenTaskCompleteListener);
   FGetTokenTaskCompleteListener := TGetTokenTaskCompleteListener.Create(self);
@@ -564,7 +548,7 @@ begin
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   TFIRMessaging.Wrap(TFIRMessaging.OCClass.messaging).tokenWithCompletion(FIRMessagingTokenWithCompletionHandler);
   {$ENDIF}
@@ -584,7 +568,7 @@ begin
   FDeleteTokenTaskIsRunning := true;
   if FGetTokenTaskIsRunning then exit;
 
-  {$REGION ' android'}
+  {$REGION 'android'}
   {$IF defined(android)}
   ALFreeAndNil(FDeleteTokenTaskCompleteListener);
   FDeleteTokenTaskCompleteListener := TDeleteTokenTaskCompleteListener.Create(self);
@@ -592,7 +576,7 @@ begin
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   TFIRMessaging.Wrap(TFIRMessaging.OCClass.messaging).deleteTokenWithCompletion(FIRMessagingDeleteTokenWithCompletionHandler);
   {$ENDIF}
@@ -601,14 +585,14 @@ begin
 end;
 
 {******************************************************************}
-procedure TALFirebaseMessaging.doTokenRefresh(const aToken: String);
+procedure TALFirebaseMessaging.doTokenRefresh(const AToken: String);
 begin
   if assigned(fOnTokenRefresh) then
     fOnTokenRefresh(aToken);
 end;
 
 {*******************************************************************************}
-procedure TALFirebaseMessaging.doMessageReceived(const aPayload: TALStringListW);
+procedure TALFirebaseMessaging.doMessageReceived(const APayload: TALStringListW);
 begin
   if assigned(fOnMessageReceived) then begin
     //under ios, when the app is not running and the user click on an alert notification
@@ -641,7 +625,7 @@ begin
 end;
 
 {*****************************************************************************}
-procedure TALFirebaseMessaging.doMessageReceived(const aPayload: TALJSONNodeW);
+procedure TALFirebaseMessaging.doMessageReceived(const APayload: TALJSONNodeW);
 begin
   var LPayload := TALStringListW.Create;
   try
@@ -652,7 +636,7 @@ begin
   end;
 end;
 {***********************************************************************}
-procedure TALFirebaseMessaging.doMessageReceived(const aPayload: String);
+procedure TALFirebaseMessaging.doMessageReceived(const APayload: String);
 begin
   var LJsonDoc := TALJSONDocumentW.create;
   try
@@ -672,7 +656,7 @@ end;
 class procedure TALFirebaseMessaging.StartupNotificationMessageHandler(const Sender: TObject; const M: TMessage);
 begin
 
-  {$REGION ' ANDROID'}
+  {$REGION 'ANDROID'}
   {$IF defined(android)}
   var LBundle: JBundle := nil;
   if (M is TApplicationEventMessage) then begin
@@ -729,7 +713,7 @@ begin
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   if (M is TPushStartupNotificationMessage) then begin
     Setlength(StartupNotificationMessages, length(StartupNotificationMessages) + 1);
@@ -768,7 +752,7 @@ begin
         allog('TALFirebaseMessaging.DeliverStartupNotificationMessages', LJsonDoc.JSON);
         {$ENDIF}
 
-        {$REGION ' ANDROID'}
+        {$REGION 'ANDROID'}
         {$IF defined(ANDROID)}
         LJsonDoc.SetChildNodeValueText('alcinoe.notification_clicked', '1');
         var LPushStartupNotificationMessage := TPushStartupNotificationMessage.Create(TPushNotificationData.Create(LJsonDoc.JSON));
@@ -776,7 +760,7 @@ begin
         {$ENDIF}
         {$ENDREGION}
 
-        {$REGION ' IOS'}
+        {$REGION 'IOS'}
         {$IF defined(IOS)}
         //under ios data message can (if you are lucky) wake up the app and fire this method
         //so we must detect if it's an alert or a pure data message. I use content-available that I
@@ -926,7 +910,7 @@ end;
 {$IF defined(IOS)}
 
 {**********************************************************************************************************************}
-constructor TALFirebaseMessaging.TUserNotificationCenterDelegate.Create(const aFirebaseMessaging: TALFirebaseMessaging);
+constructor TALFirebaseMessaging.TUserNotificationCenterDelegate.Create(const AFirebaseMessaging: TALFirebaseMessaging);
 begin
   inherited Create;
   fFirebaseMessaging := aFirebaseMessaging;
@@ -939,38 +923,69 @@ begin
   var LData := TNSJSONSerialization.OCClass.dataWithJSONObject(NSObjectToID(ADictionary), 0, Addr(LError));
   if (LData <> nil) and (LError = nil) then begin
     var LString := TNSString.Wrap(TNSString.Alloc.initWithData(LData, NSUTF8StringEncoding));
-    Result :=  NSStrToStr(LString);
+    try
+      Result :=  NSStrToStr(LString);
+    finally
+      LString.release;
+    end;
   end
   else Result := string.Empty;
 end;
 
 {***************************************************************}
 // Asks the delegate to display the in-app notification settings.
-procedure TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter(center: UNUserNotificationCenter; notification: UNNotification);
+procedure TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter(center: UNUserNotificationCenter; openSettingsForNotification: UNNotification);
 begin
   {$IFDEF DEBUG}
-  allog('TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter:center:notification');
+  allog('TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter:center:openSettingsForNotification');
   {$ENDIF}
+end;
+
+{******************************************************************************}
+// Asks the delegate to process the user's response to a delivered notification.
+procedure TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter(center: UNUserNotificationCenter; didReceiveNotificationResponse: UNNotificationResponse; withCompletionHandler: Pointer);
+var LImp: procedure(); cdecl;
+begin
+  var LJsonDoc := TALJSONDocumentW.create;
+  try
+    var LJsonStr := _NSDictionaryToJSON(didReceiveNotificationResponse.notification.request.content.userInfo);
+    if LJsonStr <> '' then LJsonDoc.LoadFromJSONString(LJsonStr);
+
+    {$IFDEF DEBUG}
+    allog('TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter:center:didReceiveNotificationResponse:withCompletionHandler', 'Message: ' + LJsonDoc.JSON);
+    {$ENDIF}
+
+    LJsonDoc.SetChildNodeValueText('alcinoe.notification_clicked', '1');
+    var LMessage := TPushRemoteNotificationMessage.Create(TPushNotificationData.Create(LJsonDoc.JSON));
+    TMessageManager.DefaultManager.SendMessage(nil, LMessage);
+
+    @LImp := imp_implementationWithBlock(withCompletionHandler);
+    LImp();
+    imp_removeBlock(@LImp);
+
+  finally
+    ALFreeAndNil(LJsonDoc);
+  end;
 end;
 
 {*********************************************************************************************************}
 // Asks the delegate how to handle a notification that arrived while the app was running in the foreground.
-procedure TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter(center: UNUserNotificationCenter; notification: UNNotification; completionHandler: Pointer);
+procedure TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter(center: UNUserNotificationCenter; willPresentNotification: UNNotification; withCompletionHandler: Pointer);
 var LImp: procedure(aOptions: UNNotificationPresentationOptions); cdecl;
 begin
   var LJsonDoc := TALJSONDocumentW.create;
   try
 
-    var LJsonStr := _NSDictionaryToJSON(notification.request.content.userInfo);
+    var LJsonStr := _NSDictionaryToJSON(willPresentNotification.request.content.userInfo);
     if LJsonStr <> '' then LJsonDoc.LoadFromJSONString(LJsonStr);
 
     {$IFDEF DEBUG}
-    allog('TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter:center:notification:completionHandler', LJsonStr);
+    allog('TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter:center:willPresentNotification:withCompletionHandler', LJsonStr);
     {$ENDIF}
 
     if ALStrToBool(LJsonDoc.GetChildNodeValuetext('alcinoe.present_notification', '0')) then begin
 
-      @LImp := imp_implementationWithBlock(completionHandler);
+      @LImp := imp_implementationWithBlock(withCompletionHandler);
       if TOSVersion.Check(14) then
         LImp(
           UNNotificationPresentationOptionBadge or
@@ -990,38 +1005,16 @@ begin
       var LMessage := TPushRemoteNotificationMessage.Create(TPushNotificationData.Create(LJsonStr));
       TMessageManager.DefaultManager.SendMessage(nil, LMessage);
 
-      @LImp := imp_implementationWithBlock(completionHandler);
+      {$IFNDEF ALCompilerVersionSupported130}
+        {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4325 is corrected and if yes remove the UNNotificationPresentationOptionNone declaration below'}
+      {$ENDIF}
+      const UNNotificationPresentationOptionNone = 0;
+
+      @LImp := imp_implementationWithBlock(withCompletionHandler);
       LImp(UNNotificationPresentationOptionNone);
       imp_removeBlock(@LImp);
 
     end;
-
-  finally
-    ALFreeAndNil(LJsonDoc);
-  end;
-end;
-
-{******************************************************************************}
-// Asks the delegate to process the user's response to a delivered notification.
-procedure TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter(center: UNUserNotificationCenter; response: UNNotificationResponse; completionHandler: Pointer); cdecl;
-var LImp: procedure(); cdecl;
-begin
-  var LJsonDoc := TALJSONDocumentW.create;
-  try
-    var LJsonStr := _NSDictionaryToJSON(response.notification.request.content.userInfo);
-    if LJsonStr <> '' then LJsonDoc.LoadFromJSONString(LJsonStr);
-
-    {$IFDEF DEBUG}
-    allog('TALFirebaseMessaging.TUserNotificationCenterDelegate.userNotificationCenter:center:response:completionHandler', 'Message: ' + LJsonDoc.JSON);
-    {$ENDIF}
-
-    LJsonDoc.SetChildNodeValueText('alcinoe.notification_clicked', '1');
-    var LMessage := TPushRemoteNotificationMessage.Create(TPushNotificationData.Create(LJsonDoc.JSON));
-    TMessageManager.DefaultManager.SendMessage(nil, LMessage);
-
-    @LImp := imp_implementationWithBlock(completionHandler);
-    LImp();
-    imp_removeBlock(@LImp);
 
   finally
     ALFreeAndNil(LJsonDoc);
@@ -1144,33 +1137,39 @@ end;
 {$ENDREGION}
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Firebase.Messaging','initialization');
+  {$ENDIF}
 
   setlength(TALFirebaseMessaging.StartupNotificationMessages, 0);
   TALFirebaseMessaging.CanDeliverStartupNotificationMessages := False;
 
-  {$REGION ' ANDROID'}
+  {$REGION 'ANDROID'}
   {$IF defined(android)}
   TMessageManager.DefaultManager.SubscribeToMessage(TMessageReceivedNotification, TALFirebaseMessaging.StartupNotificationMessageHandler);
   TMessageManager.DefaultManager.SubscribeToMessage(TApplicationEventMessage, TALFirebaseMessaging.StartupNotificationMessageHandler);
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   TMessageManager.DefaultManager.SubscribeToMessage(TPushStartupNotificationMessage, TALFirebaseMessaging.StartupNotificationMessageHandler);
   {$ENDIF}
   {$ENDREGION}
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Firebase.Messaging','finalization');
+  {$ENDIF}
 
-  {$REGION ' ANDROID'}
+  {$REGION 'ANDROID'}
   {$IF defined(android)}
   TMessageManager.DefaultManager.Unsubscribe(TMessageReceivedNotification, TALFirebaseMessaging.StartupNotificationMessageHandler);
   TMessageManager.DefaultManager.Unsubscribe(TApplicationEventMessage, TALFirebaseMessaging.StartupNotificationMessageHandler);
   {$ENDIF}
   {$ENDREGION}
 
-  {$REGION ' IOS'}
+  {$REGION 'IOS'}
   {$IF defined(IOS)}
   TMessageManager.DefaultManager.Unsubscribe(TPushStartupNotificationMessage, TALFirebaseMessaging.StartupNotificationMessageHandler);
   {$ENDIF}

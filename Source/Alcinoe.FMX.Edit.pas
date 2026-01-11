@@ -9,12 +9,11 @@ uses
   system.Classes,
   System.UITypes,
   {$IF defined(android)}
-  System.Messaging,
   Androidapi.JNI.GraphicsContentViewText,
   Androidapi.JNIBridge,
   Androidapi.JNI.Widget,
   Androidapi.JNI.JavaTypes,
-  Alcinoe.AndroidApi.Common,
+  Alcinoe.AndroidApi.Widget,
   Alcinoe.FMX.NativeView.Android,
   {$ELSEIF defined(IOS)}
   System.TypInfo,
@@ -22,14 +21,12 @@ uses
   iOSapi.UIKit,
   Macapi.ObjectiveC,
   Macapi.ObjCRuntime,
-  Alcinoe.iOSapi.UIKit,
   Alcinoe.FMX.NativeView.iOS,
   {$ELSEIF defined(ALMacOS)}
   System.TypInfo,
   Macapi.Foundation,
   Macapi.AppKit,
   Macapi.ObjectiveC,
-  Macapi.ObjCRuntime,
   Macapi.CocoaTypes,
   Alcinoe.Macapi.AppKit,
   Alcinoe.FMX.NativeView.Mac,
@@ -41,15 +38,16 @@ uses
   Alcinoe.FMX.NativeView.Win,
   {$ENDIF}
   FMX.types,
-  Fmx.controls,
   fmx.Graphics,
   Alcinoe.FMX.Controls,
+  Alcinoe.FMX.NativeControl,
   Alcinoe.FMX.Ani,
-  Alcinoe.FMX.Common,
-  Alcinoe.FMX.Objects,
-  Alcinoe.FMX.Graphics;
+  Alcinoe.FMX.Common;
 
 Type
+
+  {******************}
+  TALBaseEdit = class;
 
   {***************************}
   TALAutoCapitalizationType = (
@@ -58,30 +56,136 @@ Type
     acSentences, // Specifies automatic capitalization of the first letter of each sentence.
     acAllCharacters); // Specifies automatic capitalization of all characters, such as for entry of two-character state abbreviations for the United States.
 
-  {************************************}
-  TALBaseEditControl = class(TALControl)
-  strict private
-    fOnChange: TNotifyEvent;
-    fOnReturnKey: TNotifyEvent;
+{$REGION ' ANDROID'}
+{$IF defined(android)}
+
+  {**********************************************}
+  TALAndroidEditView = class(TALAndroidNativeView)
+  private
+    type
+      // ------------
+      // TTextWatcher
+      TTextWatcher = class(TJavaLocal, JTextWatcher)
+      private
+        FEditView: TALAndroidEditView;
+      public
+        constructor Create(const aEditView: TALAndroidEditView);
+        procedure afterTextChanged(s: JEditable); cdecl;
+        procedure beforeTextChanged(s: JCharSequence; start: Integer; count: Integer; after: Integer); cdecl;
+        procedure onTextChanged(s: JCharSequence; start: Integer; before: Integer; count: Integer); cdecl;
+      end;
+      // ---------------------
+      // TEditorActionListener
+      TEditorActionListener = class(TJavaLocal, JTextView_OnEditorActionListener)
+      private
+        fIsMultiLineEditText: Boolean;
+        FEditView: TALAndroidEditView;
+      public
+        constructor Create(const aEditView: TALAndroidEditView; const aIsMultiLineEditText: Boolean = false);
+        function onEditorAction(v: JTextView; actionId: Integer; event: JKeyEvent): Boolean; cdecl;
+      end;
+      // ------------------
+      // TKeyPreImeListener
+      TKeyPreImeListener = class(TJavaLocal, JALKeyPreImeListener)
+      private
+        FEditView: TALAndroidEditView;
+      public
+        constructor Create(const aEditView: TALAndroidEditView);
+        function onKeyPreIme(keyCode: Integer; event: JKeyEvent): Boolean; cdecl;
+      end;
+      // --------------
+      // TTouchListener
+      TTouchListener = class(TJavaLocal, JView_OnTouchListener)
+      private
+        FEditView: TALAndroidEditView;
+      public
+        constructor Create(const aEditView: TALAndroidEditView);
+        function onTouch(v: JView; event: JMotionEvent): Boolean; cdecl;
+      end;
+  private
     FTextSettings: TALBaseTextSettings;
+    FFillColor: TAlphaColor;
+    fMaxLength: integer;
+    fReturnKeyType: TReturnKeyType;
+    fKeyboardType: TVirtualKeyboardType;
+    fAutoCapitalizationType: TALAutoCapitalizationType;
+    fPassword: boolean;
+    fCheckSpelling: boolean;
+    FDefStyleAttr: String;
+    FDefStyleRes: String;
+    fIsMultiline: Boolean;
+    fTintColor: TalphaColor;
+    FTextWatcher: TTextWatcher;
+    FEditorActionListener: TEditorActionListener;
+    FKeyPreImeListener: TKeyPreImeListener;
+    FTouchListener: TTouchListener;
+    function GetView: JALEditText;
+    function GetControl: TALBaseEdit;
+    procedure DoSetInputType(
+                const aKeyboardType: TVirtualKeyboardType;
+                const aAutoCapitalizationType: TALAutoCapitalizationType;
+                const aPassword: Boolean;
+                const aCheckSpelling: Boolean;
+                const aIsMultiline: Boolean);
+    procedure DoSetReturnKeyType(const aReturnKeyType: TReturnKeyType);
+    function GetKeyboardType: TVirtualKeyboardType;
+    procedure setKeyboardType(const Value: TVirtualKeyboardType);
+    function GetAutoCapitalizationType: TALAutoCapitalizationType;
+    procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
+    function GetPassword: Boolean;
+    procedure setPassword(const Value: Boolean);
+    function GetCheckSpelling: Boolean;
+    procedure setCheckSpelling(const Value: Boolean);
+    function GetReturnKeyType: TReturnKeyType;
+    procedure setReturnKeyType(const Value: TReturnKeyType);
+    function GetPromptText: String;
+    procedure setPromptText(const Value: String);
+    function GetPromptTextColor: TAlphaColor;
+    procedure setPromptTextColor(const Value: TAlphaColor);
+    function GetTintColor: TAlphaColor;
+    procedure setTintColor(const Value: TAlphaColor);
+    function GetFillColor: TAlphaColor;
+    procedure SetFillColor(const Value: TAlphaColor);
+    procedure SetTextSettings(const Value: TALBaseTextSettings);
+    procedure TextSettingsChanged(Sender: TObject);
+    function getText: String;
+    procedure SetText(const Value: String);
+    function GetMaxLength: integer;
+    procedure SetMaxLength(const Value: integer);
   protected
-    {$IF defined(android)}
-    FNativeView: TALAndroidNativeView;
-    Function CreateNativeView: TALAndroidNativeView; virtual; abstract;
-    function GetNativeView: TALAndroidNativeView; virtual;
-    {$ELSEIF defined(IOS)}
-    FNativeView: TALIosNativeView;
-    Function CreateNativeView: TALIosNativeView; virtual; abstract;
-    function GetNativeView: TALIosNativeView; virtual;
-    {$ELSEIF defined(ALMacOS)}
-    FNativeView: TALMacNativeView;
-    Function CreateNativeView: TALMacNativeView; virtual; abstract;
-    function GetNativeView: TALMacNativeView; virtual;
-    {$ELSEIF defined(MSWindows)}
-    FNativeView: TALWinNativeView;
-    Function CreateNativeView: TALWinNativeView; virtual; abstract;
-    function GetNativeView: TALWinNativeView; virtual;
-    {$ENDIF}
+    function CreateView: JView; override;
+  public
+    constructor Create(const AControl: TALControl; Const aIsMultiline: Boolean = False; const aDefStyleAttr: String = ''; const aDefStyleRes: String = ''); reintroduce;
+    destructor Destroy; override;
+    property View: JALEditText read GetView;
+    property Control: TALBaseEdit read GetControl;
+    function getLineCount: integer; virtual;
+    function getLineHeight: Single; virtual;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual;
+    Procedure SetSelection(const AIndex: integer); overload; virtual;
+    property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType;
+    property KeyboardType: TVirtualKeyboardType read GetKeyboardType write SetKeyboardType;
+    property AutoCapitalizationType: TALAutoCapitalizationType read GetAutoCapitalizationType write SetAutoCapitalizationType;
+    property Password: Boolean read GetPassword write SetPassword;
+    property PromptText: String read GetPromptText write setPromptText;
+    property PromptTextColor: TAlphaColor read GetPromptTextColor write setPromptTextColor; // Null mean use the default color
+    property TintColor: TalphaColor read GetTintColor write SetTintColor;
+    property FillColor: TAlphaColor read GetFillColor write SetFillColor;
+    property MaxLength: integer read GetMaxLength write SetMaxLength;
+    property Text: String read getText write SetText;
+    property TextSettings: TALBaseTextSettings read FTextSettings write SetTextSettings;
+    property CheckSpelling: Boolean read GetCheckSpelling write SetCheckSpelling;
+  end;
+
+{$endif}
+{$ENDREGION}
+
+{$REGION ' IOS'}
+{$IF defined(ios)}
+
+  {******************************************}
+  TALIosBaseEditView = class(TALIosNativeView)
+  protected
     function GetKeyboardType: TVirtualKeyboardType; virtual; abstract;
     procedure setKeyboardType(const Value: TVirtualKeyboardType); virtual; abstract;
     function GetAutoCapitalizationType: TALAutoCapitalizationType; virtual; abstract;
@@ -100,46 +204,17 @@ Type
     procedure setTintColor(const Value: TAlphaColor); virtual; abstract;
     function GetFillColor: TAlphaColor; virtual; abstract;
     procedure SetFillColor(const Value: TAlphaColor); virtual; abstract;
-    procedure SetTextSettings(const Value: TALBaseTextSettings); virtual;
-    procedure TextSettingsChanged(Sender: TObject); virtual; abstract;
+    function GetTextSettings: TALBaseTextSettings; virtual; abstract;
+    procedure SetTextSettings(const Value: TALBaseTextSettings); virtual; abstract;
     function getText: String; virtual; abstract;
     procedure SetText(const Value: String); virtual; abstract;
     function GetMaxLength: integer; virtual; abstract;
     procedure SetMaxLength(const Value: integer); virtual; abstract;
-    procedure DoChange; virtual;
-    procedure DoReturnKey; virtual;
-    procedure AncestorVisibleChanged(const Visible: Boolean); override;
-    procedure AncestorParentChanged; override;
-    procedure ParentChanged; override;
-    procedure DoAbsoluteChanged; override;
-    procedure DoRootChanged; override;
-    procedure Resize; override;
-    procedure VisibleChanged; override;
-    procedure ChangeOrder; override;
-    procedure DoEndUpdate; override;
   public
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
-    procedure RecalcOpacity; override;
-    procedure RecalcEnabled; override;
-    function getLineCount: integer; virtual;
-    function getLineHeight: Single; virtual; abstract; // It includes the line spacing
-    function HasNativeView: boolean; virtual;
-    Procedure AddNativeView; virtual;
-    Procedure RemoveNativeView; virtual;
-    {$IF defined(android)}
-    property NativeView: TALAndroidNativeView read GetNativeView;
-    {$ELSEIF defined(IOS)}
-    property NativeView: TALIosNativeView read GetNativeView;
-    {$ELSEIF defined(ALMacOS)}
-    property NativeView: TALMacNativeView read GetNativeView;
-    {$ELSEIF defined(MSWindows)}
-    property NativeView: TALWinNativeView read GetNativeView;
-    {$ENDIF}
+    function getLineCount: integer; virtual; abstract;
+    function getLineHeight: Single; virtual; abstract;
     Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual; abstract;
     Procedure SetSelection(const AIndex: integer); overload; virtual; abstract;
-    property OnChange: TNotifyEvent read fOnChange write fOnChange;
-    property OnReturnKey: TNotifyEvent read fOnReturnKey write fOnReturnKey;
     property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType;
     property KeyboardType: TVirtualKeyboardType read GetKeyboardType write SetKeyboardType;
     property AutoCapitalizationType: TALAutoCapitalizationType read GetAutoCapitalizationType write SetAutoCapitalizationType;
@@ -150,150 +225,12 @@ Type
     property FillColor: TAlphaColor read GetFillColor write SetFillColor;
     property MaxLength: integer read GetMaxLength write SetMaxLength;
     property Text: String read getText write SetText;
-    property TextSettings: TALBaseTextSettings read FTextSettings write SetTextSettings;
+    property TextSettings: TALBaseTextSettings read GetTextSettings write SetTextSettings;
     property CheckSpelling: Boolean read GetCheckSpelling write SetCheckSpelling;
   end;
 
-{$REGION ' ANDROID'}
-{$IF defined(android)}
-type
-
-  {****************************}
-  TALAndroidEditControl = class;
-
-  {**********************************************}
-  TALAndroidEditText = class(TALAndroidNativeView)
-  private
-
-    type
-
-      {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-      TALTextWatcher = class(TJavaLocal, JTextWatcher)
-      private
-        FEditText: TALAndroidEditText;
-      public
-        constructor Create(const aEditText: TALAndroidEditText);
-        procedure afterTextChanged(s: JEditable); cdecl;
-        procedure beforeTextChanged(s: JCharSequence; start: Integer; count: Integer; after: Integer); cdecl;
-        procedure onTextChanged(s: JCharSequence; start: Integer; before: Integer; count: Integer); cdecl;
-      end;
-
-      {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-      TALEditorActionListener = class(TJavaLocal, JTextView_OnEditorActionListener)
-      private
-        fIsMultiLineEditText: Boolean;
-        FEditText: TALAndroidEditText;
-      public
-        constructor Create(const aEditText: TALAndroidEditText; const aIsMultiLineEditText: Boolean = false);
-        function onEditorAction(v: JTextView; actionId: Integer; event: JKeyEvent): Boolean; cdecl;
-      end;
-
-      {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-      TALKeyPreImeListener = class(TJavaLocal, JALKeyPreImeListener)
-      private
-        FEditText: TALAndroidEditText;
-      public
-        constructor Create(const aEditText: TALAndroidEditText);
-        function onKeyPreIme(keyCode: Integer; event: JKeyEvent): Boolean; cdecl;
-      end;
-
-      {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-      TALTouchListener = class(TJavaLocal, JView_OnTouchListener)
-      private
-        FEditText: TALAndroidEditText;
-      public
-        constructor Create(const aEditText: TALAndroidEditText);
-        function onTouch(v: JView; event: JMotionEvent): Boolean; cdecl;
-      end;
-
-  private
-    fIsMultiline: boolean;
-    fDefStyleAttr: String;
-    fDefStyleRes: String;
-    FTextWatcher: TALTextWatcher;
-    FEditorActionListener: TALEditorActionListener;
-    FKeyPreImeListener: TALKeyPreImeListener;
-    FTouchListener: TALTouchListener;
-    FEditControl: TALAndroidEditControl;
-    function GetView: JALEditText;
-  protected
-    function CreateView: JView; override;
-    procedure InitView; override;
-  public
-    constructor Create(const AControl: TALAndroidEditControl; Const aIsMultiline: Boolean = False; const aDefStyleAttr: String = ''; const aDefStyleRes: String = ''); reintroduce;
-    destructor Destroy; override;
-    property View: JALEditText read GetView;
-  end;
-
-  {***********************************************}
-  TALAndroidEditControl = class(TALBaseEditControl)
-  private
-    FFillColor: TAlphaColor;
-    fMaxLength: integer;
-    fReturnKeyType: TReturnKeyType;
-    fKeyboardType: TVirtualKeyboardType;
-    fAutoCapitalizationType: TALAutoCapitalizationType;
-    fPassword: boolean;
-    fCheckSpelling: boolean;
-    FDefStyleAttr: String;
-    FDefStyleRes: String;
-    fIsMultiline: Boolean;
-    fTintColor: TalphaColor;
-    procedure ApplicationEventHandler(const Sender: TObject; const M : TMessage);
-  protected
-    procedure DoSetInputType(
-                const aKeyboardType: TVirtualKeyboardType;
-                const aAutoCapitalizationType: TALAutoCapitalizationType;
-                const aPassword: Boolean;
-                const aCheckSpelling: Boolean;
-                const aIsMultiline: Boolean); virtual;
-    procedure DoSetReturnKeyType(const aReturnKeyType: TReturnKeyType); virtual;
-    Function CreateNativeView: TALAndroidNativeView; override;
-    function GetNativeView: TALAndroidEditText; reintroduce; virtual;
-    function GetKeyboardType: TVirtualKeyboardType; override;
-    procedure setKeyboardType(const Value: TVirtualKeyboardType); override;
-    function GetAutoCapitalizationType: TALAutoCapitalizationType; override;
-    procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType); override;
-    function GetPassword: Boolean; override;
-    procedure setPassword(const Value: Boolean); override;
-    function GetCheckSpelling: Boolean; override;
-    procedure setCheckSpelling(const Value: Boolean); override;
-    function GetReturnKeyType: TReturnKeyType; override;
-    procedure setReturnKeyType(const Value: TReturnKeyType); override;
-    function GetPromptText: String; override;
-    procedure setPromptText(const Value: String); override;
-    function GetPromptTextColor: TAlphaColor; override;
-    procedure setPromptTextColor(const Value: TAlphaColor); override;
-    function GetTintColor: TAlphaColor; override;
-    procedure setTintColor(const Value: TAlphaColor); override;
-    function GetFillColor: TAlphaColor; override;
-    procedure SetFillColor(const Value: TAlphaColor); override;
-    procedure TextSettingsChanged(Sender: TObject); override;
-    function getText: String; override;
-    procedure SetText(const Value: String); override;
-    function GetMaxLength: integer; override;
-    procedure SetMaxLength(const Value: integer); override;
-  public
-    constructor Create(const AOwner: TComponent; Const AIsMultiline: Boolean = False; const ADefStyleAttr: String = ''; const ADefStyleRes: String = ''); reintroduce; virtual;
-    destructor Destroy; override;
-    function getLineHeight: Single; override; // It includes the line spacing
-    property NativeView: TALAndroidEditText read GetNativeView;
-    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
-    Procedure SetSelection(const AIndex: integer); overload; override;
-  end;
-
-{$endif}
-{$ENDREGION}
-
-{$REGION ' IOS'}
-{$IF defined(ios)}
-type
-
-  {************************}
-  TALIosEditControl = class;
-
-  {******************************************}
-  IALIosEditTextField = interface(UITextField)
+  {*************************************}
+  IALIosEditView = interface(UITextField)
     ['{E4E67240-F15A-444F-8CE1-A3A830C023E8}']
     procedure touchesBegan(touches: NSSet; withEvent: UIEvent); cdecl;
     procedure touchesCancelled(touches: NSSet; withEvent: UIEvent); cdecl;
@@ -304,57 +241,44 @@ type
     function becomeFirstResponder: Boolean; cdecl;
   end;
 
-  {*******************************************}
-  TALIosEditTextField = class(TALIosNativeView)
+  {****************************************}
+  TALIosEditView = class(TALIosBaseEditView)
   private
-    FEditControl: TALIosEditControl;
-    function GetView: UITextField;
-    function ExtractFirstTouchPoint(touches: NSSet): TPointF;
-  protected
-    function GetObjectiveCClass: PTypeInfo; override;
-  public
-    procedure SetEnabled(const value: Boolean); override;
-  public
-    constructor Create; overload; override;
-    constructor Create(const AControl: TControl); overload; override;
-    destructor Destroy; override;
-    procedure touchesBegan(touches: NSSet; withEvent: UIEvent); cdecl;
-    procedure touchesCancelled(touches: NSSet; withEvent: UIEvent); cdecl;
-    procedure touchesEnded(touches: NSSet; withEvent: UIEvent); cdecl;
-    procedure touchesMoved(touches: NSSet; withEvent: UIEvent); cdecl;
-    procedure ControlEventEditingChanged; cdecl;
-    function canBecomeFirstResponder: Boolean; cdecl;
-    function becomeFirstResponder: Boolean; cdecl;
-    property View: UITextField read GetView;
-  end;
-
-  {****************************************************************}
-  TALIosEditTextFieldDelegate = class(TOCLocal, UITextFieldDelegate)
+    type
+      // ------------------
+      // TTextFieldDelegate
+      TTextFieldDelegate = class(TOCLocal, UITextFieldDelegate)
+      private
+        FEditView: TALIosEditView;
+      public
+        constructor Create(const AEditView: TALIosEditView);
+        function textField(textField: UITextField; shouldChangeCharactersInRange: NSRange; replacementString: NSString): Boolean; overload; cdecl;
+        function textField(textField: UITextField; editMenuForCharactersInRange: NSRange; suggestedActions: NSArray): UIMenu; overload; cdecl;
+        procedure textField(textField: UITextField; willPresentEditMenuWithAnimator: Pointer); overload; cdecl;
+        procedure textField(textField: UITextField; insertInputSuggestion: UIInputSuggestion); overload; cdecl;
+        procedure textFieldDidBeginEditing(textField: UITextField); cdecl;
+        procedure textFieldDidChangeSelection(textField: UITextField); cdecl;
+        procedure textFieldDidEndEditing(textField: UITextField); overload; cdecl;
+        procedure textFieldDidEndEditing(textField: UITextField; reason: UITextFieldDidEndEditingReason); overload; cdecl;
+        function textFieldShouldBeginEditing(textField: UITextField): Boolean; cdecl;
+        function textFieldShouldClear(textField: UITextField): Boolean; cdecl;
+        function textFieldShouldEndEditing(textField: UITextField): Boolean; cdecl;
+        function textFieldShouldReturn(textField: UITextField): Boolean; cdecl;
+        [MethodName('textField:willDismissEditMenuWithAnimator:')]
+        procedure textFieldWillDismissEditMenuWithAnimator(textField: UITextField; willDismissEditMenuWithAnimator: Pointer); cdecl;
+      end;
   private
-    FEditControl: TALIosEditControl;
-  public
-    constructor Create(const AEditControl: TALIosEditControl);
-    // Better name would be textFieldShouldChangeCharactersInRange
-    function textField(textField: UITextField; shouldChangeCharactersInRange: NSRange; replacementString: NSString): Boolean; cdecl;
-    procedure textFieldDidBeginEditing(textField: UITextField); cdecl;
-    procedure textFieldDidEndEditing(textField: UITextField); cdecl;
-    function textFieldShouldBeginEditing(textField: UITextField): Boolean; cdecl;
-    function textFieldShouldClear(textField: UITextField): Boolean; cdecl;
-    function textFieldShouldEndEditing(textField: UITextField): Boolean; cdecl;
-    function textFieldShouldReturn(textField: UITextField): Boolean; cdecl;
-  end;
-
-  {*******************************************}
-  TALIosEditControl = class(TALBaseEditControl)
-  private
-    FTextFieldDelegate: TALIosEditTextFieldDelegate;
+    FTextFieldDelegate: TTextFieldDelegate;
+    FTextSettings: TALBaseTextSettings;
     FFillColor: TAlphaColor;
     fMaxLength: integer;
     fPromptTextColor: TalphaColor;
+    function GetView: UITextField;
+    function GetControl: TALBaseEdit;
+    procedure applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor);
+    procedure TextSettingsChanged(Sender: TObject);
+    procedure DoChange;
   protected
-    procedure applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor); virtual;
-    Function CreateNativeView: TALIosNativeView; override;
-    function GetNativeView: TALIosEditTextField; reintroduce; virtual;
     function GetKeyboardType: TVirtualKeyboardType; override;
     procedure setKeyboardType(const Value: TVirtualKeyboardType); override;
     function GetAutoCapitalizationType: TALAutoCapitalizationType; override;
@@ -373,16 +297,23 @@ type
     procedure setTintColor(const Value: TAlphaColor); override;
     function GetFillColor: TAlphaColor; override;
     procedure SetFillColor(const Value: TAlphaColor); override;
-    procedure TextSettingsChanged(Sender: TObject); override;
+    function GetTextSettings: TALBaseTextSettings; override;
+    procedure SetTextSettings(const Value: TALBaseTextSettings); override;
     function getText: String; override;
     procedure SetText(const Value: String); override;
     function GetMaxLength: integer; override;
     procedure SetMaxLength(const Value: integer); override;
+  protected
+    function GetObjectiveCClass: PTypeInfo; override;
   public
-    constructor Create(AOwner: TComponent); override;
+    constructor Create; overload; override;
     destructor Destroy; override;
-    function getLineHeight: Single; override; // It includes the line spacing
-    property NativeView: TALIosEditTextField read GetNativeView;
+    procedure ControlEventEditingChanged; cdecl;
+    property View: UITextField read GetView;
+    property Control: TALBaseEdit read GetControl;
+    procedure SetEnabled(const value: Boolean); override;
+    function getLineCount: integer; override;
+    function getLineHeight: Single; override;
     Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
     Procedure SetSelection(const AIndex: integer); overload; override;
   end;
@@ -392,56 +323,84 @@ type
 
 {$REGION ' MacOS'}
 {$IF defined(ALMacOS)}
-type
-
-  {************************}
-  TALMacEditControl = class;
 
   {******************************************}
-  IALMacEditTextField = interface(NSTextField)
+  TALMacBaseEditView = class(TALMacNativeView)
+  protected
+    function GetKeyboardType: TVirtualKeyboardType; virtual; abstract;
+    procedure setKeyboardType(const Value: TVirtualKeyboardType); virtual; abstract;
+    function GetAutoCapitalizationType: TALAutoCapitalizationType; virtual; abstract;
+    procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType); virtual; abstract;
+    function GetPassword: Boolean; virtual; abstract;
+    procedure setPassword(const Value: Boolean); virtual; abstract;
+    function GetCheckSpelling: Boolean; virtual; abstract;
+    procedure setCheckSpelling(const Value: Boolean); virtual; abstract;
+    function GetReturnKeyType: TReturnKeyType; virtual; abstract;
+    procedure setReturnKeyType(const Value: TReturnKeyType); virtual; abstract;
+    function GetPromptText: String; virtual; abstract;
+    procedure setPromptText(const Value: String); virtual; abstract;
+    function GetPromptTextColor: TAlphaColor; virtual; abstract;
+    procedure setPromptTextColor(const Value: TAlphaColor); virtual; abstract;
+    function GetTintColor: TAlphaColor; virtual; abstract;
+    procedure setTintColor(const Value: TAlphaColor); virtual; abstract;
+    function GetFillColor: TAlphaColor; virtual; abstract;
+    procedure SetFillColor(const Value: TAlphaColor); virtual; abstract;
+    function GetTextSettings: TALBaseTextSettings; virtual; abstract;
+    procedure SetTextSettings(const Value: TALBaseTextSettings); virtual; abstract;
+    function getText: String; virtual; abstract;
+    procedure SetText(const Value: String); virtual; abstract;
+    function GetMaxLength: integer; virtual; abstract;
+    procedure SetMaxLength(const Value: integer); virtual; abstract;
+  public
+    function getLineCount: integer; virtual; abstract;
+    function getLineHeight: Single; virtual; abstract;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual; abstract;
+    Procedure SetSelection(const AIndex: integer); overload; virtual; abstract;
+    property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType;
+    property KeyboardType: TVirtualKeyboardType read GetKeyboardType write SetKeyboardType;
+    property AutoCapitalizationType: TALAutoCapitalizationType read GetAutoCapitalizationType write SetAutoCapitalizationType;
+    property Password: Boolean read GetPassword write SetPassword;
+    property PromptText: String read GetPromptText write setPromptText;
+    property PromptTextColor: TAlphaColor read GetPromptTextColor write setPromptTextColor; // Null mean use the default color
+    property TintColor: TalphaColor read GetTintColor write SetTintColor;
+    property FillColor: TAlphaColor read GetFillColor write SetFillColor;
+    property MaxLength: integer read GetMaxLength write SetMaxLength;
+    property Text: String read getText write SetText;
+    property TextSettings: TALBaseTextSettings read GetTextSettings write SetTextSettings;
+    property CheckSpelling: Boolean read GetCheckSpelling write SetCheckSpelling;
+  end;
+
+  {*************************************}
+  IALMacEditView = interface(NSTextField)
     ['{8FA87FC0-77FB-4451-8F92-52EE1AFDD94C}']
     function acceptsFirstResponder: Boolean; cdecl;
     function becomeFirstResponder: Boolean; cdecl;
   end;
 
-  {*******************************************}
-  TALMacEditTextField = class(TALMacNativeView)
+  {****************************************}
+  TALMacEditView = class(TALMacBaseEditView)
   private
-    FEditControl: TALMacEditControl;
-    function GetView: NSTextField;
-  protected
-    function GetObjectiveCClass: PTypeInfo; override;
-  public
-    procedure SetEnabled(const value: Boolean); override;
-  public
-    constructor Create; overload; override;
-    constructor Create(const AControl: TControl); overload; override;
-    function acceptsFirstResponder: Boolean; cdecl;
-    function becomeFirstResponder: Boolean; cdecl;
-    property View: NSTextField read GetView;
-  end;
-
-  {***********************************************************************************************}
-  TALMacEditTextFieldDelegate = class(TOCLocal, Alcinoe.Macapi.AppKit.NSControlTextEditingDelegate)
+    type
+      // ------------------
+      // TTextFieldDelegate
+      TTextFieldDelegate = class(TOCLocal, NSTextFieldDelegate)
+      private
+        FEditView: TALMacEditView;
+      public
+        constructor Create(const AEditView: TALMacEditView);
+        procedure controlTextDidBeginEditing(obj: NSNotification); cdecl;
+        procedure controlTextDidEndEditing(obj: NSNotification); cdecl;
+        procedure controlTextDidChange(obj: NSNotification); cdecl;
+        [MethodName('control:textShouldBeginEditing:')]
+        function controlTextShouldBeginEditing(control: NSControl; textShouldBeginEditing: NSText): Boolean; cdecl;
+        [MethodName('control:textShouldEndEditing:')]
+        function controlTextShouldEndEditing(control: NSControl; textShouldEndEditing: NSText): Boolean; cdecl;
+        [MethodName('control:textView:doCommandBySelector:')]
+        function controlTextViewDoCommandBySelector(control: NSControl; textView: NSTextView; doCommandBySelector: SEL): Boolean; cdecl;
+      end;
   private
-    FEditControl: TALMacEditControl;
-  public
-    constructor Create(const AEditControl: TALMacEditControl);
-    procedure controlTextDidBeginEditing(obj: NSNotification); cdecl;
-    procedure controlTextDidEndEditing(obj: NSNotification); cdecl;
-    procedure controlTextDidChange(obj: NSNotification); cdecl;
-    [MethodName('control:textShouldBeginEditing:')]
-    function controlTextShouldBeginEditing(control: NSControl; textShouldBeginEditing: NSText): Boolean; cdecl;
-    [MethodName('control:textShouldEndEditing:')]
-    function controlTextShouldEndEditing(control: NSControl; textShouldEndEditing: NSText): Boolean; cdecl;
-    [MethodName('control:textView:doCommandBySelector:')]
-    function controlTextViewDoCommandBySelector(control: NSControl; textView: NSTextView; doCommandBySelector: SEL): Boolean; cdecl;
-  end;
-
-  {*******************************************}
-  TALMacEditControl = class(TALBaseEditControl)
-  private
-    FTextFieldDelegate: TALMacEditTextFieldDelegate;
+    FTextFieldDelegate: TTextFieldDelegate;
+    FTextSettings: TALBaseTextSettings;
     FFillColor: TAlphaColor;
     fMaxLength: integer;
     fReturnKeyType: TReturnKeyType;
@@ -451,10 +410,12 @@ type
     fCheckSpelling: boolean;
     fPromptTextColor: TalphaColor;
     fTintColor: TalphaColor;
+    function GetView: NSTextField;
+    function GetControl: TALBaseEdit;
+    procedure applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor);
+    procedure TextSettingsChanged(Sender: TObject);
+    procedure DoChange;
   protected
-    procedure applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor); virtual;
-    Function CreateNativeView: TALMacNativeView; override;
-    function GetNativeView: TALMacEditTextField; reintroduce; virtual;
     function GetKeyboardType: TVirtualKeyboardType; override;
     procedure setKeyboardType(const Value: TVirtualKeyboardType); override;
     function GetAutoCapitalizationType: TALAutoCapitalizationType; override;
@@ -473,16 +434,22 @@ type
     procedure setTintColor(const Value: TAlphaColor); override;
     function GetFillColor: TAlphaColor; override;
     procedure SetFillColor(const Value: TAlphaColor); override;
-    procedure TextSettingsChanged(Sender: TObject); override;
+    function GetTextSettings: TALBaseTextSettings; override;
+    procedure SetTextSettings(const Value: TALBaseTextSettings); override;
     function getText: String; override;
     procedure SetText(const Value: String); override;
     function GetMaxLength: integer; override;
     procedure SetMaxLength(const Value: integer); override;
+  protected
+    function GetObjectiveCClass: PTypeInfo; override;
   public
-    constructor Create(AOwner: TComponent); override;
+    constructor Create; overload; override;
     destructor Destroy; override;
-    function getLineHeight: Single; override; // It includes the line spacing
-    property NativeView: TALMacEditTextField read GetNativeView;
+    property View: NSTextField read GetView;
+    property Control: TALBaseEdit read GetControl;
+    procedure SetEnabled(const value: Boolean); override;
+    function getLineCount: integer; override;
+    function getLineHeight: Single; override;
     Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
     Procedure SetSelection(const AIndex: integer); overload; override;
   end;
@@ -492,21 +459,48 @@ type
 
 {$REGION ' MSWINDOWS'}
 {$IF defined(MSWINDOWS)}
-type
-
-  {************************}
-  TALWinEditControl = class;
 
   {**************************************}
   TALWinEditView = class(TALWinNativeView)
   private
+    FTextSettings: TALBaseTextSettings;
+    FFillColor: TAlphaColor;
+    FPromptText: String;
+    FPromptTextColor: TalphaColor;
+    fReturnKeyType: TReturnKeyType;
+    fKeyboardType: TVirtualKeyboardType;
+    fAutoCapitalizationType: TALAutoCapitalizationType;
+    fCheckSpelling: boolean;
+    fTintColor: TalphaColor;
     FFontHandle: HFONT;
     FBackgroundBrush: HBRUSH;
-    FEditControl: TALWinEditControl;
-    {$IF not defined(ALDPK)}
+    function GetControl: TALBaseEdit;
     procedure UpdateFontHandle;
     procedure UpdateBackgroundBrush;
-    {$ENDIF}
+    function GetKeyboardType: TVirtualKeyboardType;
+    procedure setKeyboardType(const Value: TVirtualKeyboardType);
+    function GetAutoCapitalizationType: TALAutoCapitalizationType;
+    procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
+    function GetPassword: Boolean;
+    procedure setPassword(const Value: Boolean);
+    function GetCheckSpelling: Boolean;
+    procedure setCheckSpelling(const Value: Boolean);
+    function GetReturnKeyType: TReturnKeyType;
+    procedure setReturnKeyType(const Value: TReturnKeyType);
+    function GetPromptText: String;
+    procedure setPromptText(const Value: String);
+    function GetPromptTextColor: TAlphaColor;
+    procedure setPromptTextColor(const Value: TAlphaColor);
+    function GetTintColor: TAlphaColor;
+    procedure setTintColor(const Value: TAlphaColor);
+    function GetFillColor: TAlphaColor;
+    procedure SetFillColor(const Value: TAlphaColor);
+    procedure SetTextSettings(const Value: TALBaseTextSettings);
+    procedure TextSettingsChanged(Sender: TObject);
+    function getText: String;
+    procedure SetText(const Value: String);
+    function GetMaxLength: integer;
+    procedure SetMaxLength(const Value: integer);
     procedure WMKeyDown(var Message: TWMKeyDown); message WM_KEYDOWN;
     procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
     procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
@@ -522,70 +516,40 @@ type
   protected
     procedure CreateParams(var Params: TCreateParams); override;
   public
-    constructor Create(const AControl: TControl); override;
+    constructor Create; override;
     destructor Destroy; override;
-    property EditControl: TALWinEditControl read FEditControl;
-  end;
-
-  {*******************************************}
-  TALWinEditControl = class(TALBaseEditControl)
-  private
-    FFillColor: TAlphaColor;
-    FPromptText: String;
-    FPromptTextColor: TalphaColor;
-    fReturnKeyType: TReturnKeyType;
-    fKeyboardType: TVirtualKeyboardType;
-    fAutoCapitalizationType: TALAutoCapitalizationType;
-    fCheckSpelling: boolean;
-    fTintColor: TalphaColor;
-    {$IF defined(ALDPK)}
-    FPassword: Boolean;
-    FMaxLength: Integer;
-    FText: String;
-    {$ENDIF}
-  protected
-    Function CreateNativeView: TALWinNativeView; override;
-    function GetNativeView: TALWinEditView; reintroduce; virtual;
-    function GetKeyboardType: TVirtualKeyboardType; override;
-    procedure setKeyboardType(const Value: TVirtualKeyboardType); override;
-    function GetAutoCapitalizationType: TALAutoCapitalizationType; override;
-    procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType); override;
-    function GetPassword: Boolean; override;
-    procedure setPassword(const Value: Boolean); override;
-    function GetCheckSpelling: Boolean; override;
-    procedure setCheckSpelling(const Value: Boolean); override;
-    function GetReturnKeyType: TReturnKeyType; override;
-    procedure setReturnKeyType(const Value: TReturnKeyType); override;
-    function GetPromptText: String; override;
-    procedure setPromptText(const Value: String); override;
-    function GetPromptTextColor: TAlphaColor; override;
-    procedure setPromptTextColor(const Value: TAlphaColor); override;
-    function GetTintColor: TAlphaColor; override;
-    procedure setTintColor(const Value: TAlphaColor); override;
-    function GetFillColor: TAlphaColor; override;
-    procedure SetFillColor(const Value: TAlphaColor); override;
-    procedure TextSettingsChanged(Sender: TObject); override;
-    function getText: String; override;
-    procedure SetText(const Value: String); override;
-    function GetMaxLength: integer; override;
-    procedure SetMaxLength(const Value: integer); override;
-  public
-    constructor Create(AOwner: TComponent); override;
-    function getLineHeight: Single; override; // It includes the line spacing
-    property NativeView: TALWinEditView read GetNativeView;
-    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; override;
-    Procedure SetSelection(const AIndex: integer); overload; override;
+    property Control: TALBaseEdit read GetControl;
+    function getLineCount: integer; virtual;
+    function getLineHeight: Single; virtual;
+    Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual;
+    Procedure SetSelection(const AIndex: integer); overload; virtual;
+    property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType;
+    property KeyboardType: TVirtualKeyboardType read GetKeyboardType write SetKeyboardType;
+    property AutoCapitalizationType: TALAutoCapitalizationType read GetAutoCapitalizationType write SetAutoCapitalizationType;
+    property Password: Boolean read GetPassword write SetPassword;
+    property PromptText: String read GetPromptText write setPromptText;
+    property PromptTextColor: TAlphaColor read GetPromptTextColor write setPromptTextColor; // Null mean use the default color
+    property TintColor: TalphaColor read GetTintColor write SetTintColor;
+    property FillColor: TAlphaColor read GetFillColor write SetFillColor;
+    property MaxLength: integer read GetMaxLength write SetMaxLength;
+    property Text: String read getText write SetText;
+    property TextSettings: TALBaseTextSettings read FTextSettings write SetTextSettings;
+    property CheckSpelling: Boolean read GetCheckSpelling write SetCheckSpelling;
   end;
 
 {$endif}
 {$ENDREGION}
 
-type
-
-  {*******************************************************************************************************}
-  TALBaseEdit = class(TALBaseRectangle, IVirtualKeyboardControl, IControlTypeSupportable, IALNativeControl)
+  {************************************************************}
+  TALBaseEdit = class(TALNativeControl, IVirtualKeyboardControl)
   public
     type
+      // -----
+      // TFill
+      TFill = class(TALBrush)
+      protected
+        function GetDefaultColor: TAlphaColor; override;
+      end;
       // -------
       // TStroke
       TStroke = class(TALStrokeBrush)
@@ -648,7 +612,6 @@ type
         property Ellipsis;
         property MaxLines;
         property IsHtml;
-        property Trimming;
         property LineHeightMultiplier;
         property LetterSpacing;
         property Margins: TALBounds read FMargins write SetMargins;
@@ -691,7 +654,6 @@ type
         property Ellipsis;
         property MaxLines;
         property IsHtml;
-        property Trimming;
         property LineHeightMultiplier;
         property LetterSpacing;
         property Margins: TALBounds read FMargins write SetMargins;
@@ -744,16 +706,18 @@ type
           end;
       private
         FPromptTextColor: TalphaColor;
+        FPromptTextColorKey: String;
         FTintColor: TalphaColor;
+        FTintColorKey: String;
         FTextSettings: TBaseStateStyle.TTextSettings;
         FLabelTextSettings: TBaseStateStyle.TLabelTextSettings;
         FSupportingTextSettings: TBaseStateStyle.TSupportingTextSettings;
-        FPriorSupersedePromptTextColor: TalphaColor;
-        FPriorSupersedeTintColor: TalphaColor;
         function GetStateStyleParent: TBaseStateStyle;
         function GetControlParent: TALBaseEdit;
         procedure SetPromptTextColor(const AValue: TAlphaColor);
+        procedure SetPromptTextColorKey(const AValue: String);
         procedure SetTintColor(const AValue: TAlphaColor);
+        procedure SetTintColorKey(const AValue: String);
         procedure SetTextSettings(const AValue: TBaseStateStyle.TTextSettings);
         procedure SetLabelTextSettings(const AValue: TBaseStateStyle.TLabelTextSettings);
         procedure SetSupportingTextSettings(const AValue: TBaseStateStyle.TSupportingTextSettings);
@@ -761,14 +725,20 @@ type
         procedure LabelTextSettingsChanged(ASender: TObject);
         procedure SupportingTextSettingsChanged(ASender: TObject);
         function IsPromptTextColorStored: Boolean;
+        function IsPromptTextColorKeyStored: Boolean;
         function IsTintColorStored: Boolean;
+        function IsTintColorKeyStored: Boolean;
       protected
         function CreateStroke(const AParent: TALStrokeBrush): TALInheritStrokeBrush; override;
         function CreateTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TTextSettings; virtual;
         function CreateLabelTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TLabelTextSettings; virtual;
         function CreateSupportingTextSettings(const AParent: TALBaseTextSettings): TBaseStateStyle.TSupportingTextSettings; virtual;
+        procedure ApplyPromptTextColorScheme; virtual;
+        procedure ApplyTintColorScheme; virtual;
         function GetDefaultPromptTextColor: TalphaColor; virtual;
+        function GetDefaultPromptTextColorKey: String; virtual;
         function GetDefaultTintColor: TalphaColor; virtual;
+        function GetDefaultTintColorKey: String; virtual;
         function GetInherit: Boolean; override;
         procedure DoSupersede; override;
       public
@@ -788,17 +758,22 @@ type
         procedure Assign(Source: TPersistent); override;
         procedure Reset; override;
         procedure AlignToPixel; override;
-        procedure Interpolate(const ATo: TALBaseStateStyle; const ANormalizedTime: Single); override;
+        procedure ApplyColorScheme; override;
+        procedure Interpolate(const ATo: TALBaseStateStyle; const ANormalizedTime: Single; const AReverse: Boolean); override;
         property StateStyleParent: TBaseStateStyle read GetStateStyleParent;
         property ControlParent: TALBaseEdit read GetControlParent;
         property DefaultPromptTextColor: TalphaColor read GetDefaultPromptTextColor;
+        property DefaultPromptTextColorKey: String read GetDefaultPromptTextColorKey;
         property DefaultTintColor: TalphaColor read GetDefaultTintColor;
+        property DefaultTintColorKey: String read GetDefaultTintColorKey;
       published
         property LabelTextSettings: TBaseStateStyle.TLabelTextSettings read fLabelTextSettings write SetLabelTextSettings;
         property PromptTextColor: TAlphaColor read FPromptTextColor write SetPromptTextColor stored IsPromptTextColorStored;
+        property PromptTextColorKey: String read FPromptTextColorKey write SetPromptTextColorKey stored IsPromptTextColorKeyStored;
         property SupportingTextSettings: TBaseStateStyle.TSupportingTextSettings read fSupportingTextSettings write SetSupportingTextSettings;
         property TextSettings: TBaseStateStyle.TTextSettings read fTextSettings write SetTextSettings;
         property TintColor: TAlphaColor read FTintColor write SetTintColor stored IsTintColorStored;
+        property TintColorKey: String read FTintColorKey write SetTintColorKey stored IsTintColorKeyStored;
       end;
       // -------------------
       // TDisabledStateStyle
@@ -840,6 +815,17 @@ type
       // ------------
       // TStateStyles
       TStateStyles = class(TALBaseStateStyles)
+      public
+        type
+          // -----------
+          // TTransition
+          TTransition = class(TALBaseStateStyles.TTransition)
+          public
+            procedure Start; override;
+          protected
+            procedure DoProcess; override;
+            procedure DoFinish; override;
+          end;
       private
         FDisabled: TDisabledStateStyle;
         FHovered: THoveredStateStyle;
@@ -852,18 +838,17 @@ type
         procedure HoveredChanged(ASender: TObject);
         procedure FocusedChanged(ASender: TObject);
       protected
+        function CreateTransition: TALBaseStateStyles.TTransition; override;
         function CreateDisabledStateStyle(const AParent: TObject): TDisabledStateStyle; virtual;
         function CreateHoveredStateStyle(const AParent: TObject): THoveredStateStyle; virtual;
         function CreateFocusedStateStyle(const AParent: TObject): TFocusedStateStyle; virtual;
-        procedure StartTransition; override;
-        procedure TransitionAnimationProcess(Sender: TObject); override;
-        procedure TransitionAnimationFinish(Sender: TObject); override;
       public
         constructor Create(const AParent: TALControl); override;
         destructor Destroy; override;
         procedure Assign(Source: TPersistent); override;
         procedure Reset; override;
         procedure AlignToPixel; override;
+        procedure ApplyColorScheme; override;
         procedure ClearBufDrawable; override;
         procedure ClearBufPromptTextDrawable;
         procedure ClearBufLabelTextDrawable;
@@ -877,15 +862,15 @@ type
         property Transition;
       end;
   private
-    fDefStyleAttr: String;
-    fDefStyleRes: String;
     FAutoTranslate: Boolean;
     fOnChange: TNotifyEvent;
     fOnReturnKey: TNotifyEvent;
     FTextSettings: TTextSettings;
     FPromptText: String;
     FPromptTextColor: TAlphaColor;
+    FPromptTextColorKey: String;
     FTintcolor: TAlphaColor;
+    FTintcolorKey: String;
     FLabelText: String;
     FLabelTextSettings: TLabelTextSettings;
     FlabelTextAnimation: TALFloatAnimation;
@@ -897,8 +882,16 @@ type
     {$ENDIF}
     FStateStyles: TStateStyles;
     FIsTextEmpty: Boolean;
-    FNativeViewRemoved: Boolean;
-    fEditControl: TALBaseEditControl;
+    FNativeViewFrozenByPaint: Boolean;
+    //--
+    FDummyFillColor: TAlphaColor;
+    fDummyReturnKeyType: TReturnKeyType;
+    fDummyKeyboardType: TVirtualKeyboardType;
+    fDummyAutoCapitalizationType: TALAutoCapitalizationType;
+    fDummyCheckSpelling: boolean;
+    FDummyPassword: Boolean;
+    FDummyMaxLength: Integer;
+    FDummyText: String;
     //--
     fBufPromptTextDrawable: TALDrawable;
     fBufPromptTextDrawableRect: TRectF;
@@ -908,15 +901,20 @@ type
     fBufSupportingTextDrawableRect: TRectF;
     //--
     procedure UpdateEditControlPromptText;
+    function ShouldHideNativeView: Boolean;
     procedure UpdateNativeViewVisibility;
     function GetPromptText: String;
     procedure setPromptText(const Value: String);
     function GetPromptTextColor: TAlphaColor;
+    function GetPromptTextColorKey: String;
     procedure setPromptTextColor(const Value: TAlphaColor);
+    procedure setPromptTextColorKey(const Value: String);
     procedure setLabelText(const Value: String);
     procedure setSupportingText(const Value: String);
     function GetTintColor: TAlphaColor;
+    function GetTintColorKey: String;
     procedure setTintColor(const Value: TAlphaColor);
+    procedure setTintColorKey(const Value: String);
     procedure SetTextSettings(const Value: TTextSettings);
     procedure SetLabelTextSettings(const Value: TLabelTextSettings);
     procedure SetSupportingTextSettings(const Value: TSupportingTextSettings);
@@ -924,59 +922,63 @@ type
     function getText: String;
     procedure SetText(const Value: String);
     function GetIsTextEmpty: Boolean; inline;
-    procedure OnChangeImpl(Sender: TObject);
-    procedure OnReturnKeyImpl(Sender: TObject);
-    procedure SetOnReturnKey(const Value: TNotifyEvent);
     procedure setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
     function GetAutoCapitalizationType: TALAutoCapitalizationType;
     procedure SetPassword(const Value: Boolean);
     function GetPassword: Boolean;
     procedure SetCheckSpelling(const Value: Boolean);
     function GetCheckSpelling: Boolean;
-    procedure SetDefStyleAttr(const Value: String);
-    procedure SetDefStyleRes(const Value: String);
     procedure SetMaxLength(const Value: integer);
     function GetMaxLength: integer;
     procedure LabelTextAnimationProcess(Sender: TObject);
     procedure LabelTextAnimationFinish(Sender: TObject);
     function HasOpacityLabelTextAnimation: Boolean;
     function HasTranslationLabelTextAnimation: Boolean;
-    procedure UpdateEditControlStyle;
+    procedure UpdateNativeViewStyle;
+    {$IF defined(android)}
+    function GetNativeView: TALAndroidEditView;
+    {$ELSEIF defined(IOS)}
+    function GetNativeView: TALIosBaseEditView;
+    {$ELSEIF defined(ALMacOS)}
+    function GetNativeView: TALMacBaseEditView;
+    {$ELSEIF defined(MSWindows)}
+    function GetNativeView: TALWinEditView;
+    {$ENDIF}
     { IVirtualKeyboardControl }
     procedure SetKeyboardType(Value: TVirtualKeyboardType);
     function GetKeyboardType: TVirtualKeyboardType;
     procedure SetReturnKeyType(Value: TReturnKeyType);
     function GetReturnKeyType: TReturnKeyType;
     function IVirtualKeyboardControl.IsPassword = GetPassword;
-    { IControlTypeSupportable }
-    function GetControlType: TControlType;
-    procedure SetControlType(const Value: TControlType);
   protected
+    {$IF defined(android)}
+    Function CreateNativeView: TALAndroidNativeView; override;
+    {$ELSEIF defined(IOS)}
+    Function CreateNativeView: TALIosNativeView; override;
+    {$ELSEIF defined(ALMacOS)}
+    Function CreateNativeView: TALMacNativeView; override;
+    {$ELSEIF defined(MSWindows)}
+    Function CreateNativeView: TALWinNativeView; override;
+    {$ENDIF}
+    Procedure ShowNativeView; override;
+    Procedure HideNativeView; override;
+    function CreateFill: TALBrush; override;
     function CreateStroke: TALStrokeBrush; override;
     function CreateTextSettings: TTextSettings; virtual;
     function CreateLabelTextSettings: TLabelTextSettings; virtual;
     function CreateSupportingTextSettings: TSupportingTextSettings; virtual;
     function CreateStateStyles: TStateStyles; virtual;
-    function CreateEditControl: TALBaseEditControl; virtual;
-    function GetEditControl: TALBaseEditControl; virtual;
-    property EditControl: TALBaseEditControl read GetEditControl;
-    {$IF defined(android)}
-    function GetNativeView: TALAndroidNativeView; virtual;
-    {$ELSEIF defined(IOS)}
-    function GetNativeView: TALIosNativeView; virtual;
-    {$ELSEIF defined(ALMacOS)}
-    function GetNativeView: TALMacNativeView; virtual;
-    {$ELSEIF defined(MSWindows)}
-    function GetNativeView: TALWinNativeView; virtual;
-    {$ENDIF}
-    procedure InitEditControl; virtual;
+    procedure ApplyPromptTextColorScheme; virtual;
+    procedure ApplyTintColorScheme; virtual;
+    procedure InitNativeView; override;
+    procedure RecreateNativeView; override;
+    procedure DoChange; virtual;
+    procedure DoReturnKey; virtual;
     procedure DoEnter; override;
     procedure DoExit; override;
     procedure IsMouseOverChanged; override;
     function GetDefaultSize: TSizeF; override;
     procedure Loaded; override;
-    procedure SetXRadius(const Value: Single); override;
-    procedure SetYRadius(const Value: Single); override;
     procedure TextSettingsChanged(Sender: TObject); virtual;
     procedure LabelTextSettingsChanged(Sender: TObject); virtual;
     procedure SupportingTextSettingsChanged(Sender: TObject); virtual;
@@ -1021,23 +1023,22 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
     procedure AlignToPixel; override;
+    procedure ApplyColorScheme; override;
     {$IF defined(android)}
-    property NativeView: TALAndroidNativeView read GetNativeView;
+    property NativeView: TALAndroidEditView read GetNativeView;
     {$ELSEIF defined(IOS)}
-    property NativeView: TALIosNativeView read GetNativeView;
+    property NativeView: TALIosBaseEditView read GetNativeView;
     {$ELSEIF defined(ALMacOS)}
-    property NativeView: TALMacNativeView read GetNativeView;
+    property NativeView: TALMacBaseEditView read GetNativeView;
     {$ELSEIF defined(MSWindows)}
-    property NativeView: TALWinNativeView read GetNativeView;
+    property NativeView: TALWinEditView read GetNativeView;
     {$ENDIF}
-    function HasNativeView: boolean;
-    Procedure AddNativeView;
-    Procedure RemoveNativeView;
     Procedure SetSelection(const AStart: integer; const AStop: Integer); overload; virtual;
     Procedure SetSelection(const AIndex: integer); overload; virtual;
     function getLineCount: integer;
-    function getLineHeight: Single; // It includes the line spacing
+    function getLineHeight: Single;
     procedure MakeBufDrawable; override;
     procedure MakeBufPromptTextDrawable; virtual;
     procedure MakeBufLabelTextDrawable; virtual;
@@ -1052,10 +1053,10 @@ type
     // a style resource that supplies defaults style values
     // Exemple of use: https://stackoverflow.com/questions/5051753/how-do-i-apply-a-style-programmatically
     // NOTE: !!IMPORTANT!! This properties must be defined the very first because the stream system must load it the very first
-    property DefStyleAttr: String read fDefStyleAttr write SetDefStyleAttr;
+    property DefStyleAttr;
     // Android only - the name of a style resource that supplies default style values
     // NOTE: !!IMPORTANT!! This properties must be defined the very first because the stream system must load it the very first
-    property DefStyleRes: String read fDefStyleRes write SetDefStyleRes;
+    property DefStyleRes;
     //property Action;
     property Align;
     property Anchors;
@@ -1066,6 +1067,7 @@ type
     //property CanParentFocus;
     //property Caret;
     property CheckSpelling: Boolean read GetCheckSpelling write SetCheckSpelling default true;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Corners;
@@ -1094,7 +1096,11 @@ type
     property PopupMenu;
     property Position;
     property PromptText: String read GetPromptText write setPromptText;
-    property PromptTextColor: TAlphaColor read GetPromptTextColor write setPromptTextColor default TalphaColors.null; // Null mean use the default PromptTextColor
+    /// <summary>
+    ///   Null mean use the default PromptTextColor
+    /// </summary>
+    property PromptTextColor: TAlphaColor read GetPromptTextColor write setPromptTextColor default TalphaColors.null;
+    property PromptTextColorKey: String read GetPromptTextColorKey write setPromptTextColorKey;
     //property ReadOnly;
     property ReturnKeyType: TReturnKeyType read GetReturnKeyType write SetReturnKeyType default TReturnKeyType.Default;
     //property RotationAngle;
@@ -1112,7 +1118,12 @@ type
     property TabStop;
     property Text: String read getText write SetText;
     property TextSettings: TTextSettings read FTextSettings write SetTextSettings;
-    property TintColor: TAlphaColor read GetTintColor write setTintColor default TalphaColors.null; // IOS only - the color of the cursor caret and the text selection handles. null mean use the default TintColor
+    /// <summary>
+    ///   IOS only - the color of the cursor caret and the text
+    ///   selection handles. null mean use the default TintColor
+    /// </summary>
+    property TintColor: TAlphaColor read GetTintColor write setTintColor default TalphaColors.null;
+    property TintColorKey: String read GetTintColorKey write setTintColorKey;
     property TouchTargetExpansion;
     property Visible;
     property Width;
@@ -1135,14 +1146,14 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown; // Not work under android - it's like this with their @{[^# virtual keyboard :(
     //property OnKeyUp; // Not work under android - it's like this with their @{[^# virtual keyboard :(
     property OnPainting;
     property OnPaint;
     //property OnResize;
     property OnResized;
-    property OnReturnKey: TNotifyEvent read fOnReturnKey write SetOnReturnKey;
+    property OnReturnKey: TNotifyEvent read fOnReturnKey write fOnReturnKey;
     //property OnTyping;
     //property OnValidate;
     //property OnValidating;
@@ -1155,10 +1166,24 @@ type
     procedure AdjustSize; override;
   public
     constructor Create(AOwner: TComponent); override;
-    function HasUnconstrainedAutosizeX: Boolean; override;
+    function HasUnconstrainedAutosizeWidth: Boolean; override;
   published
-    property AutoSize default True;
+    property AutoSize default TALAutoSizeMode.Both;
     property Password;
+  end;
+
+  {***************************}
+  TALDummyEdit = class(TALEdit)
+  protected
+    {$IF defined(android)}
+    Function CreateNativeView: TALAndroidNativeView; override;
+    {$ELSEIF defined(IOS)}
+    Function CreateNativeView: TALIosNativeView; override;
+    {$ELSEIF defined(ALMacOS)}
+    Function CreateNativeView: TALMacNativeView; override;
+    {$ELSEIF defined(MSWindows)}
+    Function CreateNativeView: TALWinNativeView; override;
+    {$ENDIF}
   end;
 
 procedure Register;
@@ -1169,9 +1194,12 @@ uses
   System.SysUtils,
   System.Math,
   System.Math.Vectors,
-  System.UIConsts,
-  FMX.Types3D,
   FMX.Utils,
+  FMX.Types3D,
+  Fmx.controls,
+  {$IF defined(ALBackwardCompatible)}
+  System.UIConsts,
+  {$endif}
   {$IF defined(android)}
   Androidapi.Helpers,
   Androidapi.Input,
@@ -1179,7 +1207,6 @@ uses
   Androidapi.JNI.App,
   Androidapi.JNI.Util,
   Androidapi.JNI.Os,
-  FMX.Platform,
   FMX.Platform.Android,
   FMX.Platform.UI.Android,
   {$ELSEIF defined(IOS)}
@@ -1187,16 +1214,13 @@ uses
   iOSapi.CocoaTypes,
   Macapi.Helpers,
   iOSapi.CoreText,
-  FMX.Platform.iOS,
   FMX.Helpers.iOS,
-  FMX.Consts,
-  Alcinoe.iOSapi.Foundation,
   {$ELSEIF defined(ALMacOS)}
+  Macapi.ObjCRuntime,
   Macapi.CoreFoundation,
   Macapi.Helpers,
   FMX.Helpers.Mac,
-  FMX.Consts,
-  Alcinoe.Macapi.Foundation,
+  Alcinoe.StringUtils,
   {$ELSEIF defined(MSWINDOWS)}
   Winapi.CommCtrl,
   Fmx.Forms,
@@ -1208,309 +1232,72 @@ uses
   {$IFDEF ALDPK}
   DesignIntf,
   {$ENDIF}
-  Alcinoe.FMX.Memo,
   Alcinoe.FMX.BreakText,
-  Alcinoe.StringUtils,
+  Alcinoe.FMX.Styles,
+  Alcinoe.FMX.Graphics,
   Alcinoe.Common;
 
 {**}
 Type
-  _TALBaseStateStyleAccessProtected = class(TALBaseStateStyle);
-
-{********************************************************}
-constructor TALBaseEditControl.Create(AOwner: TComponent);
-begin
-  inherited create(AOwner);
-  CanFocus := True;
-  fOnChange := nil;
-  FOnReturnKey := nil;
-  FTextSettings := TALBaseEdit.TTextSettings.Create;
-  FTextSettings.OnChanged := TextSettingsChanged;
-  FNativeView := CreateNativeView;
-end;
-
-{************************************}
-destructor TALBaseEditControl.Destroy;
-begin
-  ALFreeAndNil(FTextSettings);
-  ALFreeAndNil(FNativeView);
-  inherited Destroy;
-end;
-
-{********************}
-{$IF defined(android)}
-function TALBaseEditControl.GetNativeView: TALAndroidNativeView;
-begin
-  Result := FNativeView;
-end;
-{$ENDIF}
-
-{****************}
-{$IF defined(IOS)}
-function TALBaseEditControl.GetNativeView: TALIosNativeView;
-begin
-  Result := FNativeView;
-end;
-{$ENDIF}
-
-{********************}
-{$IF defined(ALMacOS)}
-function TALBaseEditControl.GetNativeView: TALMacNativeView;
-begin
-  Result := FNativeView;
-end;
-{$ENDIF}
-
-{**********************}
-{$IF defined(MSWindows)}
-function TALBaseEditControl.GetNativeView: TALWinNativeView;
-begin
-  Result := FNativeView;
-end;
-{$ENDIF}
-
-{*****************************************************************************}
-procedure TALBaseEditControl.SetTextSettings(const Value: TALBaseTextSettings);
-begin
-  FTextSettings.Assign(Value);
-end;
-
-{************************************}
-procedure TALBaseEditControl.DoChange;
-begin
-  if assigned(fOnChange) then
-    fOnChange(self);
-end;
-
-{***************************************}
-procedure TALBaseEditControl.DoReturnKey;
-begin
-  if assigned(fOnReturnKey) then
-    fOnReturnKey(self);
-end;
-
-{*****************************************}
-procedure TALBaseEditControl.DoRootChanged;
-begin
-  inherited;
-  if csDestroying in ComponentState then exit;
-  {$IF not defined(ALDPK)}
-  NativeView.RootChanged(Root);
-  {$ENDIF}
-end;
-
-{**********************************}
-procedure TALBaseEditControl.Resize;
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  NativeView.UpdateFrame;
-  {$ENDIF}
-end;
-
-{*********************************************}
-procedure TALBaseEditControl.DoAbsoluteChanged;
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  if not (csLoading in ComponentState) then
-    NativeView.UpdateFrame;
-  {$ENDIF}
-end;
-
-{******************************************}
-procedure TALBaseEditControl.VisibleChanged;
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  NativeView.SetVisible(Visible);
-  {$ENDIF}
-end;
-
-{***************************************}
-procedure TALBaseEditControl.ChangeOrder;
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  NativeView.ChangeOrder;
-  {$ENDIF}
-end;
-
-{*****************************************}
-procedure TALBaseEditControl.RecalcOpacity;
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  NativeView.setAlpha(AbsoluteOpacity);
-  {$ENDIF}
-end;
-
-{*****************************************}
-procedure TALBaseEditControl.RecalcEnabled;
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  NativeView.SetEnabled(AbsoluteEnabled);
-  {$ENDIF}
-end;
-
-{*************************************************}
-function TALBaseEditControl.HasNativeView: boolean;
-begin
-  {$IF not defined(ALDPK)}
-  Result := NativeView.Visible;
-  {$ELSE}
-  Result := false;
-  {$ENDIF}
-end;
-
-{*****************************************}
-Procedure TALBaseEditControl.AddNativeView;
-begin
-  {$IF not defined(ALDPK)}
-  if NativeView.visible then exit;
-  NativeView.SetVisible(true);
-  if Parentcontrol.IsFocused then begin
-    NativeView.SetFocus;
-    {$IF defined(android)}
-    ALVirtualKeyboardVisible := True;
-    {$IF defined(DEBUG)}
-    ALLog('TALBaseEditControl.showVirtualKeyboard', 'control.name: ' + Name);
-    {$ENDIF}
-    MainActivity.getVirtualKeyboard.showFor(NativeView.View);
-    {$ENDIF}
-  end;
-  {$ENDIF}
-end;
-
-{********************************************}
-Procedure TALBaseEditControl.RemoveNativeView;
-begin
-  {$IF not defined(ALDPK)}
-  if not NativeView.visible then exit;
-  NativeView.ResetFocus;
-  {$IF defined(android)}
-  ALVirtualKeyboardVisible := False;
-  TThread.ForceQueue(nil,
-    procedure
-    begin
-      If not ALVirtualKeyboardVisible then begin
-        {$IF defined(DEBUG)}
-        ALLog('TALBaseEditControl.hideVirtualKeyboard');
-        {$ENDIF}
-        MainActivity.getVirtualKeyboard.hide;
-      end;
-    end);
-  {$ENDIF}
-  NativeView.SetVisible(False);
-  {$ENDIF}
-end;
-
-{**************************************************************************}
-procedure TALBaseEditControl.AncestorVisibleChanged(const Visible: Boolean);
-begin
-  inherited;
-  {$IF not defined(ALDPK)}
-  NativeView.AncestorVisibleChanged;
-  {$ENDIF}
-end;
-
-{*************************************************}
-procedure TALBaseEditControl.AncestorParentChanged;
-begin
-  inherited;
-  if csDestroying in ComponentState then exit;
-  {$IF not defined(ALDPK)}
-  NativeView.UpdateFrame;
-  {$ENDIF}
-end;
-
-{*****************************************}
-procedure TALBaseEditControl.ParentChanged;
-begin
-  inherited;
-  if csDestroying in ComponentState then exit;
-  {$IF not defined(ALDPK)}
-  NativeView.UpdateFrame;
-  {$ENDIF}
-end;
-
-{***************************************}
-procedure TALBaseEditControl.DoEndUpdate;
-begin
-  inherited;
-  if csDestroying in ComponentState then exit;
-  // Without this, in some case when we are doing beginupdate to the TEdit
-  // (because in android for exemple we would like to not refresh the position of the control during calculation)
-  // then when we do endupdate the control is not paint or lost somewhere
-  {$IF not defined(ALDPK)}
-  NativeView.UpdateFrame;
-  {$ENDIF}
-end;
-
-{************************************************}
-function TALBaseEditControl.getLineCount: integer;
-begin
-  Result := 1;
-end;
+  _TALBaseStateStyleProtectedAccess = class(TALBaseStateStyle);
 
 {$REGION ' ANDROID'}
 {$IF defined(android)}
 
-{**********************************************************************************************}
-constructor TALAndroidEditText.TALKeyPreImeListener.Create(const aEditText: TALAndroidEditText);
+{********************************************************************************************}
+constructor TALAndroidEditView.TKeyPreImeListener.Create(const aEditView: TALAndroidEditView);
 begin
   inherited Create;
-  FEditText := aEditText;
+  FEditView := aEditView;
 end;
 
-{********************************************************************************************************}
-function TALAndroidEditText.TALKeyPreImeListener.onKeyPreIme(keyCode: Integer; event: JKeyEvent): Boolean;
+{******************************************************************************************************}
+function TALAndroidEditView.TKeyPreImeListener.onKeyPreIme(keyCode: Integer; event: JKeyEvent): Boolean;
 begin
   {$IF defined(DEBUG)}
-  if event <> nil then
-    ALLog(
-      'TALAndroidEditText.TALKeyPreImeListener.onKeyPreIme',
-      'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
-      'keyCode: ' + inttostr(keyCode) + ' | ' +
-      'event: ' + JstringToString(event.toString))
-  else
-    ALLog(
-      'TALAndroidEditText.TALKeyPreImeListener.onKeyPreIme',
-      'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
-      'keyCode: ' + inttostr(keyCode));
+  //if event <> nil then
+  //  ALLog(
+  //    Classname + '.onKeyPreIme',
+  //    'control.name: ' + FEditText.Control.Name + ' | ' +
+  //    'keyCode: ' + inttostr(keyCode) + ' | ' +
+  //    'event: ' + JstringToString(event.toString))
+  //else
+  //  ALLog(
+  //    Classname + '.onKeyPreIme',
+  //    'control.name: ' + FEditText.Control.Name + ' | ' +
+  //    'keyCode: ' + inttostr(keyCode));
   {$ENDIF}
   if ((event = nil) or (event.getAction = AKEY_EVENT_ACTION_UP)) and
      (keyCode = AKEYCODE_BACK) then begin
 
     result := true;
-    FEditText.FEditcontrol.resetfocus;
+    FEditView.control.resetfocus;
 
   end
   else result := false;
 end;
 
-{******************************************************************************************}
-constructor TALAndroidEditText.TALTouchListener.Create(const aEditText: TALAndroidEditText);
+{****************************************************************************************}
+constructor TALAndroidEditView.TTouchListener.Create(const aEditView: TALAndroidEditView);
 begin
   inherited Create;
-  FEditText := aEditText;
+  FEditView := aEditView;
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Presentation.Android.TAndroidNativeView.ProcessTouch was not updated and adjust the IFDEF'}
 {$ENDIF}
-function TALAndroidEditText.TALTouchListener.onTouch(v: JView; event: JMotionEvent): Boolean;
+function TALAndroidEditView.TTouchListener.onTouch(v: JView; event: JMotionEvent): Boolean;
 begin
-  if (FEditText.Form <> nil) and
-     (not FeditText.view.hasFocus) and
-     ((not FeditText.fIsMultiline) or
-      (FeditText.FEditControl.getLineCount < FeditText.FeditControl.Height / FeditText.FeditControl.getLineHeight)) then begin
+  if (FEditView.Form <> nil) and
+     (not FEditView.view.hasFocus) and
+     ((not FEditView.fIsMultiline) or
+      (FEditView.getLineCount < FEditView.Control.GetNativeViewHeight / FEditView.getLineHeight)) then begin
 
     var LHandle: TAndroidWindowHandle;
-    if FEditText.Form.IsHandleAllocated then
-      LHandle := WindowHandleToPlatform(FEditText.Form.Handle)
+    if FEditView.Form.IsHandleAllocated then
+      LHandle := WindowHandleToPlatform(FEditView.Form.Handle)
     else
       LHandle := nil;
 
@@ -1518,24 +1305,24 @@ begin
       LHandle.CurrentMotionEvent := event;
 
     var LTouchPoint := TPointF.Create(event.getRawX / ALGetScreenScale, event.getRawY / ALGetScreenScale);
-    LTouchPoint := FEditText.Form.ScreenToClient(LTouchPoint);
+    LTouchPoint := FEditView.Form.ScreenToClient(LTouchPoint);
     var LEventAction := event.getAction;
     if LEventAction = TJMotionEvent.JavaClass.ACTION_DOWN then begin
-      FEditText.Form.MouseMove([ssTouch], LTouchPoint.X, LTouchPoint.Y);
-      FEditText.Form.MouseMove([], LTouchPoint.X, LTouchPoint.Y); // Require for correct IsMouseOver handle
-      FEditText.Form.MouseDown(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
+      FEditView.Form.MouseMove([ssTouch], LTouchPoint.X, LTouchPoint.Y);
+      FEditView.Form.MouseMove([], LTouchPoint.X, LTouchPoint.Y); // Require for correct IsMouseOver handle
+      FEditView.Form.MouseDown(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
     end
     else if LEventAction = TJMotionEvent.JavaClass.ACTION_MOVE then begin
-      FEditText.Form.MouseMove([ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y)
+      FEditView.Form.MouseMove([ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y)
     end
     else if LEventAction = TJMotionEvent.JavaClass.ACTION_CANCEL then begin
-      FEditText.Form.MouseUp(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y, False);
-      FEditText.Form.MouseLeave;
+      FEditView.Form.MouseUp(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y, False);
+      FEditView.Form.MouseLeave;
     end
     else if LEventAction = TJMotionEvent.JavaClass.ACTION_UP then
     begin
-      FEditText.Form.MouseUp(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
-      FEditText.Form.MouseLeave;
+      FEditView.Form.MouseUp(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
+      FEditView.Form.MouseLeave;
     end;
     Result := True;
 
@@ -1546,62 +1333,62 @@ begin
   else begin
     // In Android, within a single-line EditText, it's possible for the text line to shift slightly vertically
     // (as if the text is taller than the line height). To prevent this minor scrolling, we consume the touch event.
-    if (not FeditText.fIsMultiline) and (FeditText.view.hasFocus) and (event.getAction() = TJMotionEvent.JavaClass.ACTION_MOVE) then result := true
+    if (not FEditView.fIsMultiline) and (FEditView.view.hasFocus) and (event.getAction() = TJMotionEvent.JavaClass.ACTION_MOVE) then result := true
     else result := false;
   end
 end;
 
-{****************************************************************************************}
-constructor TALAndroidEditText.TALTextWatcher.Create(const aEditText: TALAndroidEditText);
+{**************************************************************************************}
+constructor TALAndroidEditView.TTextWatcher.Create(const aEditView: TALAndroidEditView);
 begin
   inherited Create;
-  FEditText := aEditText;
+  FEditView := aEditView;
 end;
 
-{*************************************************************************}
-procedure TALAndroidEditText.TALTextWatcher.afterTextChanged(s: JEditable);
+{***********************************************************************}
+procedure TALAndroidEditView.TTextWatcher.afterTextChanged(s: JEditable);
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALAndroidEditText.TALTextWatcher.afterTextChanged', 'control.name: ' + FEditText.FEditControl.parent.Name);
+  //ALLog(Classname + '.afterTextChanged', 'control.name: ' + FEditText.Control.Name);
   {$ENDIF}
-  FEditText.fEditControl.DoChange;
+  FEditView.Control.DoChange;
 end;
 
-{******************************************************************************************************************************}
-procedure TALAndroidEditText.TALTextWatcher.beforeTextChanged(s: JCharSequence; start: Integer; count: Integer; after: Integer);
+{****************************************************************************************************************************}
+procedure TALAndroidEditView.TTextWatcher.beforeTextChanged(s: JCharSequence; start: Integer; count: Integer; after: Integer);
 begin
   // Nothing to do
 end;
 
-{***************************************************************************************************************************}
-procedure TALAndroidEditText.TALTextWatcher.onTextChanged(s: JCharSequence; start: Integer; before: Integer; count: Integer);
+{*************************************************************************************************************************}
+procedure TALAndroidEditView.TTextWatcher.onTextChanged(s: JCharSequence; start: Integer; before: Integer; count: Integer);
 begin
   // Nothing to do
 end;
 
-{**********************************************************************************************************************************************}
-constructor TALAndroidEditText.TALEditorActionListener.Create(const aEditText: TALAndroidEditText; const aIsMultiLineEditText: Boolean = false);
+{********************************************************************************************************************************************}
+constructor TALAndroidEditView.TEditorActionListener.Create(const aEditView: TALAndroidEditView; const aIsMultiLineEditText: Boolean = false);
 begin
   inherited Create;
   fIsMultiLineEditText := aIsMultiLineEditText;
-  FEditText := aEditText;
+  FEditView := aEditView;
 end;
 
-{*****************************************************************************************************************************}
-function TALAndroidEditText.TALEditorActionListener.onEditorAction(v: JTextView; actionId: Integer; event: JKeyEvent): Boolean;
+{***************************************************************************************************************************}
+function TALAndroidEditView.TEditorActionListener.onEditorAction(v: JTextView; actionId: Integer; event: JKeyEvent): Boolean;
 begin
   {$IF defined(DEBUG)}
-   if event <> nil then
-     ALLog(
-       'TALAndroidEditText.TALEditorActionListener.onEditorAction',
-       'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
-       'actionId: ' + inttostr(actionId) + ' | ' +
-       'event: ' + JstringToString(event.toString))
-   else
-     ALLog(
-       'TALAndroidEditText.TALEditorActionListener.onEditorAction',
-       'control.name: ' + FEditText.FEditControl.parent.Name + ' | ' +
-       'actionId: ' + inttostr(actionId));
+  //if event <> nil then
+  //  ALLog(
+  //    Classname + '.onEditorAction',
+  //    'control.name: ' + FEditText.Control.Name + ' | ' +
+  //    'actionId: ' + inttostr(actionId) + ' | ' +
+  //    'event: ' + JstringToString(event.toString))
+  //else
+  //  ALLog(
+  //    Classname + '.onEditorAction',
+  //    'control.name: ' + FEditText.Control.Name + ' | ' +
+  //    'actionId: ' + inttostr(actionId));
   {$ENDIF}
   //IME_ACTION_DONE: the action key performs a "done" operation, typically meaning there is nothing more to input and the IME will be closed.
   //IME_ACTION_GO: the action key performs a "go" operation to take the user to the target of the text they typed. Typically used, for example, when entering a URL.
@@ -1611,7 +1398,7 @@ begin
   //IME_ACTION_SEARCH: the action key performs a "search" operation, taking the user to the results of searching for the text they have typed (in whatever context is appropriate).
   //IME_ACTION_SEND: the action key performs a "send" operation, delivering the text to its target. This is typically used when composing a message in IM or SMS where sending is immediate.
   //IME_ACTION_UNSPECIFIED: no specific action has been associated with this editor, let the editor come up with its own if it can.
-  if (assigned(FEditText.FEditControl.OnReturnKey)) and
+  if (assigned(FEditView.Control.OnReturnKey)) and
      (((actionId = TJEditorInfo.javaClass.IME_ACTION_UNSPECIFIED) and // IME_ACTION_UNSPECIFIED = the return key
        (not fIsMultiLineEditText)) or
       (actionId = TJEditorInfo.javaClass.IME_ACTION_DONE) or
@@ -1621,31 +1408,65 @@ begin
       (actionId = TJEditorInfo.javaClass.IME_ACTION_SEND)) then begin
 
     result := true;
-    FEditText.FEditControl.DoReturnKey;
+    FEditView.Control.DoReturnKey;
 
   end
-  else result := false;
+  else begin
+    // When using TYPE_CLASS_NUMBER: pressing Return can make Android switch to
+    // the default keyboard during the dismiss animation. To avoid this, set the
+    // Return key to IME_ACTION_DONE, handle the action manually (clear focus and
+    // hide the keyboard), and return true to consume the event so Android does
+    // not move focus to another control (which would trigger a keyboard type
+    // change).
+    result := True;
+    FEditView.ResetFocus;
+  end;
 end;
 
-{***********************************************************************************************************************************************************************************}
-constructor TALAndroidEditText.Create(const AControl: TALAndroidEditControl; Const aIsMultiline: Boolean = False; const aDefStyleAttr: String = ''; const aDefStyleRes: String = '');
+{************************************************************************************************************************************************************************}
+constructor TALAndroidEditView.Create(const AControl: TALControl; Const aIsMultiline: Boolean = False; const aDefStyleAttr: String = ''; const aDefStyleRes: String = '');
 begin
-  fIsMultiline := aIsMultiline;
   fDefStyleAttr := aDefStyleAttr;
   fDefStyleRes := aDefStyleRes;
-  FTextWatcher := TALTextWatcher.Create(self);
-  FEditorActionListener := TALEditorActionListener.Create(self, aIsMultiline);
-  FKeyPreImeListener := TALKeyPreImeListener.Create(self);
-  FTouchListener := TALTouchListener.Create(self);
-  fEditControl := TALAndroidEditControl(AControl);
-  inherited create(AControl);  // This will call InitView
+  inherited create(AControl); // This will call CreateView
+  fIsMultiline := aIsMultiline;
+  FTextSettings := TALBaseEdit.TTextSettings.Create;
+  FTextSettings.OnChanged := TextSettingsChanged;
+  FFillColor := $ffffffff;
+  fMaxLength := 0;
+  fReturnKeyType := tReturnKeyType.Default;
+  fKeyboardType := TVirtualKeyboardType.default;
+  fAutoCapitalizationType := TALAutoCapitalizationType.acNone;
+  fPassword := false;
+  fCheckSpelling := true;
+  FTintColor := TalphaColors.Null;
+  //--
+  // We must call setSingleLine before doing View.addTextChangedListener
+  // else it's will fire TALAndroidEditView.TTextWatcher.afterTextChanged
+  if fIsMultiline then View.setSingleLine(False)
+  else View.setSingleLine(True);
+  //--
+  view.setBackgroundColor(TJColor.JavaClass.TRANSPARENT);
+  view.setBackground(nil);
+  view.setPadding(0, 0, 0, 0);
+  //--
+  DoSetReturnKeyType(fReturnKeyType);
+  DoSetInputType(fKeyboardType, fAutoCapitalizationType, fPassword, fCheckSpelling, fIsMultiline);
+  //--
+  FTextWatcher := TTextWatcher.Create(self);
+  View.addTextChangedListener(fTextWatcher);
+  FEditorActionListener := TEditorActionListener.Create(self, aIsMultiline);
+  View.setOnEditorActionListener(fEditorActionListener);
+  FKeyPreImeListener := TKeyPreImeListener.Create(self);
+  View.SetKeyPreImeListener(fKeyPreImeListener);
+  FTouchListener := TTouchListener.Create(self);
+  View.SetOnTouchListener(fTouchListener);
 end;
 
 {************************************}
-destructor TALAndroidEditText.Destroy;
+destructor TALAndroidEditView.Destroy;
 begin
 
-  View.setVisibility(TJView.JavaClass.INVISIBLE);
   View.RemoveTextChangedListener(FTextWatcher);
   View.setOnEditorActionListener(nil);
   View.SetKeyPreImeListener(nil);
@@ -1656,12 +1477,13 @@ begin
   alfreeandNil(FKeyPreImeListener);
   alfreeandNil(FTouchListener);
 
+  ALFreeAndNil(FTextSettings);
   inherited;
 
 end;
 
 {********************************************}
-function TALAndroidEditText.CreateView: JView;
+function TALAndroidEditView.CreateView: JView;
 begin
   var LSDKVersion := TJBuild_VERSION.JavaClass.SDK_INT;
   //-----
@@ -1714,73 +1536,27 @@ begin
                         TAndroidHelper.Context.getPackageName())) // String: Optional default package to find, if "package:" is not included in the name. Can be null to require an explicit package.
 end;
 
-{************************************}
-procedure TALAndroidEditText.InitView;
-begin
-  inherited;
-  //-----
-  if fIsMultiline then View.setSingleLine(False)
-  else View.setSingleLine(True);
-  View.setClickable(True);
-  View.setFocusable(True);
-  View.setFocusableInTouchMode(True);
-  //-----
-  View.addTextChangedListener(fTextWatcher);
-  View.setOnEditorActionListener(fEditorActionListener);
-  View.SetKeyPreImeListener(fKeyPreImeListener);
-  View.SetOnTouchListener(fTouchListener);
-end;
-
 {***********************************************}
-function TALAndroidEditText.GetView: JALEditText;
+function TALAndroidEditView.GetView: JALEditText;
 begin
   Result := inherited GetView<JALEditText>;
 end;
 
-{*************************************************************************************************************************************************************************}
-constructor TALAndroidEditControl.Create(const AOwner: TComponent; Const AIsMultiline: Boolean = False; const ADefStyleAttr: String = ''; const ADefStyleRes: String = '');
+{**************************************************}
+function TALAndroidEditView.GetControl: TALBaseEdit;
 begin
-  FDefStyleAttr := ADefStyleAttr;
-  FDefStyleRes := ADefStyleRes;
-  fIsMultiline := aIsMultiline;
-  inherited create(AOwner);
-  FFillColor := $ffffffff;
-  fMaxLength := 0;
-  TMessageManager.DefaultManager.SubscribeToMessage(TApplicationEventMessage, ApplicationEventHandler);
-  fReturnKeyType := tReturnKeyType.Default;
-  fKeyboardType := TVirtualKeyboardType.default;
-  fAutoCapitalizationType := TALAutoCapitalizationType.acNone;
-  fPassword := false;
-  fCheckSpelling := true;
-  FTintColor := TalphaColors.Null;
-  DoSetReturnKeyType(fReturnKeyType);
-  DoSetInputType(fKeyboardType, fAutoCapitalizationType, fPassword, fCheckSpelling, fIsMultiline);
+  Result := TALBaseEdit(inherited Control);
 end;
 
-{***************************************}
-destructor TALAndroidEditControl.Destroy;
+{************************************************}
+function TALAndroidEditView.getLineCount: integer;
 begin
-  TMessageManager.DefaultManager.Unsubscribe(TApplicationEventMessage, ApplicationEventHandler);
-  inherited Destroy;
+  if FIsMultiline then result := view.getLineCount
+  else Result := 1;
 end;
 
-{********************************************************************}
-Function TALAndroidEditControl.CreateNativeView: TALAndroidNativeView;
-begin
-  result := TALAndroidEditText.create(self, FIsMultiline, FDefStyleAttr, FDefStyleRes);
-  result.view.setBackgroundColor(TJColor.JavaClass.TRANSPARENT);
-  result.view.setBackground(nil);
-  result.view.setPadding(0, 0, 0, 0);
-end;
-
-{***************************************************************}
-function TALAndroidEditControl.GetNativeView: TALAndroidEditText;
-begin
-  result := TALAndroidEditText(inherited GetNativeView);
-end;
-
-{*********************************************}
-procedure TALAndroidEditControl.DoSetInputType(
+{******************************************}
+procedure TALAndroidEditView.DoSetInputType(
             const aKeyboardType: TVirtualKeyboardType;
             const aAutoCapitalizationType: TALAutoCapitalizationType;
             const aPassword: Boolean;
@@ -1874,18 +1650,18 @@ begin
 
   if aIsMultiline then LInputType := LInputType or TJInputType.JavaClass.TYPE_TEXT_FLAG_MULTI_LINE;
 
-  NativeView.view.setInputType(LInputType);
+  view.setInputType(LInputType);
 
 end;
 
-{*******************************************************************}
-function TALAndroidEditControl.GetKeyboardType: TVirtualKeyboardType;
+{****************************************************************}
+function TALAndroidEditView.GetKeyboardType: TVirtualKeyboardType;
 begin
   Result := fKeyboardType;
 end;
 
-{*********************************************************************************}
-procedure TALAndroidEditControl.setKeyboardType(const Value: TVirtualKeyboardType);
+{******************************************************************************}
+procedure TALAndroidEditView.setKeyboardType(const Value: TVirtualKeyboardType);
 begin
   if (value <> fKeyboardType) then begin
     fKeyboardType := Value;
@@ -1893,14 +1669,14 @@ begin
   end;
 end;
 
-{**********************************************************************************}
-function TALAndroidEditControl.GetAutoCapitalizationType: TALAutoCapitalizationType;
+{*******************************************************************************}
+function TALAndroidEditView.GetAutoCapitalizationType: TALAutoCapitalizationType;
 begin
   result := fAutoCapitalizationType;
 end;
 
-{************************************************************************************************}
-procedure TALAndroidEditControl.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
+{*********************************************************************************************}
+procedure TALAndroidEditView.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
 begin
   if (value <> fAutoCapitalizationType) then begin
     fAutoCapitalizationType := Value;
@@ -1908,14 +1684,14 @@ begin
   end;
 end;
 
-{**************************************************}
-function TALAndroidEditControl.GetPassword: Boolean;
+{***********************************************}
+function TALAndroidEditView.GetPassword: Boolean;
 begin
   Result := fPassword;
 end;
 
-{****************************************************************}
-procedure TALAndroidEditControl.setPassword(const Value: Boolean);
+{*************************************************************}
+procedure TALAndroidEditView.setPassword(const Value: Boolean);
 begin
   if (value <> fPassword) then begin
     fPassword := Value;
@@ -1923,14 +1699,14 @@ begin
   end;
 end;
 
-{*******************************************************}
-function TALAndroidEditControl.GetCheckSpelling: Boolean;
+{****************************************************}
+function TALAndroidEditView.GetCheckSpelling: Boolean;
 begin
   result := fCheckSpelling;
 end;
 
-{*********************************************************************}
-procedure TALAndroidEditControl.SetCheckSpelling(const Value: Boolean);
+{******************************************************************}
+procedure TALAndroidEditView.SetCheckSpelling(const Value: Boolean);
 begin
   if (value <> fCheckSpelling) then begin
     fCheckSpelling := Value;
@@ -1938,8 +1714,8 @@ begin
   end;
 end;
 
-{***************************************************************************************}
-procedure TALAndroidEditControl.DoSetReturnKeyType(const aReturnKeyType: TReturnKeyType);
+{************************************************************************************}
+procedure TALAndroidEditView.DoSetReturnKeyType(const aReturnKeyType: TReturnKeyType);
 begin
   var LImeOptions: integer;
   case aReturnKeyType of
@@ -1950,17 +1726,17 @@ begin
     TReturnKeyType.Send:          LImeOptions := TJEditorInfo.JavaClass.IME_ACTION_NONE; // TJEditorInfo.JavaClass.IME_ACTION_SEND; => https://stackoverflow.com/questions/44708338/setimeactionlabel-or-setimeoptions-not-work-i-always-have-caption-done-on-the
     else {TReturnKeyType.Default} LImeOptions := TJEditorInfo.JavaClass.IME_ACTION_NONE;
   end;
-  NativeView.view.setImeOptions(LImeOptions);
+  view.setImeOptions(LImeOptions);
 end;
 
-{**************************************************************}
-function TALAndroidEditControl.GetReturnKeyType: TReturnKeyType;
+{***********************************************************}
+function TALAndroidEditView.GetReturnKeyType: TReturnKeyType;
 begin
   Result := fReturnKeyType;
 end;
 
-{****************************************************************************}
-procedure TALAndroidEditControl.setReturnKeyType(const Value: TReturnKeyType);
+{*************************************************************************}
+procedure TALAndroidEditView.setReturnKeyType(const Value: TReturnKeyType);
 begin
   if (value <> fReturnKeyType) then begin
     fReturnKeyType := Value;
@@ -1968,60 +1744,67 @@ begin
   end;
 end;
 
-{***************************************************}
-function TALAndroidEditControl.GetMaxLength: integer;
+{************************************************}
+function TALAndroidEditView.GetMaxLength: integer;
 begin
   Result := FMaxLength;
 end;
 
-{*****************************************************************}
-procedure TALAndroidEditControl.SetMaxLength(const Value: integer);
+{**************************************************************}
+procedure TALAndroidEditView.SetMaxLength(const Value: integer);
 begin
   if value <> FMaxLength then begin
     FMaxLength := value;
-    NativeView.View.setMaxLength(Value);
+    View.setMaxLength(Value);
   end;
 end;
 
-{***************************************************}
-function TALAndroidEditControl.GetPromptText: String;
+{************************************************}
+function TALAndroidEditView.GetPromptText: String;
 begin
-  result := JCharSequenceToStr(NativeView.View.getHint);
+  result := JCharSequenceToStr(View.getHint);
 end;
 
-{*****************************************************************}
-procedure TALAndroidEditControl.setPromptText(const Value: String);
+{**************************************************************}
+procedure TALAndroidEditView.setPromptText(const Value: String);
 begin
-  NativeView.View.setHint(StrToJCharSequence(Value));
+  View.setHint(StrToJCharSequence(Value));
 end;
 
-{*************************************************************}
-function TALAndroidEditControl.GetPromptTextColor: TAlphaColor;
+{**********************************************************}
+function TALAndroidEditView.GetPromptTextColor: TAlphaColor;
 begin
-  result := TAlphaColor(NativeView.View.getCurrentHintTextColor);
+  result := TAlphaColor(View.getCurrentHintTextColor);
 end;
 
-{***************************************************************************}
-procedure TALAndroidEditControl.setPromptTextColor(const Value: TAlphaColor);
+{************************************************************************}
+procedure TALAndroidEditView.setPromptTextColor(const Value: TAlphaColor);
 begin
   if Value <> TalphaColors.null then
-    NativeView.View.setHintTextColor(integer(Value));
+    View.setHintTextColor(integer(Value));
 end;
 
-{*********************************************}
-function TALAndroidEditControl.getText: String;
+{******************************************}
+function TALAndroidEditView.getText: String;
 begin
-  result := JCharSequenceToStr(NativeView.View.gettext);
+  result := JCharSequenceToStr(View.gettext);
 end;
 
-{***********************************************************}
-procedure TALAndroidEditControl.SetText(const Value: String);
+{********************************************************}
+procedure TALAndroidEditView.SetText(const Value: String);
 begin
-  NativeView.View.setText(StrToJCharSequence(Value), TJTextView_BufferType.javaClass.EDITABLE);
+  View.setText(StrToJCharSequence(Value), TJTextView_BufferType.javaClass.EDITABLE);
+  if Value <> '' then setSelection(length(Value));
 end;
 
-{*******************************************************************}
-procedure TALAndroidEditControl.TextSettingsChanged(Sender: TObject);
+{*****************************************************************************}
+procedure TALAndroidEditView.SetTextSettings(const Value: TALBaseTextSettings);
+begin
+  FTextSettings.Assign(Value);
+end;
+
+{****************************************************************}
+procedure TALAndroidEditView.TextSettingsChanged(Sender: TObject);
 begin
 
   var LFontColor := integer(textsettings.font.color);
@@ -2033,7 +1816,7 @@ begin
                                   TFontWeight.Black,
                                   TFontWeight.UltraBlack] then LFontStyles := LFontStyles + [TFontStyle.fsBold];
   if textsettings.font.Slant in [TFontSlant.Italic, TFontSlant.Oblique] then LFontStyles := LFontStyles + [TFontStyle.fsItalic];
-  var LFontFamily := ALExtractPrimaryFontFamily(textsettings.font.Family);
+  var LFontFamily := ALResolveFontFamily(ALExtractPrimaryFontFamily(textsettings.font.Family));
   //-----
   //top	              0x30	     	Push object to the top of its container, not changing its size.
   //bottom	          0x50	     	Push object to the bottom of its container, not changing its size.
@@ -2064,89 +1847,65 @@ begin
   end;
 
   //-----
-  NativeView.view.setTextColor(LFontColor); // Sets the text color for all the states (normal, selected, focused) to be this color.
-  NativeView.view.setTextSize(TJTypedValue.javaclass.COMPLEX_UNIT_DIP, LFontSize); // Set the default text size to a given unit and value.
+  view.setTextColor(LFontColor); // Sets the text color for all the states (normal, selected, focused) to be this color.
+  view.setTextSize(TJTypedValue.javaclass.COMPLEX_UNIT_DIP, LFontSize); // Set the default text size to a given unit and value.
   //-----
   var LTypeface := TJTypeface.JavaClass.create(StringToJString(LFontFamily), ALfontStyleToAndroidStyle(LFontStyles));
   // Note that not all Typeface families actually have bold and italic variants, so you may
   // need to use setTypeface(Typeface, int) to get the appearance that you actually want.
-  NativeView.view.setTypeface(LTypeface);
+  view.setTypeface(LTypeface);
   LTypeface := nil;
-  NativeView.view.setgravity(LGravity);
+  view.setgravity(LGravity);
   //-----
-  if not SameValue(textsettings.LineHeightMultiplier, 0, TEpsilon.Scale) then
-    NativeView.view.setLineSpacing(0{add}, textsettings.LineHeightMultiplier{mult});
+  var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(LFontSize, textsettings.LineHeightMultiplier);
+  if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0 then
+    // To mirror Skia’s behavior, the line height is calculated as: lineHeight = fontSize * LineHeightMultiplier
+    view.setLineHeight(Round(LFontSize * LTmpLineHeightMultiplier * ALGetScreenScale))
+  else
+    view.setLinespacing(0{add},1{mult});
 
 end;
 
-{*******************************************************}
-function TALAndroidEditControl.GetTintColor: TAlphaColor;
+{****************************************************}
+function TALAndroidEditView.GetTintColor: TAlphaColor;
 begin
   Result := FTintColor;
 end;
 
-{*********************************************************************}
-procedure TALAndroidEditControl.setTintColor(const Value: TAlphaColor);
+{******************************************************************}
+procedure TALAndroidEditView.setTintColor(const Value: TAlphaColor);
 begin
   FTintColor := Value;
 end;
 
-{*******************************************************}
-function TALAndroidEditControl.GetFillColor: TAlphaColor;
+{****************************************************}
+function TALAndroidEditView.GetFillColor: TAlphaColor;
 begin
   Result := FFillColor;
 end;
 
-{*********************************************************************}
-procedure TALAndroidEditControl.SetFillColor(const Value: TAlphaColor);
+{******************************************************************}
+procedure TALAndroidEditView.SetFillColor(const Value: TAlphaColor);
 begin
   FFillColor := Value;
 end;
 
-{************************************************************************************************}
-procedure TALAndroidEditControl.ApplicationEventHandler(const Sender: TObject; const M: TMessage);
+{************************************************}
+function TALAndroidEditView.getLineHeight: Single;
 begin
-  {$IF defined(DEBUG)}
-  if isfocused and
-     (M is TApplicationEventMessage) then begin
-    case (M as TApplicationEventMessage).Value.Event of
-      TApplicationEvent.FinishedLaunching: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.FinishedLaunching');
-      TApplicationEvent.BecameActive: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.BecameActive');
-      TApplicationEvent.WillBecomeInactive: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillBecomeInactive');
-      TApplicationEvent.EnteredBackground: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.EnteredBackground');
-      TApplicationEvent.WillBecomeForeground: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillBecomeForeground');
-      TApplicationEvent.WillTerminate: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.WillTerminate');
-      TApplicationEvent.LowMemory: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.LowMemory');
-      TApplicationEvent.TimeChange: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.TimeChange');
-      TApplicationEvent.OpenURL: ALLog('TALAndroidEditControl.ApplicationEventHandler', 'Event: TApplicationEvent.OpenURL');
-    end;
-  end;
-  {$ENDIF}
-  //problem is that as we play with view, the WillBecomeInactive - BecameActive will be call everytime we toggle the
-  //view under the MainActivity.getViewStack. so we can't use these event to know that the application resume from
-  //background. most easy is to close the virtual keyboard when the application entere in background (EnteredBackground
-  //event is call ONLY when application entered in the background so everything is fine
-  if isfocused and
-     (M is TApplicationEventMessage) and
-     ((M as TApplicationEventMessage).Value.Event = TApplicationEvent.EnteredBackground) then resetfocus;
+  result := view.getLineHeight / ALGetScreenScale;
 end;
 
-{***************************************************}
-function TALAndroidEditControl.getLineHeight: Single;
+{*************************************************************************************}
+Procedure TALAndroidEditView.setSelection(const AStart: integer; const AStop: Integer);
 begin
-  result := NativeView.view.getLineHeight / ALGetScreenScale;
+  View.setSelection(aStart, aStop);
 end;
 
-{****************************************************************************************}
-Procedure TALAndroidEditControl.setSelection(const AStart: integer; const AStop: Integer);
+{***************************************************************}
+Procedure TALAndroidEditView.setSelection(const AIndex: integer);
 begin
-  NativeView.View.setSelection(aStart, aStop);
-end;
-
-{******************************************************************}
-Procedure TALAndroidEditControl.setSelection(const AIndex: integer);
-begin
-  NativeView.view.setSelection(aindex);
+  view.setSelection(aindex);
 end;
 
 {$endif}
@@ -2155,268 +1914,113 @@ end;
 {$REGION ' IOS'}
 {$IF defined(ios)}
 
-{*************************************}
-constructor TALIosEditTextField.Create;
-begin
-  inherited;
-  View.setExclusiveTouch(True);
-  View.setBorderStyle(UITextBorderStyleNone);
-  View.addTarget(GetObjectID, sel_getUid(MarshaledAString(TMarshal.AsAnsi('ControlEventEditingChanged'))), UIControlEventEditingChanged);
-end;
-
-{***************************************************************}
-constructor TALIosEditTextField.Create(const AControl: TControl);
-begin
-  fEditControl := TALIosEditControl(AControl);
-  inherited;
-end;
-
-{*************************************}
-destructor TALIosEditTextField.Destroy;
-begin
-  View.removeTarget(GetObjectID, sel_getUid(MarshaledAString(TMarshal.AsAnsi('ControlEventEditingChanged'))), UIControlEventEditingChanged);
-  inherited;
-end;
-
-{*************************************************************}
-procedure TALIosEditTextField.SetEnabled(const value: Boolean);
-begin
-  inherited;
-  View.SetEnabled(value);
-end;
-
-{***************************************************************************}
-function TALIosEditTextField.ExtractFirstTouchPoint(touches: NSSet): TPointF;
-begin
-  var LPointer := touches.anyObject;
-  if LPointer=nil then
-    raise Exception.Create('Error 46450539-F150-45FC-BA01-0397F2A98B0C');
-  var LLocalTouch := TUITouch.Wrap(LPointer);
-  if Form=nil then
-    raise Exception.Create('Error 5F61EC6E-0C13-46CD-A0C0-8417AA32B62A');
-  var LTouchPoint := LLocalTouch.locationInView(GetFormView(Form));
-  Result := TPointF.Create(LTouchPoint.X, LTouchPoint.Y);
-end;
-
-{*****************************************************************************}
-procedure TALIosEditTextField.touchesBegan(touches: NSSet; withEvent: UIEvent);
-begin
-  if (Form <> nil) and
-     (not view.isFirstResponder) and
-     (touches.count > 0) then begin
-
-    var LHandle: TiOSWindowHandle;
-    if Form.IsHandleAllocated then
-      LHandle := WindowHandleToPlatform(Form.Handle)
-    else
-      LHandle := nil;
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := withEvent;
-
-    var LTouchPoint := ExtractFirstTouchPoint(touches);
-    Form.MouseMove([ssTouch], LTouchPoint.X, LTouchPoint.Y);
-    Form.MouseMove([], LTouchPoint.X, LTouchPoint.Y); // Require for correct IsMouseOver handle
-    Form.MouseDown(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := nil;
-
-  end;
-end;
-
-{*********************************************************************************}
-procedure TALIosEditTextField.touchesCancelled(touches: NSSet; withEvent: UIEvent);
-begin
-  if (Form <> nil) and
-     (not view.isFirstResponder) and
-     (touches.count > 0) then begin
-
-    var LHandle: TiOSWindowHandle;
-    if Form.IsHandleAllocated then
-      LHandle := WindowHandleToPlatform(Form.Handle)
-    else
-      LHandle := nil;
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := withEvent;
-
-    var LTouchPoint := ExtractFirstTouchPoint(touches);
-    Form.MouseUp(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
-    Form.MouseLeave;
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := nil;
-
-  end;
-end;
-
-{*****************************************************************************}
-procedure TALIosEditTextField.touchesEnded(touches: NSSet; withEvent: UIEvent);
-begin
-  if (Form <> nil) and
-     (not view.isFirstResponder) and
-     (touches.count > 0) then begin
-
-    var LHandle: TiOSWindowHandle;
-    if Form.IsHandleAllocated then
-      LHandle := WindowHandleToPlatform(Form.Handle)
-    else
-      LHandle := nil;
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := withEvent;
-
-    var LTouchPoint := ExtractFirstTouchPoint(touches);
-    Form.MouseUp(TMouseButton.mbLeft, [ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
-    Form.MouseLeave;
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := nil;
-
-  end;
-end;
-
-{*****************************************************************************}
-procedure TALIosEditTextField.touchesMoved(touches: NSSet; withEvent: UIEvent);
-begin
-  if (Form <> nil) and
-     (not view.isFirstResponder) and
-     (touches.count > 0) then begin
-
-    var LHandle: TiOSWindowHandle;
-    if Form.IsHandleAllocated then
-      LHandle := WindowHandleToPlatform(Form.Handle)
-    else
-      LHandle := nil;
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := withEvent;
-
-    var LTouchPoint := ExtractFirstTouchPoint(touches);
-    Form.MouseMove([ssLeft, ssTouch], LTouchPoint.x, LTouchPoint.y);
-
-    if LHandle <> nil then
-      LHandle.CurrentTouchEvent := nil;
-
-  end;
-end;
-
-{************************************************************}
-function TALIosEditTextField.canBecomeFirstResponder: Boolean;
-begin
-  {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextField.canBecomeFirstResponder', 'control.name: ' + fEditControl.parent.Name);
-  {$ENDIF}
-  Result := UITextField(Super).canBecomeFirstResponder and TControl(fEditControl.Owner).canFocus;
-end;
-
-{*********************************************************}
-function TALIosEditTextField.becomeFirstResponder: Boolean;
-begin
-  {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextField.becomeFirstResponder', 'control.name: ' + fEditControl.parent.Name);
-  {$ENDIF}
-  Result := UITextField(Super).becomeFirstResponder;
-  if (not TControl(fEditControl.Owner).IsFocused) then
-    TControl(fEditControl.Owner).SetFocus;
-end;
-
-{*******************************************************}
-procedure TALIosEditTextField.ControlEventEditingChanged;
-begin
-  {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextField.ControlEventEditingChanged', 'control.name: ' + fEditControl.parent.Name);
-  {$ENDIF}
-  fEditControl.DoChange;
-end;
-
-{*********************************************************}
-function TALIosEditTextField.GetObjectiveCClass: PTypeInfo;
-begin
-  Result := TypeInfo(IALIosEditTextField);
-end;
-
-{************************************************}
-function TALIosEditTextField.GetView: UITextField;
-begin
-  Result := inherited GetView<UITextField>;
-end;
-
 {************************************************************************************}
-constructor TALIosEditTextFieldDelegate.Create(const AEditControl: TALIosEditControl);
+constructor TALIosEditView.TTextFieldDelegate.Create(const AEditView: TALIosEditView);
 begin
   inherited Create;
-  FEditControl := AEditControl;
-  if FEditControl = nil then
-    raise EArgumentNilException.Create(Format(SWrongParameter, ['AEditControl']));
+  FEditView := AEditView;
 end;
 
-{***************************************************************************************************************************************************}
-function TALIosEditTextFieldDelegate.textField(textField: UITextField; shouldChangeCharactersInRange: NSRange; replacementString: NSString): Boolean;
+{*********************************************************************************************************************************************************}
+function TALIosEditView.TTextFieldDelegate.textField(textField: UITextField; shouldChangeCharactersInRange: NSRange; replacementString: NSString): Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog(
-    'TALIosEditTextFieldDelegate.textField',
-    'control.name: ' + FEditControl.parent.Name + ' | ' +
-    'replacementString: ' + NSStrToStr(replacementString));
+  //ALLog(
+  //  Classname + '.textField:shouldChangeCharactersInRange:replacementString',
+  //  'control.name: ' + FTextField.Control.Name + ' | ' +
+  //  'replacementString: ' + NSStrToStr(replacementString));
   {$ENDIF}
-  if FEditControl.maxLength > 0 then begin
-    var LText: NSString := TNSString.Wrap(textField.text);
+  if FEditView.maxLength > 0 then begin
+    var LText := textField.text;
     if shouldChangeCharactersInRange.length + shouldChangeCharactersInRange.location > LText.length then exit(false);
-    result := LText.length + replacementString.length - shouldChangeCharactersInRange.length <= NSUInteger(FEditControl.maxLength);
+    result := LText.length + replacementString.length - shouldChangeCharactersInRange.length <= NSUInteger(FEditView.maxLength);
   end
   else Result := True;
 end;
 
-{*************************************************************************************}
-procedure TALIosEditTextFieldDelegate.textFieldDidBeginEditing(textField: UITextField);
+{*****************************************************************************************************************************************************}
+function TALIosEditView.TTextFieldDelegate.textField(textField: UITextField; editMenuForCharactersInRange: NSRange; suggestedActions: NSArray): UIMenu;
+begin
+  // Return nil to present the default system menu.
+  Result := nil;
+end;
+
+{**********************************************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textField(textField: UITextField; willPresentEditMenuWithAnimator: Pointer);
 begin
 end;
 
-{***********************************************************************************}
-procedure TALIosEditTextFieldDelegate.textFieldDidEndEditing(textField: UITextField);
+{**********************************************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textField(textField: UITextField; insertInputSuggestion: UIInputSuggestion);
 begin
-  TControl(FEditControl.Owner).ResetFocus;
 end;
 
-{************************************************************************************************}
-function TALIosEditTextFieldDelegate.textFieldShouldBeginEditing(textField: UITextField): Boolean;
+{*******************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textFieldDidBeginEditing(textField: UITextField);
+begin
+end;
+
+{**********************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textFieldDidChangeSelection(textField: UITextField);
+begin
+end;
+
+{*****************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textFieldDidEndEditing(textField: UITextField);
+begin
+  FEditView.Control.ResetFocus;
+end;
+
+{*********************************************************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textFieldDidEndEditing(textField: UITextField; reason: UITextFieldDidEndEditingReason);
+begin
+  FEditView.Control.ResetFocus;
+end;
+
+{******************************************************************************************************}
+function TALIosEditView.TTextFieldDelegate.textFieldShouldBeginEditing(textField: UITextField): Boolean;
 begin
   Result := True;
 end;
 
-{*****************************************************************************************}
-function TALIosEditTextFieldDelegate.textFieldShouldClear(textField: UITextField): Boolean;
+{***********************************************************************************************}
+function TALIosEditView.TTextFieldDelegate.textFieldShouldClear(textField: UITextField): Boolean;
 begin
   Result := true;
 end;
 
-{**********************************************************************************************}
-function TALIosEditTextFieldDelegate.textFieldShouldEndEditing(textField: UITextField): Boolean;
+{****************************************************************************************************}
+function TALIosEditView.TTextFieldDelegate.textFieldShouldEndEditing(textField: UITextField): Boolean;
 begin
   Result := True;
 end;
 
-{******************************************************************************************}
-function TALIosEditTextFieldDelegate.textFieldShouldReturn(textField: UITextField): Boolean;
+{************************************************************************************************}
+function TALIosEditView.TTextFieldDelegate.textFieldShouldReturn(textField: UITextField): Boolean;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALIosEditTextFieldDelegate.textFieldShouldReturn', 'control.name: ' + FEditControl.parent.Name);
+  //ALLog(Classname + '.textFieldShouldReturn', 'control.name: ' + FTextField.Control.Name);
   {$ENDIF}
-  if assigned(fEditControl.OnReturnKey) then begin
-    fEditControl.DoReturnKey;
+  if assigned(FEditView.Control.OnReturnKey) then begin
+    FEditView.Control.DoReturnKey;
     result := false;
   end
   else Result := true; // return YES if the text field should implement its default behavior for the return button; otherwise, NO.
 end;
 
-{*******************************************************}
-constructor TALIosEditControl.Create(AOwner: TComponent);
+{*****************************************************************************************************************************************************}
+procedure TALIosEditView.TTextFieldDelegate.textFieldWillDismissEditMenuWithAnimator(textField: UITextField; willDismissEditMenuWithAnimator: Pointer);
 begin
-  inherited create(AOwner);
-  FTextFieldDelegate := TALIosEditTextFieldDelegate.Create(Self);
-  NativeView.View.setDelegate(FTextFieldDelegate.GetObjectID);
+end;
+
+{********************************}
+constructor TALIosEditView.Create;
+begin
+  inherited; // This will call InitView
+  FTextFieldDelegate := TTextFieldDelegate.Create(Self);
+  View.setDelegate(FTextFieldDelegate.GetObjectID);
+  FTextSettings := TALBaseEdit.TTextSettings.Create;
+  FTextSettings.OnChanged := TextSettingsChanged;
   FFillColor := $ffffffff;
   fMaxLength := 0;
   fPromptTextColor := TalphaColors.Null;
@@ -2425,30 +2029,63 @@ begin
   setAutoCapitalizationType(TALAutoCapitalizationType.acNone);
   SetPassword(false);
   SetCheckSpelling(True);
+  View.setBorderStyle(UITextBorderStyleNone);
+  View.addTarget(GetObjectID, sel_getUid(MarshaledAString(TMarshal.AsAnsi('ControlEventEditingChanged'))), UIControlEventEditingChanged);
 end;
 
-{***********************************}
-destructor TALIosEditControl.Destroy;
+{********************************}
+destructor TALIosEditView.Destroy;
 begin
-  NativeView.View.setDelegate(nil);
+  View.removeTarget(GetObjectID, sel_getUid(MarshaledAString(TMarshal.AsAnsi('ControlEventEditingChanged'))), UIControlEventEditingChanged);
+  View.setDelegate(nil);
   ALFreeAndNil(FTextFieldDelegate);
-  inherited Destroy;
+  ALFreeAndNil(FTextSettings);
+  inherited;
 end;
 
-{************************************************************}
-Function TALIosEditControl.CreateNativeView: TALIosNativeView;
+
+{********************************************************}
+procedure TALIosEditView.SetEnabled(const value: Boolean);
 begin
-  result := TALIosEditTextField.create(self);
+  inherited;
+  View.SetEnabled(value);
 end;
 
-{************************************************************}
-function TALIosEditControl.GetNativeView: TALIosEditTextField;
+{**************************************************}
+procedure TALIosEditView.ControlEventEditingChanged;
 begin
-  result := TALIosEditTextField(inherited GetNativeView);
+  {$IF defined(DEBUG)}
+  //ALLog(Classname + '.ControlEventEditingChanged', 'control.name: ' + Control.Name);
+  {$ENDIF}
+  DoChange;
 end;
 
-{*****************************************************************************}
-procedure TALIosEditControl.SetKeyboardType(const Value: TVirtualKeyboardType);
+{****************************************************}
+function TALIosEditView.GetObjectiveCClass: PTypeInfo;
+begin
+  Result := TypeInfo(IALIosEditView);
+end;
+
+{*******************************************}
+function TALIosEditView.GetView: UITextField;
+begin
+  Result := inherited GetView<UITextField>;
+end;
+
+{**********************************************}
+function TALIosEditView.GetControl: TALBaseEdit;
+begin
+  Result := TALBaseEdit(inherited Control);
+end;
+
+{********************************************}
+function TALIosEditView.getLineCount: integer;
+begin
+  Result := 1;
+end;
+
+{**************************************************************************}
+procedure TALIosEditView.SetKeyboardType(const Value: TVirtualKeyboardType);
 begin
   var LUIKeyboardType: UIKeyboardType;
   case Value of
@@ -2461,13 +2098,13 @@ begin
     TVirtualKeyboardType.EmailAddress:          LUIKeyboardType := UIKeyboardTypeEmailAddress;
     else {TVirtualKeyboardType.Default}         LUIKeyboardType := UIKeyboardTypeDefault;
   end;
-  NativeView.View.setKeyboardType(LUIKeyboardType);
+  View.setKeyboardType(LUIKeyboardType);
 end;
 
-{***************************************************************}
-function TALIosEditControl.GetKeyboardType: TVirtualKeyboardType;
+{************************************************************}
+function TALIosEditView.GetKeyboardType: TVirtualKeyboardType;
 begin
-  var LUIKeyboardType := NativeView.View.KeyboardType;
+  var LUIKeyboardType := View.KeyboardType;
   case LUIKeyboardType of
     UIKeyboardTypeNumbersAndPunctuation: result := TVirtualKeyboardType.NumbersAndPunctuation;
     UIKeyboardTypeNumberPad:             result := TVirtualKeyboardType.NumberPad;
@@ -2479,8 +2116,8 @@ begin
   end;
 end;
 
-{********************************************************************************************}
-procedure TALIosEditControl.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
+{*****************************************************************************************}
+procedure TALIosEditView.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
 begin
   var LUITextAutoCapitalizationType: UITextAutoCapitalizationType;
   case Value of
@@ -2489,13 +2126,13 @@ begin
     TALAutoCapitalizationType.acAllCharacters:  LUITextAutoCapitalizationType := UITextAutoCapitalizationTypeAllCharacters;
     else {TALAutoCapitalizationType.acNone}     LUITextAutoCapitalizationType := UITextAutoCapitalizationTypeNone;
   end;
-  NativeView.View.setAutoCapitalizationType(LUITextAutoCapitalizationType);
+  View.setAutoCapitalizationType(LUITextAutoCapitalizationType);
 end;
 
-{******************************************************************************}
-function TALIosEditControl.GetAutoCapitalizationType: TALAutoCapitalizationType;
+{***************************************************************************}
+function TALIosEditView.GetAutoCapitalizationType: TALAutoCapitalizationType;
 begin
-  var LUITextAutoCapitalizationType := NativeView.View.AutoCapitalizationType;
+  var LUITextAutoCapitalizationType := View.AutoCapitalizationType;
   case LUITextAutoCapitalizationType of
     UITextAutoCapitalizationTypeWords:         result := TALAutoCapitalizationType.acWords;
     UITextAutoCapitalizationTypeSentences:     result := TALAutoCapitalizationType.acSentences;
@@ -2504,39 +2141,39 @@ begin
   end;
 end;
 
-{************************************************************}
-procedure TALIosEditControl.SetPassword(const Value: Boolean);
+{*********************************************************}
+procedure TALIosEditView.SetPassword(const Value: Boolean);
 begin
-  NativeView.View.setSecureTextEntry(Value);
+  View.setSecureTextEntry(Value);
 end;
 
-{**********************************************}
-function TALIosEditControl.GetPassword: Boolean;
+{*******************************************}
+function TALIosEditView.GetPassword: Boolean;
 begin
-  result := NativeView.View.isSecureTextEntry;
+  result := View.isSecureTextEntry;
 end;
 
-{*****************************************************************}
-procedure TALIosEditControl.SetCheckSpelling(const Value: Boolean);
+{**************************************************************}
+procedure TALIosEditView.SetCheckSpelling(const Value: Boolean);
 begin
   if Value then begin
-    NativeView.View.setSpellCheckingType(UITextSpellCheckingTypeYes);
-    NativeView.View.setAutocorrectionType(UITextAutocorrectionTypeDefault);
+    View.setSpellCheckingType(UITextSpellCheckingTypeYes);
+    View.setAutocorrectionType(UITextAutocorrectionTypeDefault);
   end
   else begin
-    NativeView.View.setSpellCheckingType(UITextSpellCheckingTypeNo);
-    NativeView.View.setAutocorrectionType(UITextAutocorrectionTypeNo);
+    View.setSpellCheckingType(UITextSpellCheckingTypeNo);
+    View.setAutocorrectionType(UITextAutocorrectionTypeNo);
   end;
 end;
 
-{***************************************************}
-function TALIosEditControl.GetCheckSpelling: Boolean;
+{************************************************}
+function TALIosEditView.GetCheckSpelling: Boolean;
 begin
-  result := NativeView.View.SpellCheckingType = UITextSpellCheckingTypeYes;
+  result := View.SpellCheckingType = UITextSpellCheckingTypeYes;
 end;
 
-{************************************************************************}
-procedure TALIosEditControl.setReturnKeyType(const Value: TReturnKeyType);
+{*********************************************************************}
+procedure TALIosEditView.setReturnKeyType(const Value: TReturnKeyType);
 begin
   var LUIReturnKeyType: UIReturnKeyType;
   case Value of
@@ -2547,13 +2184,13 @@ begin
     TReturnKeyType.Send:           LUIReturnKeyType := UIReturnKeySend;
     else {TReturnKeyType.Default}  LUIReturnKeyType := UIReturnKeyDefault;
   end;
-  NativeView.View.setReturnKeyType(LUIReturnKeyType);
+  View.setReturnKeyType(LUIReturnKeyType);
 end;
 
-{**********************************************************}
-function TALIosEditControl.GetReturnKeyType: TReturnKeyType;
+{*******************************************************}
+function TALIosEditView.GetReturnKeyType: TReturnKeyType;
 begin
-  var LUIReturnKeyType := NativeView.View.ReturnKeyType;
+  var LUIReturnKeyType := View.ReturnKeyType;
   case LUIReturnKeyType of
     UIReturnKeyDone:    result := TReturnKeyType.Done;
     UIReturnKeyGo:      result := TReturnKeyType.Go;
@@ -2564,28 +2201,28 @@ begin
   end;
 end;
 
-{***********************************************}
-function TALIosEditControl.GetPromptText: String;
+{********************************************}
+function TALIosEditView.GetPromptText: String;
 begin
-  var LAttributedString := TALNSAttributedString.wrap(NSObjectToID(TUITextField.Wrap(NSObjectToID(NativeView.View)).AttributedPlaceholder));
-  if LAttributedString = nil then Result := NSStrToStr(NativeView.View.placeholder)
+  var LAttributedString := View.AttributedPlaceholder;
+  if LAttributedString = nil then Result := NSStrToStr(View.placeholder)
   else result := NSStrToStr(LAttributedString.&String);
 end;
 
-{*************************************************************}
-procedure TALIosEditControl.setPromptText(const Value: String);
+{**********************************************************}
+procedure TALIosEditView.setPromptText(const Value: String);
 begin
   applyPromptTextWithColor(Value, fPromptTextColor);
 end;
 
-{*********************************************************}
-function TALIosEditControl.GetPromptTextColor: TAlphaColor;
+{******************************************************}
+function TALIosEditView.GetPromptTextColor: TAlphaColor;
 begin
   Result := fPromptTextColor;
 end;
 
-{***********************************************************************}
-procedure TALIosEditControl.setPromptTextColor(const Value: TAlphaColor);
+{********************************************************************}
+procedure TALIosEditView.setPromptTextColor(const Value: TAlphaColor);
 begin
   if Value <> fPromptTextColor then begin
     fPromptTextColor := Value;
@@ -2593,8 +2230,8 @@ begin
   end;
 end;
 
-{**************************************************************************************************}
-procedure TALIosEditControl.applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor);
+{***********************************************************************************************}
+procedure TALIosEditView.applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor);
 begin
   //Using `setPlaceholderString` is not suitable here because it does not allow customizing the placeholder text color,
   //which depends on the OS's light or dark mode. However, this application requires a placeholder color that is
@@ -2616,123 +2253,148 @@ begin
                              ALSetColorAlpha(TextSettings.Font.Color, 0.5)).
                                PremultipliedAlpha.
                                ToAlphaColor);
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+        // No release required for LUIColor because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
         LPromptTextAttr.addAttribute(NSForegroundColorAttributeName, NSObjectToID(LUIColor), LTextRange);
-        //NOTE: If I try to release the LUIColor I have an exception
       finally
         LPromptTextAttr.endEditing;
       end;
     end;
 
-    NativeView.View.setAttributedPlaceholder(LPromptTextAttr);
+    View.setAttributedPlaceholder(LPromptTextAttr);
 
   finally
     LPromptTextAttr.release;
   end;
 end;
 
-{***************************************************}
-function TALIosEditControl.GetTintColor: TAlphaColor;
+{************************************************}
+function TALIosEditView.GetTintColor: TAlphaColor;
 begin
   var red: CGFloat;
   var green: CGFloat;
   var blue: CGFloat;
   var alpha: CGFloat;
-  if not NativeView.View.tintColor.getRed(@red, @green, @blue, @alpha) then result := TalphaColors.Null
+  if not View.tintColor.getRed(@red, @green, @blue, @alpha) then result := TalphaColors.Null
   else result := TAlphaColorF.Create(red, green, blue, alpha).ToAlphaColor;
 end;
 
-{*****************************************************************}
-procedure TALIosEditControl.setTintColor(const Value: TAlphaColor);
+{**************************************************************}
+procedure TALIosEditView.setTintColor(const Value: TAlphaColor);
 begin
   if Value <> TalphaColors.Null then
-    NativeView.View.setTintColor(AlphaColorToUIColor(Value));
+    View.setTintColor(AlphaColorToUIColor(Value));
 end;
 
-{*****************************************}
-function TALIosEditControl.getText: String;
+{**************************************}
+function TALIosEditView.getText: String;
 begin
-  result := NSStrToStr(TNSString.Wrap(NativeView.View.text));
+  result := NSStrToStr(View.text);
 end;
 
-{*******************************************************}
-procedure TALIosEditControl.SetText(const Value: String);
+{****************************************************}
+procedure TALIosEditView.SetText(const Value: String);
 begin
-  NativeView.View.setText(StrToNSStr(Value));
+  if Value <> getText then begin
+    View.setText(StrToNSStr(Value));
+    DoChange;
+  end;
 end;
 
-{***********************************************}
-function TALIosEditControl.GetMaxLength: integer;
+{********************************************}
+function TALIosEditView.GetMaxLength: integer;
 begin
   Result := FMaxLength;
 end;
 
-{*************************************************************}
-procedure TALIosEditControl.SetMaxLength(const Value: integer);
+{**********************************************************}
+procedure TALIosEditView.SetMaxLength(const Value: integer);
 begin
   FMaxLength := Value;
 end;
 
-{***************************************************************}
-procedure TALIosEditControl.TextSettingsChanged(Sender: TObject);
+{***********************************************************}
+function TALIosEditView.GetTextSettings: TALBaseTextSettings;
+begin
+  result := FTextSettings;
+end;
+
+{*************************************************************************}
+procedure TALIosEditView.SetTextSettings(const Value: TALBaseTextSettings);
+begin
+  FTextSettings.Assign(Value);
+end;
+
+{************************************************************}
+procedure TALIosEditView.TextSettingsChanged(Sender: TObject);
 begin
   // Font
-  var LFontRef := ALCreateCTFontRef(TextSettings.Font.Family, TextSettings.Font.Size, TextSettings.Font.Weight, TextSettings.Font.Slant);
+  var LFontRef := ALCreateCTFontRef(ALResolveFontFamily(TextSettings.Font.Family), TextSettings.Font.Size, TextSettings.Font.Weight, TextSettings.Font.Slant);
   try
     var LDictionary := TNSDictionary.Wrap(
                          TNSDictionary.OCClass.dictionaryWithObject(
                            LFontRef,
-                           NSObjectToID(TNSString.Wrap(kCTFontAttributeName))));
+                           kCTFontAttributeName));
+    // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+    // No release required for LDictionary because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+
     // Setting this property applies the specified attributes to the entire
     // text of the text field. Unset attributes maintain their default values.
-    // Note: I can't later call LDictionary.release or I have an error
-    NativeView.View.setdefaultTextAttributes(LDictionary);
+    View.setdefaultTextAttributes(LDictionary);
   finally
     CFRelease(LFontRef);
   end;
 
   // TextAlignment
-  NativeView.View.setTextAlignment(ALTextHorzAlignToUITextAlignment(TextSettings.HorzAlign));
+  View.setTextAlignment(ALTextHorzAlignToNSTextAlignment(TextSettings.HorzAlign));
 
   // TextColor
-  NativeView.View.setTextColor(AlphaColorToUIColor(TextSettings.Font.Color));
+  View.setTextColor(AlphaColorToUIColor(TextSettings.Font.Color));
 end;
 
-{***************************************************}
-function TALIosEditControl.GetFillColor: TAlphaColor;
+{********************************}
+procedure TALIosEditView.DoChange;
+begin
+  Control.DoChange;
+end;
+
+{************************************************}
+function TALIosEditView.GetFillColor: TAlphaColor;
 begin
   Result := FFillColor;
 end;
 
-{*****************************************************************}
-procedure TALIosEditControl.SetFillColor(const Value: TAlphaColor);
+{**************************************************************}
+procedure TALIosEditView.SetFillColor(const Value: TAlphaColor);
 begin
   FFillColor := Value;
 end;
 
-{***********************************************}
-function TALIosEditControl.getLineHeight: Single;
+{********************************************}
+function TALIosEditView.getLineHeight: Single;
 begin
-  if NativeView.View.font = nil then
-    TextSettingsChanged(nil);
-  result := NativeView.View.font.lineHeight;
-  if not SameValue(textsettings.LineHeightMultiplier, 0, TEpsilon.Scale) then
-    result := result * textsettings.LineHeightMultiplier;
+  var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(textsettings.font.size, textsettings.LineHeightMultiplier);
+  if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0 then result := textsettings.Font.Size * LTmpLineHeightMultiplier
+  else begin
+    if View.font = nil then TextSettingsChanged(nil);
+    result := View.font.lineHeight;
+  end;
 end;
 
-{************************************************************************************}
-Procedure TALIosEditControl.setSelection(const AStart: integer; const AStop: Integer);
+{*********************************************************************************}
+Procedure TALIosEditView.setSelection(const AStart: integer; const AStop: Integer);
 begin
-  var LStartPosition: UITextPosition := NativeView.View.positionFromPosition(NativeView.View.beginningOfDocument, AStart);
-  var LEndPosition: UITextPosition := NativeView.View.positionFromPosition(LStartPosition, AStop - AStart);
-  NativeView.View.setSelectedTextRange(NativeView.View.textRangeFromPosition(LStartPosition, LEndPosition));
+  var LStartPosition: UITextPosition := View.positionFromPosition(View.beginningOfDocument, AStart);
+  var LEndPosition: UITextPosition := View.positionFromPosition(LStartPosition, AStop - AStart);
+  View.setSelectedTextRange(View.textRangeFromPosition(LStartPosition, LEndPosition));
 end;
 
-{**************************************************************}
-Procedure TALIosEditControl.setSelection(const AIndex: integer);
+{***********************************************************}
+Procedure TALIosEditView.setSelection(const AIndex: integer);
 begin
-  var LStartPosition := NativeView.View.positionFromPosition(NativeView.View.beginningOfDocument, AIndex);
-  var LEndPosition := NativeView.View.positionFromPosition(LStartPosition, 0);
-  NativeView.View.setSelectedTextRange(NativeView.View.textRangeFromPosition(LStartPosition, LEndPosition));
+  var LStartPosition := View.positionFromPosition(View.beginningOfDocument, AIndex);
+  var LEndPosition := View.positionFromPosition(LStartPosition, 0);
+  View.setSelectedTextRange(View.textRangeFromPosition(LStartPosition, LEndPosition));
 end;
 
 {$endif}
@@ -2741,125 +2403,76 @@ end;
 {$REGION ' MacOS'}
 {$IF defined(ALMacOS)}
 
-{*************************************}
-constructor TALMacEditTextField.Create;
-begin
-  inherited;
-  View.SetBezeled(False);
-  View.setBordered(false);
-  TALNSControl.Wrap(NSObjectToID(View)).setLineBreakMode(NSLineBreakByClipping);
-  View.setDrawsBackground(false);
-  View.setFocusRingType(NSFocusRingTypeNone);
-end;
-
-{***************************************************************}
-constructor TALMacEditTextField.Create(const AControl: TControl);
-begin
-  fEditControl := TalMacEditControl(AControl);
-  inherited;
-end;
-
-{*************************************************************}
-procedure TALMacEditTextField.SetEnabled(const value: Boolean);
-begin
-  inherited;
-  View.SetEnabled(value);
-end;
-
-{**********************************************************}
-function TALMacEditTextField.acceptsFirstResponder: Boolean;
-begin
-  {$IF defined(DEBUG)}
-  ALLog('TALMacEditTextField.acceptsFirstResponder', 'control.name: ' + fEditControl.parent.Name);
-  {$ENDIF}
-  Result := NSTextField(Super).acceptsFirstResponder and TControl(fEditControl.Owner).canFocus;
-end;
-
-{*********************************************************}
-function TALMacEditTextField.becomeFirstResponder: Boolean;
-begin
-  {$IF defined(DEBUG)}
-  ALLog('TALMacEditTextField.becomeFirstResponder', 'control.name: ' + fEditControl.parent.Name);
-  {$ENDIF}
-  Result := NSTextField(Super).becomeFirstResponder;
-  if (not TControl(fEditControl.Owner).IsFocused) then
-    TControl(fEditControl.Owner).SetFocus;
-end;
-
-{*********************************************************}
-function TALMacEditTextField.GetObjectiveCClass: PTypeInfo;
-begin
-  Result := TypeInfo(IALMacEditTextField);
-end;
-
-{************************************************}
-function TALMacEditTextField.GetView: NSTextField;
-begin
-  Result := inherited GetView<NSTextField>;
-end;
-
 {************************************************************************************}
-constructor TALMacEditTextFieldDelegate.Create(const AEditControl: TALMacEditControl);
+constructor TALMacEditView.TTextFieldDelegate.Create(const AEditView: TALMacEditView);
 begin
   inherited Create;
-  FEditControl := AEditControl;
-  if FEditControl = nil then
-    raise EArgumentNilException.Create(Format(SWrongParameter, ['AEditControl']));
+  FEditView := AEditView;
+end;
+
+{******************************************************************************************}
+procedure TALMacEditView.TTextFieldDelegate.controlTextDidBeginEditing(obj: NSNotification);
+begin
+end;
+
+{****************************************************************************************}
+procedure TALMacEditView.TTextFieldDelegate.controlTextDidEndEditing(obj: NSNotification);
+begin
+  FEditView.Control.ResetFocus;
 end;
 
 {************************************************************************************}
-procedure TALMacEditTextFieldDelegate.controlTextDidBeginEditing(obj: NSNotification);
+procedure TALMacEditView.TTextFieldDelegate.controlTextDidChange(obj: NSNotification);
 begin
-end;
-
-{**********************************************************************************}
-procedure TALMacEditTextFieldDelegate.controlTextDidEndEditing(obj: NSNotification);
-begin
-  TControl(FEditControl.Owner).ResetFocus;
-end;
-
-{******************************************************************************}
-procedure TALMacEditTextFieldDelegate.controlTextDidChange(obj: NSNotification);
-begin
-  if FEditControl.maxLength > 0 then begin
-    var LText := NSStrToStr(FEditControl.NativeView.View.stringValue);
-    if LText.length > FEditControl.maxLength then begin
-      FEditControl.NativeView.View.SetStringValue(StrToNSStr(ALCopyStr(LText,1,FEditControl.maxLength)));
+  if FEditView.maxLength > 0 then begin
+    var LText := NSStrToStr(FEditView.View.stringValue);
+    if LText.length > FEditView.maxLength then begin
+      FEditView.View.SetStringValue(StrToNSStr(ALCopyStr(LText,1,FEditView.maxLength)));
       exit;
     end;
   end;
-  fEditControl.DoChange;
+  fEditView.DoChange;
 end;
 
-{******************************************************************************************************************************}
-function TALMacEditTextFieldDelegate.controlTextShouldBeginEditing(control: NSControl; textShouldBeginEditing: NSText): Boolean;
+{************************************************************************************************************************************}
+function TALMacEditView.TTextFieldDelegate.controlTextShouldBeginEditing(control: NSControl; textShouldBeginEditing: NSText): Boolean;
 begin
   Result := True;
 end;
 
-{**************************************************************************************************************************}
-function TALMacEditTextFieldDelegate.controlTextShouldEndEditing(control: NSControl; textShouldEndEditing: NSText): Boolean;
+{********************************************************************************************************************************}
+function TALMacEditView.TTextFieldDelegate.controlTextShouldEndEditing(control: NSControl; textShouldEndEditing: NSText): Boolean;
 begin
   Result := True;
 end;
 
-{***************************************************************************************************************************************************}
-function TALMacEditTextFieldDelegate.controlTextViewDoCommandBySelector(control: NSControl; textView: NSTextView; doCommandBySelector: SEL): Boolean;
+{*********************************************************************************************************************************************************}
+function TALMacEditView.TTextFieldDelegate.controlTextViewDoCommandBySelector(control: NSControl; textView: NSTextView; doCommandBySelector: SEL): Boolean;
 begin
-  if assigned(fEditControl.OnReturnKey) and (sel_getName(doCommandBySelector) = 'insertNewline:') then begin
-    fEditControl.DoReturnKey;
+  if assigned(fEditView.Control.OnReturnKey) and (sel_getName(doCommandBySelector) = 'insertNewline:') then begin
+    fEditView.Control.DoReturnKey;
     Result := True;
   end
   else
     result := False;
 end;
 
-{*******************************************************}
-constructor TALMacEditControl.Create(AOwner: TComponent);
+{********************************}
+constructor TALMacEditView.Create;
 begin
-  inherited create(AOwner);
-  FTextFieldDelegate := TALMacEditTextFieldDelegate.Create(Self);
-  TALNSTextField.wrap(NSObjectToID(NativeView.View)).setDelegate(FTextFieldDelegate.GetObjectID);
+  inherited; // This will call InitView
+  View.SetBezeled(False);
+  View.setBordered(false);
+  View.setLineBreakMode(NSLineBreakByClipping);
+  View.setDrawsBackground(false);
+  View.setFocusRingType(NSFocusRingTypeNone);
+  FTextFieldDelegate := TTextFieldDelegate.Create(Self);
+  {$IFNDEF ALCompilerVersionSupported130}
+    {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4352 has been resolved. If resolved, remove the class definition below.'}
+  {$ENDIF}
+  View.setDelegate(FTextFieldDelegate);
+  FTextSettings := TALBaseEdit.TTextSettings.Create;
+  FTextSettings.OnChanged := TextSettingsChanged;
   FFillColor := $ffffffff;
   fMaxLength := 0;
   fReturnKeyType := tReturnKeyType.Default;
@@ -2871,108 +2484,128 @@ begin
   FTintColor := TalphaColors.Null;
 end;
 
-{***********************************}
-destructor TALMacEditControl.Destroy;
+{********************************}
+destructor TALMacEditView.Destroy;
 begin
-  NativeView.View.setDelegate(nil);
+  View.setDelegate(nil);
   ALFreeAndNil(FTextFieldDelegate);
+  ALFreeAndNil(FTextSettings);
   inherited Destroy;
 end;
 
-{************************************************************}
-Function TALMacEditControl.CreateNativeView: TALMacNativeView;
+{********************************************************}
+procedure TALMacEditView.SetEnabled(const value: Boolean);
 begin
-  result := TALMacEditTextField.create(self);
+  inherited;
+  View.SetEnabled(value);
+end;
+
+{****************************************************}
+function TALMacEditView.GetObjectiveCClass: PTypeInfo;
+begin
+  Result := TypeInfo(IALMacEditView);
+end;
+
+{*******************************************}
+function TALMacEditView.GetView: NSTextField;
+begin
+  Result := inherited GetView<NSTextField>;
+end;
+
+{**********************************************}
+function TALMacEditView.GetControl: TALBaseEdit;
+begin
+  Result := TALBaseEdit(inherited Control);
+end;
+
+{********************************************}
+function TALMacEditView.getLineCount: integer;
+begin
+  Result := 1;
 end;
 
 {************************************************************}
-function TALMacEditControl.GetNativeView: TALMacEditTextField;
-begin
-  result := TALMacEditTextField(inherited GetNativeView);
-end;
-
-{***************************************************************}
-function TALMacEditControl.GetKeyboardType: TVirtualKeyboardType;
+function TALMacEditView.GetKeyboardType: TVirtualKeyboardType;
 begin
   Result := FKeyboardType;
 end;
 
-{*****************************************************************************}
-procedure TALMacEditControl.setKeyboardType(const Value: TVirtualKeyboardType);
+{**************************************************************************}
+procedure TALMacEditView.setKeyboardType(const Value: TVirtualKeyboardType);
 begin
   FKeyboardType := Value;
 end;
 
-{******************************************************************************}
-function TALMacEditControl.GetAutoCapitalizationType: TALAutoCapitalizationType;
+{***************************************************************************}
+function TALMacEditView.GetAutoCapitalizationType: TALAutoCapitalizationType;
 begin
   Result := FAutoCapitalizationType;
 end;
 
-{********************************************************************************************}
-procedure TALMacEditControl.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
+{*****************************************************************************************}
+procedure TALMacEditView.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
 begin
   FAutoCapitalizationType := Value;
 end;
 
-{**********************************************}
-function TALMacEditControl.GetPassword: Boolean;
+{*******************************************}
+function TALMacEditView.GetPassword: Boolean;
 begin
   Result := FPassword;
 end;
 
-{************************************************************}
-procedure TALMacEditControl.setPassword(const Value: Boolean);
+{*********************************************************}
+procedure TALMacEditView.setPassword(const Value: Boolean);
 begin
   FPassword := Value;
 end;
 
-{***************************************************}
-function TALMacEditControl.GetCheckSpelling: Boolean;
+{************************************************}
+function TALMacEditView.GetCheckSpelling: Boolean;
 begin
   Result := FCheckSpelling;
 end;
 
-{*****************************************************************}
-procedure TALMacEditControl.setCheckSpelling(const Value: Boolean);
+{**************************************************************}
+procedure TALMacEditView.setCheckSpelling(const Value: Boolean);
 begin
   FCheckSpelling := Value;
 end;
 
-{**********************************************************}
-function TALMacEditControl.GetReturnKeyType: TReturnKeyType;
+{*******************************************************}
+function TALMacEditView.GetReturnKeyType: TReturnKeyType;
 begin
   Result := FReturnKeyType;
 end;
 
-{************************************************************************}
-procedure TALMacEditControl.setReturnKeyType(const Value: TReturnKeyType);
+{*********************************************************************}
+procedure TALMacEditView.setReturnKeyType(const Value: TReturnKeyType);
 begin
   FReturnKeyType := Value;
 end;
 
-{***********************************************}
-function TALMacEditControl.GetPromptText: String;
+{********************************************}
+function TALMacEditView.GetPromptText: String;
 begin
-  var LAttributedString := TALNSTextField.Wrap(NSObjectToID(NativeView.View)).placeholderAttributedString;
-  if LAttributedString = nil then Result := NSStrToStr(TALNSTextField.Wrap(NSObjectToID(NativeView.View)).PlaceholderString)
-  else result := NSStrToStr(TALNSAttributedString.wrap(NSObjectToID(LAttributedString)).&String);
+  var LAttributedString := TALNSTextField.Wrap(NSObjectToID(View)).placeholderAttributedString;
+  if LAttributedString = nil then Result := NSStrToStr(TALNSTextField.Wrap(NSObjectToID(View)).PlaceholderString)
+  else result := NSStrToStr(LAttributedString.&String);
 end;
 
-{*************************************************************}
-procedure TALMacEditControl.setPromptText(const Value: String);
+{**********************************************************}
+procedure TALMacEditView.setPromptText(const Value: String);
 begin
   applyPromptTextWithColor(Value, fPromptTextColor);
 end;
 
-{*********************************************************}
-function TALMacEditControl.GetPromptTextColor: TAlphaColor;
+{******************************************************}
+function TALMacEditView.GetPromptTextColor: TAlphaColor;
 begin
   result := fPromptTextColor;
 end;
 
-{***********************************************************************}
-procedure TALMacEditControl.setPromptTextColor(const Value: TAlphaColor);
+{********************************************************************}
+procedure TALMacEditView.setPromptTextColor(const Value: TAlphaColor);
 begin
   if Value <> fPromptTextColor then begin
     fPromptTextColor := Value;
@@ -2980,8 +2613,8 @@ begin
   end;
 end;
 
-{**************************************************************************************************}
-procedure TALMacEditControl.applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor);
+{***********************************************************************************************}
+procedure TALMacEditView.applyPromptTextWithColor(const aStr: String; const aColor: TAlphaColor);
 begin
   //Using `setPlaceholderString` is not suitable here because it does not allow customizing the placeholder text color,
   //which depends on the OS's light or dark mode. However, this application requires a placeholder color that is
@@ -3003,8 +2636,9 @@ begin
                              ALSetColorAlpha(TextSettings.Font.Color, 0.5)).
                                PremultipliedAlpha.
                                ToAlphaColor);
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+        // No release required for LUIColor because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
         LPromptTextAttr.addAttribute(NSForegroundColorAttributeName, NSObjectToID(LNSColor), LTextRange);
-        //NOTE: If I try to release the LNSColor I have an exception
 
         // No need to do this in iOS, only in MacOS
         var LParagraphStyle := TNSMutableParagraphStyle.Alloc;
@@ -3017,7 +2651,7 @@ begin
         end;
 
         // No need to do this in iOS, only in MacOS
-        var LFontRef := ALCreateCTFontRef(TextSettings.Font.Family, TextSettings.Font.Size, TextSettings.Font.Weight, TextSettings.Font.Slant);
+        var LFontRef := ALCreateCTFontRef(ALResolveFontFamily(TextSettings.Font.Family), TextSettings.Font.Size, TextSettings.Font.Weight, TextSettings.Font.Slant);
         try
           LPromptTextAttr.addAttribute(NSFontAttributeName, NSObjectToID(TNSFont.Wrap(LFontRef)), LTextRange);
         finally
@@ -3028,106 +2662,129 @@ begin
       end;
     end;
 
-    TALNSTextField.Wrap(NSObjectToID(NativeView.View)).setPlaceholderAttributedString(LPromptTextAttr);
+    TALNSTextField.Wrap(NSObjectToID(View)).setPlaceholderAttributedString(LPromptTextAttr);
 
   finally
     LPromptTextAttr.release;
   end;
 end;
 
-{***************************************************}
-function TALMacEditControl.GetTintColor: TAlphaColor;
+{************************************************}
+function TALMacEditView.GetTintColor: TAlphaColor;
 begin
   Result := FTintColor;
 end;
 
-{*****************************************************************}
-procedure TALMacEditControl.setTintColor(const Value: TAlphaColor);
+{**************************************************************}
+procedure TALMacEditView.setTintColor(const Value: TAlphaColor);
 begin
   FTintColor := Value;
 end;
 
-{***************************************************}
-function TALMacEditControl.GetFillColor: TAlphaColor;
+{************************************************}
+function TALMacEditView.GetFillColor: TAlphaColor;
 begin
   Result := FFillColor;
 end;
 
-{*****************************************************************}
-procedure TALMacEditControl.SetFillColor(const Value: TAlphaColor);
+{**************************************************************}
+procedure TALMacEditView.SetFillColor(const Value: TAlphaColor);
 begin
   FFillColor := Value;
 end;
 
-{*****************************************}
-function TALMacEditControl.getText: String;
+{**************************************}
+function TALMacEditView.getText: String;
 begin
-  result := NSStrToStr(NativeView.View.StringValue);
+  result := NSStrToStr(View.StringValue);
 end;
 
-{*******************************************************}
-procedure TALMacEditControl.SetText(const Value: String);
+{****************************************************}
+procedure TALMacEditView.SetText(const Value: String);
 begin
-  NativeView.View.setStringValue(StrToNSStr(Value));
+  if Value <> getText then begin
+    View.setStringValue(StrToNSStr(Value));
+    DoChange;
+  end;
 end;
 
-{***************************************************************}
-procedure TALMacEditControl.TextSettingsChanged(Sender: TObject);
+{***********************************************************}
+function TALMacEditView.GetTextSettings: TALBaseTextSettings;
+begin
+  result := FTextSettings;
+end;
+
+{*************************************************************************}
+procedure TALMacEditView.SetTextSettings(const Value: TALBaseTextSettings);
+begin
+  FTextSettings.Assign(Value);
+end;
+
+{************************************************************}
+procedure TALMacEditView.TextSettingsChanged(Sender: TObject);
 begin
   // Font
-  var LFontRef := ALCreateCTFontRef(TextSettings.Font.Family, TextSettings.Font.Size, TextSettings.Font.Weight, TextSettings.Font.Slant);
+  var LFontRef := ALCreateCTFontRef(ALResolveFontFamily(TextSettings.Font.Family), TextSettings.Font.Size, TextSettings.Font.Weight, TextSettings.Font.Slant);
   try
-    NativeView.View.setFont(TNSFont.Wrap(LFontRef));
+    View.setFont(TNSFont.Wrap(LFontRef));
   finally
     CFRelease(LFontRef);
   end;
 
   // TextAlignment
-  NativeView.View.setAlignment(ALTextHorzAlignToNSTextAlignment(TextSettings.HorzAlign));
+  View.setAlignment(ALTextHorzAlignToNSTextAlignment(TextSettings.HorzAlign));
 
   // TextColor
-  NativeView.View.setTextColor(AlphaColorToNSColor(TextSettings.Font.Color));
+  View.setTextColor(AlphaColorToNSColor(TextSettings.Font.Color));
 
   // Update the PromptText with the new font settings. This is only necessary in macOS.
   // In iOS, this step is not required.
   applyPromptTextWithColor(PromptText, PromptTextColor);
 end;
 
-{***********************************************}
-function TALMacEditControl.GetMaxLength: integer;
+{********************************}
+procedure TALMacEditView.DoChange;
+begin
+  Control.DoChange;
+end;
+
+{********************************************}
+function TALMacEditView.GetMaxLength: integer;
 begin
   Result := FMaxLength;
 end;
 
-{*************************************************************}
-procedure TALMacEditControl.SetMaxLength(const Value: integer);
+{**********************************************************}
+procedure TALMacEditView.SetMaxLength(const Value: integer);
 begin
   FMaxLength := Value;
 end;
 
-{***********************************************}
-function TALMacEditControl.getLineHeight: Single;
+{********************************************}
+function TALMacEditView.getLineHeight: Single;
 begin
-  var LfontMetrics := ALGetFontMetrics(
-                        TextSettings.Font.Family, // const AFontFamily: String;
-                        TextSettings.Font.Size, // const AFontSize: single;
-                        TextSettings.Font.Weight, // const AFontWeight: TFontWeight;
-                        TextSettings.Font.Slant); // const AFontSlant: TFontSlant;
-  result := -LfontMetrics.Ascent + LfontMetrics.Descent + LfontMetrics.Leading;
-  if not SameValue(textsettings.LineHeightMultiplier, 0, TEpsilon.Scale) then
-    result := result * textsettings.LineHeightMultiplier;
+  var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(textsettings.font.size, textsettings.LineHeightMultiplier);
+  if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0 then result := textsettings.Font.Size * LTmpLineHeightMultiplier
+  else begin
+    var LfontMetrics := ALGetFontMetrics(
+                          ALResolveFontFamily(TextSettings.Font.Family), // const AFontFamily: String;
+                          TextSettings.Font.Size, // const AFontSize: single;
+                          TextSettings.Font.Weight, // const AFontWeight: TFontWeight;
+                          TextSettings.Font.Slant); // const AFontSlant: TFontSlant;
+    result := -LfontMetrics.Ascent + LfontMetrics.Descent + LfontMetrics.Leading;
+  end;
 end;
 
-{************************************************************************************}
-Procedure TALMacEditControl.setSelection(const AStart: integer; const AStop: Integer);
+{*********************************************************************************}
+Procedure TALMacEditView.setSelection(const AStart: integer; const AStop: Integer);
 begin
-  NativeView.View.currentEditor.setSelectedRange(NSMakeRange(AStart, AStop-AStart));
+  View.currentEditor.setSelectedRange(NSMakeRange(AStart, AStop-AStart));
 end;
 
-{**************************************************************}
-Procedure TALMacEditControl.setSelection(const AIndex: integer);
+{***********************************************************}
+Procedure TALMacEditView.setSelection(const AIndex: integer);
 begin
-  NativeView.View.currentEditor.setSelectedRange(NSMakeRange(AIndex, 0));
+  View.currentEditor.setSelectedRange(NSMakeRange(AIndex, 0));
 end;
 
 {$endif}
@@ -3154,14 +2811,24 @@ begin
     raise EComponentError.Create('This control requires version 4.70 or greater of COMCTL32.DLL');
 end;
 
-{**********************************************************}
-constructor TALWinEditView.Create(const AControl: TControl);
+{********************************}
+constructor TALWinEditView.Create;
 begin
   CheckCommonControl(ICC_STANDARD_CLASSES);
+  inherited;
   FFontHandle := 0;
   FBackgroundBrush := 0;
-  fEditControl := TALWinEditControl(AControl);
-  inherited Create(AControl);
+  FTextSettings := TALBaseEdit.TTextSettings.Create;
+  FTextSettings.OnChanged := TextSettingsChanged;
+  FFillColor := $ffffffff;
+  FPromptText := '';
+  FPromptTextColor := TalphaColors.Null;
+  fReturnKeyType := tReturnKeyType.Default;
+  fKeyboardType := TVirtualKeyboardType.default;
+  fAutoCapitalizationType := TALAutoCapitalizationType.acNone;
+  fCheckSpelling := true;
+  FTintColor := TalphaColors.Null;
+  SetPassword(false);
 end;
 
 {***************************************************************}
@@ -3179,11 +2846,17 @@ begin
     raise Exception.Create('Error 5E76956E-B13B-4694-8D83-CA6BEBC06CCE');
   if (FBackgroundBrush <> 0) and (not DeleteObject(FBackgroundBrush)) then
     RaiseLastOsError;
+  ALFreeAndNil(FTextSettings);
   inherited Destroy;
 end;
 
-{**********************}
-{$IF not defined(ALDPK)}
+{**********************************************}
+function TALWinEditView.GetControl: TALBaseEdit;
+begin
+  Result := TALBaseEdit(inherited Control);
+end;
+
+{****************************************}
 procedure TALWinEditView.UpdateFontHandle;
 begin
   SendMessage(Handle, WM_SETFONT, 0, 0);
@@ -3193,39 +2866,36 @@ begin
     FFontHandle := 0;
   end;
   FFontHandle := CreateFont(
-                   -Round(FEditControl.TextSettings.Font.Size * ALGetScreenScale), // nHeight
+                   -Round(TextSettings.Font.Size * ALGetScreenScale), // nHeight
                    0, // nWidth
                    0, // nEscapement
                    0, // nOrientaion
-                   FontWeightToWinapi(FEditControl.TextSettings.Font.Weight), // fnWeight
-                   DWORD(not FEditControl.TextSettings.Font.Slant.IsRegular), // fdwItalic
-                   DWORD(TALTextDecorationKind.Underline in FEditControl.TextSettings.Decoration.Kinds), // fdwUnderline
-                   DWORD(TALTextDecorationKind.LineThrough in FEditControl.TextSettings.Decoration.Kinds), // fdwStrikeOut
+                   FontWeightToWinapi(TextSettings.Font.Weight), // fnWeight
+                   DWORD(not TextSettings.Font.Slant.IsRegular), // fdwItalic
+                   DWORD(TALTextDecorationKind.Underline in TextSettings.Decoration.Kinds), // fdwUnderline
+                   DWORD(TALTextDecorationKind.LineThrough in TextSettings.Decoration.Kinds), // fdwStrikeOut
                    0, // fdwCharSet
                    0, // fdwOutputPrecision
                    0, // fdwClipPrecision
                    0, // fdwQuality
                    0, // fdwPitchAndFamily
-                   PChar(ALExtractPrimaryFontFamily(FEditControl.TextSettings.Font.Family))); // lpszFace
+                   PChar(ALResolveFontFamily(ALExtractPrimaryFontFamily(TextSettings.Font.Family)))); // lpszFace
 
   SendMessage(Handle, WM_SETFONT, FFontHandle, 1);
 end;
-{$ENDIF}
 
-{**********************}
-{$IF not defined(ALDPK)}
+{*********************************************}
 procedure TALWinEditView.UpdateBackgroundBrush;
 begin
   if (fBackgroundBrush <> 0) and (not DeleteObject(fBackgroundBrush)) then
     RaiseLastOsError;
-  if FEditControl.FillColor <> TAlphaColors.Null then begin
-    fBackgroundBrush := CreateSolidBrush(TAlphaColors.ColorToRGB(FEditControl.FillColor));
+  if FillColor <> TAlphaColors.Null then begin
+    fBackgroundBrush := CreateSolidBrush(TAlphaColors.ColorToRGB(FillColor));
     if fBackgroundBrush = 0 then RaiseLastOsError;
   end
   else
     fBackgroundBrush := 0;
 end;
-{$ENDIF}
 
 {**********************************************************}
 procedure TALWinEditView.WMKeyDown(var Message: TWMKeyDown);
@@ -3239,8 +2909,8 @@ begin
     PeekMessage(LMsg, Handle, 0, 0, PM_REMOVE);
   end;
   inherited;
-  if Message.CharCode = VK_RETURN then fEditControl.DoReturnKey
-  else if Message.CharCode = VK_DELETE then fEditControl.DoChange;
+  if Message.CharCode = VK_RETURN then Control.DoReturnKey
+  else if Message.CharCode = VK_DELETE then Control.DoChange;
 end;
 
 {******************************************************************}
@@ -3269,7 +2939,7 @@ procedure TALWinEditView.WMChar(var Message: TWMChar);
 begin
   inherited;
   invalidate;
-  fEditControl.DoChange;
+  Control.DoChange;
 end;
 
 {**********************************************************}
@@ -3277,7 +2947,7 @@ procedure TALWinEditView.WMSetText(var Message: TWMSetText);
 begin
   inherited;
   invalidate;
-  fEditControl.DoChange;
+  Control.DoChange;
 end;
 
 {******************************************************}
@@ -3285,7 +2955,7 @@ procedure TALWinEditView.WMPaste(var Message: TWMPaste);
 begin
   inherited;
   invalidate;
-  fEditControl.DoChange;
+  Control.DoChange;
 end;
 
 {**************************************************}
@@ -3293,7 +2963,7 @@ procedure TALWinEditView.WMCut(var Message: TWMCut);
 begin
   inherited;
   invalidate;
-  fEditControl.DoChange;
+  Control.DoChange;
 end;
 
 {******************************************************}
@@ -3301,7 +2971,7 @@ procedure TALWinEditView.WMClear(var Message: TWMClear);
 begin
   inherited;
   invalidate;
-  fEditControl.DoChange;
+  Control.DoChange;
 end;
 
 {****************************************************}
@@ -3309,16 +2979,16 @@ procedure TALWinEditView.WMUndo(var Message: TWMUndo);
 begin
   inherited;
   invalidate;
-  fEditControl.DoChange;
+  Control.DoChange;
 end;
 
 {**************************************************************************}
 procedure TALWinEditView.WMTextColor(var Message: WinApi.Messages.TMessage);
 begin
   inherited;
-  if SetTextColor(Message.wParam, TAlphaColors.ColorToRGB(FeditControl.TextSettings.Font.Color)) = CLR_INVALID then RaiseLastOSError;
+  if SetTextColor(Message.wParam, TAlphaColors.ColorToRGB(TextSettings.Font.Color)) = CLR_INVALID then RaiseLastOSError;
   if fBackgroundBrush <> 0 then begin
-    if SetBkColor(Message.wParam, TAlphaColors.ColorToRGB(FEditControl.FillColor)) = CLR_INVALID then RaiseLastOSError;
+    if SetBkColor(Message.wParam, TAlphaColors.ColorToRGB(FillColor)) = CLR_INVALID then RaiseLastOSError;
     Message.Result := LRESULT(FBackgroundBrush);
   end
   else
@@ -3328,17 +2998,17 @@ end;
 {******************************************************}
 procedure TALWinEditView.WMPaint(var Message: TWMPaint);
 begin
-  if (FEditControl.PromptText <> '') and
+  if (PromptText <> '') and
      (GetWindowTextLength(Handle) = 0) then begin
     var LPS: PAINTSTRUCT;
     var LDC := BeginPaint(Handle, LPS);
     if LDC = 0 then raise Exception.Create('Error 3B053C24-4A18-497C-82B1-C540EF7C2A4B');
     Try
-      var LPromptTextColor := FeditControl.PromptTextColor;
+      var LPromptTextColor := PromptTextColor;
       if LPromptTextColor = TAlphaColors.Null then
-        LPromptTextColor := ALBlendColor(FEditControl.fillColor, FeditControl.TextSettings.Font.Color, 0.3);
+        LPromptTextColor := ALBlendColor(fillColor, TextSettings.Font.Color, 0.3);
       if SetTextColor(LDC, TAlphaColors.ColorToRGB(LPromptTextColor)) = CLR_INVALID then RaiseLastOSError;
-      if SetBkColor(LDC, TAlphaColors.ColorToRGB(FeditControl.fillColor)) = CLR_INVALID then RaiseLastOSError;
+      if SetBkColor(LDC, TAlphaColors.ColorToRGB(fillColor)) = CLR_INVALID then RaiseLastOSError;
       if FBackgroundBrush <> 0 then begin
         if FillRect(LDC, LPS.rcPaint, FBackgroundBrush) = 0 then raiseLastOsError;
       end
@@ -3350,20 +3020,20 @@ begin
       var LMargins := SendMessage(Handle, EM_GETMARGINS, 0, 0);
       //LOWORD(LMargins) = Left Margin
       //HIWORD(LMargins) = Right Margin
-      case FeditControl.TextSettings.HorzAlign of
+      case TextSettings.HorzAlign of
         TALTextHorzAlign.Center: begin
           var LTextSize: TSize;
-          GetTextExtentPoint32(LDC, Pchar(FEditControl.PromptText), Length(FEditControl.PromptText), LTextSize);
-          TextOut(LDC, round((FeditControl.Width - LtextSize.cx) / 2), 0, Pchar(FEditControl.PromptText), Length(FEditControl.PromptText));
+          GetTextExtentPoint32(LDC, Pchar(PromptText), Length(PromptText), LTextSize);
+          TextOut(LDC, round((Control.GetNativeViewWidth - LtextSize.cx) / 2), 0, Pchar(PromptText), Length(PromptText));
         end;
         TALTextHorzAlign.Leading,
         TALTextHorzAlign.Justify:  begin
-          TextOut(LDC, round(LOWORD(LMargins) * ALGetScreenScale), 0, Pchar(FEditControl.PromptText), Length(FEditControl.PromptText));
+          TextOut(LDC, round(LOWORD(LMargins) * ALGetScreenScale), 0, Pchar(PromptText), Length(PromptText));
         end;
         TALTextHorzAlign.Trailing: begin
           var LTextSize: TSize;
-          GetTextExtentPoint32(LDC, Pchar(FEditControl.PromptText), Length(FEditControl.PromptText), LTextSize);
-          TextOut(LDC, round(FeditControl.Width - LtextSize.cx - HIWORD(LMargins)), 0, Pchar(FEditControl.PromptText), Length(FEditControl.PromptText));
+          GetTextExtentPoint32(LDC, Pchar(PromptText), Length(PromptText), LTextSize);
+          TextOut(LDC, round(Control.GetNativeViewWidth - LtextSize.cx - HIWORD(LMargins)), 0, Pchar(PromptText), Length(PromptText));
         end;
         else
           raise Exception.Create('Error 21CC0DF5-9030-4F6C-9830-112E17E1A392');
@@ -3377,67 +3047,36 @@ begin
     inherited;
 end;
 
-{*******************************************************}
-constructor TALWinEditControl.Create(AOwner: TComponent);
+{********************************************}
+function TALWinEditView.getLineCount: integer;
 begin
-  inherited create(AOwner);
-  FFillColor := $ffffffff;
-  FPromptText := '';
-  FPromptTextColor := TalphaColors.Null;
-  fReturnKeyType := tReturnKeyType.Default;
-  fKeyboardType := TVirtualKeyboardType.default;
-  fAutoCapitalizationType := TALAutoCapitalizationType.acNone;
-  fCheckSpelling := true;
-  FTintColor := TalphaColors.Null;
-  {$IF defined(ALDPK)}
-  FPassword := False;
-  FMaxLength := 0;
-  FText := '';
-  {$ENDIF}
-  SetPassword(false);
+  Result := 1;
 end;
 
 {************************************************************}
-Function TALWinEditControl.CreateNativeView: TALWinNativeView;
-begin
-  {$IF defined(ALDPK)}
-  Result := nil;
-  {$ELSE}
-  result := TALWinEditView.create(self);
-  {$ENDIF}
-end;
-
-{*******************************************************}
-function TALWinEditControl.GetNativeView: TALWinEditView;
-begin
-  result := TALWinEditView(inherited GetNativeView);
-end;
-
-{***************************************************************}
-function TALWinEditControl.GetKeyboardType: TVirtualKeyboardType;
+function TALWinEditView.GetKeyboardType: TVirtualKeyboardType;
 begin
   Result := FKeyboardType;
 end;
 
-{*****************************************************************************}
-procedure TALWinEditControl.setKeyboardType(const Value: TVirtualKeyboardType);
+{**************************************************************************}
+procedure TALWinEditView.setKeyboardType(const Value: TVirtualKeyboardType);
 begin
   FKeyboardType := Value;
 end;
 
-{******************************************************************************}
-function TALWinEditControl.GetAutoCapitalizationType: TALAutoCapitalizationType;
+{***************************************************************************}
+function TALWinEditView.GetAutoCapitalizationType: TALAutoCapitalizationType;
 begin
   result := fAutoCapitalizationType;
 end;
 
-{********************************************************************************************}
-procedure TALWinEditControl.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
+{*****************************************************************************************}
+procedure TALWinEditView.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
 begin
   if (value <> fAutoCapitalizationType) then begin
     fAutoCapitalizationType := Value;
-    {$IF not defined(ALDPK)}
-    var LStyle := GetWindowLong(NativeView.Handle, GWL_STYLE);
+    var LStyle := GetWindowLong(Handle, GWL_STYLE);
     if LStyle = 0 then RaiseLastOsError;
     case fAutoCapitalizationType of
       TALAutoCapitalizationType.acNone:          LStyle := LStyle and not ES_UPPERCASE;
@@ -3446,171 +3085,146 @@ begin
       TALAutoCapitalizationType.acAllCharacters: LStyle := LStyle or ES_UPPERCASE;
       else raise Exception.Create('Error 21CC0DF5-9030-4F6C-9830-112E17E1A392');
     end;
-    if SetWindowLong(NativeView.Handle, GWL_STYLE, LStyle) = 0 then RaiseLastOsError;
-    {$ENDIF}
-  end;
-end;
-
-{************************************************************}
-procedure TALWinEditControl.setPassword(const Value: Boolean);
-begin
-  {$IF defined(ALDPK)}
-  FPassword := Value;
-  {$ELSE}
-  if (value <> Password) then begin
-    if Value then SendMessage(NativeView.Handle, EM_SETPASSWORDCHAR, Ord('*'), 0)
-    else SendMessage(NativeView.Handle, EM_SETPASSWORDCHAR, 0, 0);
-    NativeView.Invalidate;
-  end;
-  {$ENDIF}
-end;
-
-{**********************************************}
-function TALWinEditControl.GetPassword: Boolean;
-begin
-  {$IF defined(ALDPK)}
-  Result := FPassword;
-  {$ELSE}
-  Result := SendMessage(NativeView.Handle, EM_GETPASSWORDCHAR, 0, 0) <> 0;
-  {$ENDIF}
-end;
-
-{*************************************************************}
-procedure TALWinEditControl.SetMaxLength(const Value: integer);
-begin
-  {$IF defined(ALDPK)}
-  FMaxLength := Value;
-  {$ELSE}
-  SendMessage(NativeView.Handle, EM_LIMITTEXT, Value, 0);
-  {$ENDIF}
-end;
-
-{***********************************************}
-function TALWinEditControl.GetMaxLength: integer;
-begin
-  {$IF defined(ALDPK)}
-  Result := FMaxLength;
-  {$ELSE}
-  Result := SendMessage(NativeView.Handle, EM_GETLIMITTEXT, 0, 0);
-  if Result = $7FFFFFFE {2147483646} then Result := 0;
-  {$ENDIF}
-end;
-
-{***************************************************}
-function TALWinEditControl.GetCheckSpelling: Boolean;
-begin
-  result := FCheckSpelling
-end;
-
-{*****************************************************************}
-procedure TALWinEditControl.setCheckSpelling(const Value: Boolean);
-begin
-  FCheckSpelling := Value;
-end;
-
-{**********************************************************}
-function TALWinEditControl.GetReturnKeyType: TReturnKeyType;
-begin
-  Result := FReturnKeyType;
-end;
-
-{************************************************************************}
-procedure TALWinEditControl.setReturnKeyType(const Value: TReturnKeyType);
-begin
-  FReturnKeyType := Value;
-end;
-
-{***********************************************}
-function TALWinEditControl.GetPromptText: String;
-begin
-  Result := FPromptText;
-end;
-
-{*************************************************************}
-procedure TALWinEditControl.setPromptText(const Value: String);
-begin
-  if FPromptText <> Value then begin
-    FPromptText := Value;
-    {$IF not defined(ALDPK)}
-    NativeView.Invalidate;
-    {$ENDIF}
+    if SetWindowLong(Handle, GWL_STYLE, LStyle) = 0 then RaiseLastOsError;
   end;
 end;
 
 {*********************************************************}
-function TALWinEditControl.GetPromptTextColor: TAlphaColor;
+procedure TALWinEditView.setPassword(const Value: Boolean);
+begin
+  if (value <> Password) then begin
+    if Value then SendMessage(Handle, EM_SETPASSWORDCHAR, Ord('*'), 0)
+    else SendMessage(Handle, EM_SETPASSWORDCHAR, 0, 0);
+    Invalidate;
+  end;
+end;
+
+{*******************************************}
+function TALWinEditView.GetPassword: Boolean;
+begin
+  Result := SendMessage(Handle, EM_GETPASSWORDCHAR, 0, 0) <> 0;
+end;
+
+{**********************************************************}
+procedure TALWinEditView.SetMaxLength(const Value: integer);
+begin
+  SendMessage(Handle, EM_LIMITTEXT, Value, 0);
+end;
+
+{********************************************}
+function TALWinEditView.GetMaxLength: integer;
+begin
+  Result := SendMessage(Handle, EM_GETLIMITTEXT, 0, 0);
+  if Result = $7FFFFFFE {2147483646} then Result := 0;
+end;
+
+{************************************************}
+function TALWinEditView.GetCheckSpelling: Boolean;
+begin
+  result := FCheckSpelling
+end;
+
+{**************************************************************}
+procedure TALWinEditView.setCheckSpelling(const Value: Boolean);
+begin
+  FCheckSpelling := Value;
+end;
+
+{*******************************************************}
+function TALWinEditView.GetReturnKeyType: TReturnKeyType;
+begin
+  Result := FReturnKeyType;
+end;
+
+{*********************************************************************}
+procedure TALWinEditView.setReturnKeyType(const Value: TReturnKeyType);
+begin
+  FReturnKeyType := Value;
+end;
+
+{********************************************}
+function TALWinEditView.GetPromptText: String;
+begin
+  Result := FPromptText;
+end;
+
+{**********************************************************}
+procedure TALWinEditView.setPromptText(const Value: String);
+begin
+  if FPromptText <> Value then begin
+    FPromptText := Value;
+    Invalidate;
+  end;
+end;
+
+{******************************************************}
+function TALWinEditView.GetPromptTextColor: TAlphaColor;
 begin
   Result := FPromptTextColor;
 end;
 
-{***********************************************************************}
-procedure TALWinEditControl.setPromptTextColor(const Value: TAlphaColor);
+{********************************************************************}
+procedure TALWinEditView.setPromptTextColor(const Value: TAlphaColor);
 begin
   if Value <> FPromptTextColor then begin
     FPromptTextColor := Value;
-    {$IF not defined(ALDPK)}
-    NativeView.Invalidate;
-    {$ENDIF}
+    Invalidate;
   end;
 end;
 
-{***************************************************}
-function TALWinEditControl.GetTintColor: TAlphaColor;
+{************************************************}
+function TALWinEditView.GetTintColor: TAlphaColor;
 begin
   Result := FTintColor;
 end;
 
-{*****************************************************************}
-procedure TALWinEditControl.setTintColor(const Value: TAlphaColor);
+{**************************************************************}
+procedure TALWinEditView.setTintColor(const Value: TAlphaColor);
 begin
   FTintColor := Value;
 end;
 
-{***************************************************}
-function TALWinEditControl.GetFillColor: TAlphaColor;
+{************************************************}
+function TALWinEditView.GetFillColor: TAlphaColor;
 begin
   Result := FFillColor;
 end;
 
-{*****************************************************************}
-procedure TALWinEditControl.SetFillColor(const Value: TAlphaColor);
+{**************************************************************}
+procedure TALWinEditView.SetFillColor(const Value: TAlphaColor);
 begin
   if FFillColor <> Value then begin
     FFillColor := Value;
-    {$IF not defined(ALDPK)}
-    NativeView.UpdateBackgroundBrush;
-    NativeView.Invalidate;
-    {$ENDIF}
+    UpdateBackgroundBrush;
+    Invalidate;
   end;
 end;
 
-{*****************************************}
-function TALWinEditControl.getText: String;
+{**************************************}
+function TALWinEditView.getText: String;
 begin
-  {$IF defined(ALDPK)}
-  Result := FText;
-  {$ELSE}
-  Result := GetHWNDText(NativeView.Handle);
-  {$ENDIF}
+  Result := GetHWNDText(Handle);
 end;
 
-{*******************************************************}
-procedure TALWinEditControl.SetText(const Value: String);
+{****************************************************}
+procedure TALWinEditView.SetText(const Value: String);
 begin
-  {$IF defined(ALDPK)}
-  FText := Value;
-  {$ELSE}
-  SetWindowText(NativeView.Handle, PChar(Value));
-  {$ENDIF}
+  SetWindowText(Handle, PChar(Value));
+  if Value <> '' then setSelection(length(Value));
 end;
 
-{***************************************************************}
-procedure TALWinEditControl.TextSettingsChanged(Sender: TObject);
+{*************************************************************************}
+procedure TALWinEditView.SetTextSettings(const Value: TALBaseTextSettings);
 begin
-  {$IF not defined(ALDPK)}
-  NativeView.UpdateFontHandle;
+  FTextSettings.Assign(Value);
+end;
+
+{************************************************************}
+procedure TALWinEditView.TextSettingsChanged(Sender: TObject);
+begin
+  UpdateFontHandle;
   //--
-  var LStyle := GetWindowLong(NativeView.Handle, GWL_STYLE);
+  var LStyle := GetWindowLong(Handle, GWL_STYLE);
   if LStyle = 0 then RaiseLastOsError;
   case TextSettings.HorzAlign of
       TALTextHorzAlign.Center:   LStyle := LStyle or ES_CENTER;
@@ -3619,41 +3233,51 @@ begin
       TALTextHorzAlign.Justify:  LStyle := LStyle or ES_LEFT;
     else raise Exception.Create('Error 21CC0DF5-9030-4F6C-9830-112E17E1A392');
   end;
-  if SetWindowLong(NativeView.Handle, GWL_STYLE, LStyle) = 0 then RaiseLastOsError;
-  SendMessage(NativeView.Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(0, 0));
+  if SetWindowLong(Handle, GWL_STYLE, LStyle) = 0 then RaiseLastOsError;
+  SendMessage(Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(0, 0));
   //--
-  NativeView.Invalidate;
-  {$ENDIF}
+  Invalidate;
 end;
 
-{***********************************************}
-function TALWinEditControl.getLineHeight: Single;
+{********************************************}
+function TALWinEditView.getLineHeight: Single;
 begin
+
+  //
+  // The classic Windows edit control doesn't natively support line spacing adjustments
+  // var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(textsettings.font.size, textsettings.LineHeightMultiplier);
+  // if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0 then result := textsettings.Font.Size * LTmpLineHeightMultiplier
+  //
+
   var LfontMetrics := ALGetFontMetrics(
-                        TextSettings.Font.Family, // const AFontFamily: String;
+                        ALResolveFontFamily(TextSettings.Font.Family), // const AFontFamily: String;
                         TextSettings.Font.Size, // const AFontSize: single;
                         TextSettings.Font.Weight, // const AFontWeight: TFontWeight;
                         TextSettings.Font.Slant); // const AFontSlant: TFontSlant;
   result := -LfontMetrics.Ascent + LfontMetrics.Descent + LfontMetrics.Leading;
-  // The classic Edit control doesn't natively support line spacing adjustments
-  // if not SameValue(textsettings.LineHeightMultiplier, 0, TEpsilon.Scale) then
-  //   result := result * textsettings.LineHeightMultiplier;
+
 end;
 
-{************************************************************************************}
-Procedure TALWinEditControl.SetSelection(const AStart: integer; const AStop: Integer);
+{*********************************************************************************}
+Procedure TALWinEditView.SetSelection(const AStart: integer; const AStop: Integer);
 begin
-  SendMessage(NativeView.Handle, EM_SETSEL, AStart, AStop);
+  SendMessage(Handle, EM_SETSEL, AStart, AStop);
 end;
 
-{**************************************************************}
-Procedure TALWinEditControl.SetSelection(const AIndex: integer);
+{***********************************************************}
+Procedure TALWinEditView.SetSelection(const AIndex: integer);
 begin
-  SendMessage(NativeView.Handle, EM_SETSEL, AIndex, AIndex);
+  SendMessage(Handle, EM_SETSEL, AIndex, AIndex);
 end;
 
 {$endif}
 {$ENDREGION}
+
+{******************************************************}
+function TALBaseEdit.TFill.GetDefaultColor: TAlphaColor;
+begin
+  Result := TAlphaColors.white;
+end;
 
 {********************************************************}
 function TALBaseEdit.TStroke.GetDefaultColor: TAlphaColor;
@@ -3939,7 +3563,9 @@ begin
   inherited Create(AParent);
   //--
   FPromptTextColor := DefaultPromptTextColor;
+  FPromptTextColorKey := DefaultPromptTextColorKey;
   FTintColor := DefaultTintColor;
+  FTintColorKey := DefaultTintColorKey;
   //--
   if StateStyleParent <> nil then begin
     FTextSettings := CreateTextSettings(StateStyleParent.TextSettings);
@@ -3967,9 +3593,6 @@ begin
   //BufLabelTextDrawableRect: TRectF;
   BufSupportingTextDrawable := ALNullDrawable;
   //BufSupportingTextDrawableRect: TRectF;
-  //--
-  //FPriorSupersedePromptTextColor
-  //FPriorSupersedeTintColor
 end;
 
 {*********************************************}
@@ -4012,7 +3635,9 @@ begin
     BeginUpdate;
     Try
       PromptTextColor := TBaseStateStyle(Source).PromptTextColor;
+      PromptTextColorKey := TBaseStateStyle(Source).PromptTextColorKey;
       TintColor := TBaseStateStyle(Source).TintColor;
+      TintColorKey := TBaseStateStyle(Source).TintColorKey;
       TextSettings.Assign(TBaseStateStyle(Source).TextSettings);
       LabelTextSettings.Assign(TBaseStateStyle(Source).LabelTextSettings);
       SupportingTextSettings.Assign(TBaseStateStyle(Source).SupportingTextSettings);
@@ -4033,7 +3658,9 @@ begin
   Try
     inherited;
     PromptTextColor := DefaultPromptTextColor;
+    PromptTextColorKey := DefaultPromptTextColorKey;
     TintColor := DefaultTintColor;
+    TintColorKey := DefaultTintColorKey;
     TextSettings.Reset;
     LabelTextSettings.Reset;
     SupportingTextSettings.Reset;
@@ -4054,6 +3681,46 @@ begin
   finally
     EndUpdate;
   end;
+end;
+
+{***************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.ApplyPromptTextColorScheme;
+begin
+  if FPromptTextColorKey <> '' then begin
+    var LPromptTextColor := TALStyleManager.Instance.GetColor(FPromptTextColorKey);
+    if FPromptTextColor <> LPromptTextColor then begin
+      FPromptTextColor := LPromptTextColor;
+      Change;
+    end;
+  end;
+end;
+
+{*********************************************************}
+procedure TALBaseEdit.TBaseStateStyle.ApplyTintColorScheme;
+begin
+  if FTintColorKey <> '' then begin
+    var LTintColor := TALStyleManager.Instance.GetColor(FTintColorKey);
+    if FTintColor <> LTintColor then begin
+      FTintColor := LTintColor;
+      Change;
+    end;
+  end;
+end;
+
+{*****************************************************}
+procedure TALBaseEdit.TBaseStateStyle.ApplyColorScheme;
+begin
+  BeginUpdate;
+  Try
+    Inherited;
+    TextSettings.ApplyColorScheme;
+    LabelTextSettings.ApplyColorScheme;
+    SupportingTextSettings.ApplyColorScheme;
+    ApplyPromptTextColorScheme;
+    ApplyTintColorScheme;
+  finally
+    EndUpdate;
+  End;
 end;
 
 {*****************************************************}
@@ -4083,8 +3750,8 @@ begin
   ALFreeAndNilDrawable(BufSupportingTextDrawable);
 end;
 
-{*************************************************************************************************************}
-procedure TALBaseEdit.TBaseStateStyle.Interpolate(const ATo: TALBaseStateStyle; const ANormalizedTime: Single);
+{**************************************************************************************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.Interpolate(const ATo: TALBaseStateStyle; const ANormalizedTime: Single; const AReverse: Boolean);
 begin
   {$IF defined(debug)}
   if (ATo <> nil) and (not (ATo is TBaseStateStyle)) then
@@ -4092,10 +3759,14 @@ begin
   {$ENDIF}
   BeginUpdate;
   Try
-    inherited Interpolate(ATo, ANormalizedTime);
+    var LPrevPromptTextColorKey := FPromptTextColorKey;
+    var LPrevTintColorKey := FTintColorKey;
+
+    inherited Interpolate(ATo, ANormalizedTime, AReverse);
+
     if ATo <> nil then begin
       PromptTextColor := ALInterpolateColor(PromptTextColor{Start}, TBaseStateStyle(ATo).PromptTextColor{Stop}, ANormalizedTime);
-      TextSettings.Interpolate(TBaseStateStyle(ATo).TextSettings, ANormalizedTime);
+      TextSettings.Interpolate(TBaseStateStyle(ATo).TextSettings, ANormalizedTime, AReverse);
       TintColor := ALInterpolateColor(TintColor{Start}, TBaseStateStyle(ATo).TintColor{Stop}, ANormalizedTime);
     end
     {$IF defined(debug)}
@@ -4103,14 +3774,17 @@ begin
     {$ENDIF}
     else if ControlParent <> nil then begin
       PromptTextColor := ALInterpolateColor(PromptTextColor{Start}, ControlParent.PromptTextColor{Stop}, ANormalizedTime);
-      TextSettings.Interpolate(ControlParent.TextSettings, ANormalizedTime);
+      TextSettings.Interpolate(ControlParent.TextSettings, ANormalizedTime, AReverse);
       TintColor := ALInterpolateColor(TintColor{Start}, ControlParent.TintColor{Stop}, ANormalizedTime);
     end
     else begin
       PromptTextColor := ALInterpolateColor(PromptTextColor{Start}, DefaultPromptTextColor{Stop}, ANormalizedTime);
-      TextSettings.Interpolate(nil, ANormalizedTime);
+      TextSettings.Interpolate(nil, ANormalizedTime, AReverse);
       TintColor := ALInterpolateColor(TintColor{Start}, DefaultTintColor{Stop}, ANormalizedTime);
     end;
+
+    var FPromptTextColorKey := LPrevPromptTextColorKey;
+    var FTintColorKey := LPrevTintColorKey;
   finally
     EndUpdate;
   end;
@@ -4120,10 +3794,6 @@ end;
 procedure TALBaseEdit.TBaseStateStyle.DoSupersede;
 begin
   inherited;
-  //--
-  FPriorSupersedePromptTextColor := FPromptTextColor;
-  FPriorSupersedeTintColor := FTintColor;
-  //--
   if StateStyleParent <> nil then begin
     if PromptTextColor = TAlphaColors.Null then PromptTextColor := StateStyleParent.PromptTextColor;
     if TintColor = TAlphaColors.Null then TintColor := StateStyleParent.TintColor;
@@ -4164,7 +3834,17 @@ procedure TALBaseEdit.TBaseStateStyle.SetPromptTextColor(const AValue: TAlphaCol
 begin
   if FPromptTextColor <> AValue then begin
     FPromptTextColor := AValue;
+    FPromptTextColorKey := '';
     Change;
+  end;
+end;
+
+{********************************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.SetPromptTextColorKey(const AValue: String);
+begin
+  if FPromptTextColorKey <> AValue then begin
+    FPromptTextColorKey := AValue;
+    ApplyPromptTextColorScheme;
   end;
 end;
 
@@ -4173,7 +3853,17 @@ procedure TALBaseEdit.TBaseStateStyle.SetTintColor(const AValue: TAlphaColor);
 begin
   if FTintColor <> AValue then begin
     FTintColor := AValue;
+    FTintColorKey := '';
     Change;
+  end;
+end;
+
+{**************************************************************************}
+procedure TALBaseEdit.TBaseStateStyle.SetTintColorKey(const AValue: String);
+begin
+  if FTintColorKey <> AValue then begin
+    FTintColorKey := AValue;
+    ApplyTintColorScheme;
   end;
 end;
 
@@ -4201,10 +3891,22 @@ begin
   Result := TAlphaColors.Null;
 end;
 
+{************************************************************************}
+function TALBaseEdit.TBaseStateStyle.GetDefaultPromptTextColorKey: String;
+begin
+  Result := '';
+end;
+
 {********************************************************************}
 function TALBaseEdit.TBaseStateStyle.GetDefaultTintColor: TalphaColor;
 begin
   Result := TAlphaColors.Null;
+end;
+
+{******************************************************************}
+function TALBaseEdit.TBaseStateStyle.GetDefaultTintColorKey: String;
+begin
+  Result := '';
 end;
 
 {*******************************************************}
@@ -4242,10 +3944,22 @@ begin
   result := FPromptTextColor <> DefaultPromptTextColor;
 end;
 
+{***********************************************************************}
+function TALBaseEdit.TBaseStateStyle.IsPromptTextColorKeyStored: Boolean;
+begin
+  result := FPromptTextColorKey <> DefaultPromptTextColorKey;
+end;
+
 {**************************************************************}
 function TALBaseEdit.TBaseStateStyle.IsTintColorStored: Boolean;
 begin
   result := FTintColor <> DefaultTintColor;
+end;
+
+{*****************************************************************}
+function TALBaseEdit.TBaseStateStyle.IsTintColorKeyStored: Boolean;
+begin
+  result := FTintColorKey <> DefaultTintColorKey;
 end;
 
 {****************************************************************}
@@ -4306,6 +4020,29 @@ begin
   Result := inherited GetInherit;
 end;
 
+{***************************************************}
+procedure TALBaseEdit.TStateStyles.TTransition.Start;
+begin
+  inherited;
+  TStateStyles(Owner).Parent.UpdateNativeViewStyle;
+end;
+
+{*******************************************************}
+procedure TALBaseEdit.TStateStyles.TTransition.DoProcess;
+begin
+  inherited;
+  if Enabled then
+    TStateStyles(Owner).Parent.UpdateNativeViewStyle;
+end;
+
+{******************************************************}
+procedure TALBaseEdit.TStateStyles.TTransition.DoFinish;
+begin
+  inherited;
+  if Enabled then
+    TStateStyles(Owner).Parent.UpdateNativeViewStyle;
+end;
+
 {*********************************************************************}
 constructor TALBaseEdit.TStateStyles.Create(const AParent: TALControl);
 begin
@@ -4330,6 +4067,12 @@ begin
   inherited Destroy;
 end;
 
+{*********************************************************************************}
+function TALBaseEdit.TStateStyles.CreateTransition: TALBaseStateStyles.TTransition;
+begin
+  result := TTransition.Create(Self);
+end;
+
 {******************************************************************************************************}
 function TALBaseEdit.TStateStyles.CreateDisabledStateStyle(const AParent: TObject): TDisabledStateStyle;
 begin
@@ -4346,27 +4089,6 @@ end;
 function TALBaseEdit.TStateStyles.CreateFocusedStateStyle(const AParent: TObject): TFocusedStateStyle;
 begin
   Result := TFocusedStateStyle.Create(AParent);
-end;
-
-{*************************************************}
-procedure TALBaseEdit.TStateStyles.StartTransition;
-begin
-  inherited;
-  Parent.UpdateEditControlStyle;
-end;
-
-{*****************************************************************************}
-procedure TALBaseEdit.TStateStyles.TransitionAnimationProcess(Sender: TObject);
-begin
-  inherited;
-  Parent.UpdateEditControlStyle;
-end;
-
-{****************************************************************************}
-procedure TALBaseEdit.TStateStyles.TransitionAnimationFinish(Sender: TObject);
-begin
-  inherited;
-  Parent.UpdateEditControlStyle;
 end;
 
 {*************************************************************}
@@ -4410,6 +4132,20 @@ begin
     Disabled.AlignToPixel;
     Hovered.AlignToPixel;
     Focused.AlignToPixel;
+  finally
+    EndUpdate;
+  end;
+end;
+
+{**************************************************}
+procedure TALBaseEdit.TStateStyles.ApplyColorScheme;
+begin
+  BeginUpdate;
+  Try
+    inherited;
+    Disabled.ApplyColorScheme;
+    Hovered.ApplyColorScheme;
+    Focused.ApplyColorScheme;
   finally
     EndUpdate;
   end;
@@ -4504,8 +4240,6 @@ constructor TALBaseEdit.Create(AOwner: TComponent);
 begin
   inherited;
   //--
-  fDefStyleAttr := '';
-  fDefStyleRes := '';
   FAutoTranslate := true;
   fOnChange := nil;
   FOnReturnKey := nil;
@@ -4515,8 +4249,10 @@ begin
   //--
   FPromptText := '';
   FPromptTextColor := TAlphaColors.null;
+  FPromptTextColorKey := '';
   //--
   FTintcolor := TAlphaColors.null;
+  FTintcolorKey := '';
   //--
   FLabelText := '';
   FLabelTextSettings := CreateLabelTextSettings;
@@ -4524,8 +4260,8 @@ begin
   FlabelTextAnimation := TALFloatAnimation.Create;
   FlabelTextAnimation.StartValue := 0;
   FlabelTextAnimation.StopValue := 1;
-  FlabelTextAnimation.AnimationType := TanimationType.out;
-  FlabelTextAnimation.Interpolation := TALInterpolationType.linear;
+  FlabelTextAnimation.InterpolationType := TALInterpolationType.linear;
+  FlabelTextAnimation.InterpolationMode := TALInterpolationMode.out;
   FlabelTextAnimation.OnProcess := labelTextAnimationProcess;
   FlabelTextAnimation.OnFinish := labelTextAnimationFinish;
   //--
@@ -4535,7 +4271,16 @@ begin
   FSupportingTextMarginBottomUpdated := False;
   //--
   FIsTextEmpty := True;
-  FNativeViewRemoved := False;
+  FNativeViewFrozenByPaint := False;
+  //--
+  FDummyFillColor := $ffffffff;
+  fDummyReturnKeyType := tReturnKeyType.Default;
+  fDummyKeyboardType := TVirtualKeyboardType.default;
+  fDummyAutoCapitalizationType := TALAutoCapitalizationType.acNone;
+  fDummyCheckSpelling := true;
+  FDummyPassword := False;
+  FDummyMaxLength := 0;
+  FDummyText := '';
   //--
   fBufPromptTextDrawable := ALNullDrawable;
   //fBufPromptTextDrawableRect
@@ -4563,24 +4308,6 @@ begin
   {$ENDIF}
   FStateStyles := CreateStateStyles;
   FStateStyles.OnChanged := StateStylesChanged;
-  //--
-  {$IF defined(DEBUG)}
-  if fEditControl <> nil then
-    raise Exception.Create('Error CE2932F6-E44A-4A4B-AAE3-71FE4077FCF2');
-  {$ENDIF}
-  {$IF defined(android)}
-  // In Android we must first know the value of DefStyleAttr/DefStyleRes
-  // before to create the fEditControl. I use this way to know that the compoment
-  // will load it's properties from the dfm
-  if not IsOwnerLoading then begin
-    fEditControl := CreateEditControl;
-    InitEditControl;
-  end
-  else fEditControl := nil;
-  {$ELSE}
-  fEditControl := CreateEditControl;
-  InitEditControl;
-  {$ENDIF}
 end;
 
 {*****************************}
@@ -4594,8 +4321,38 @@ begin
   ALFreeAndNil(FPrevStateStyles);
   {$ENDIF}
   ALFreeAndNil(FStateStyles);
-  ALFreeAndNil(fEditControl);
   inherited Destroy;
+end;
+
+{************************************************}
+procedure TALBaseEdit.Assign(Source: TPersistent);
+begin
+  BeginUpdate;
+  Try
+    if Source is TALBaseEdit then begin
+      DefStyleAttr := TALBaseEdit(Source).DefStyleAttr;
+      DefStyleRes := TALBaseEdit(Source).DefStyleRes;
+      AutoTranslate := TALBaseEdit(Source).AutoTranslate;
+      OnChange := TALBaseEdit(Source).OnChange;
+      OnReturnKey := TALBaseEdit(Source).OnReturnKey;
+      TextSettings.Assign(TALBaseEdit(Source).TextSettings);
+      PromptText := TALBaseEdit(Source).PromptText;
+      PromptTextColor := TALBaseEdit(Source).PromptTextColor;
+      PromptTextColorKey := TALBaseEdit(Source).PromptTextColorKey;
+      Tintcolor := TALBaseEdit(Source).Tintcolor;
+      TintcolorKey := TALBaseEdit(Source).TintcolorKey;
+      LabelText := TALBaseEdit(Source).LabelText;
+      LabelTextSettings.Assign(TALBaseEdit(Source).LabelTextSettings);
+      SupportingText := TALBaseEdit(Source).SupportingText;
+      SupportingTextSettings.Assign(TALBaseEdit(Source).SupportingTextSettings);
+      StateStyles.Assign(TALBaseEdit(Source).StateStyles);
+    end
+    else
+      ALAssignError(Source{ASource}, Self{ADest});
+    inherited Assign(Source);
+  Finally
+    EndUpdate;
+  End;
 end;
 
 {*********************************}
@@ -4640,6 +4397,57 @@ begin
   end;
 end;
 
+{***********************************************}
+procedure TALBaseEdit.ApplyPromptTextColorScheme;
+begin
+  if FPromptTextColorKey <> '' then begin
+    var LPromptTextColor := TALStyleManager.Instance.GetColor(FPromptTextColorKey);
+    if FPromptTextColor <> LPromptTextColor then begin
+      FPromptTextColor := LPromptTextColor;
+      ClearBufPromptTextDrawable;
+      UpdateNativeViewStyle;
+    end;
+  end;
+end;
+
+{*****************************************}
+procedure TALBaseEdit.ApplyTintColorScheme;
+begin
+  if FTintColorKey <> '' then begin
+    var LTintColor := TALStyleManager.Instance.GetColor(FTintColorKey);
+    if FTintColor <> LTintColor then begin
+      FTintColor := LTintColor;
+      UpdateNativeViewStyle;
+    end;
+  end;
+end;
+
+{*************************************}
+procedure TALBaseEdit.ApplyColorScheme;
+begin
+  BeginUpdate;
+  Try
+    inherited;
+    TextSettings.ApplyColorScheme;
+    LabelTextSettings.ApplyColorScheme;
+    SupportingTextSettings.ApplyColorScheme;
+    StateStyles.ApplyColorScheme;
+    ApplyPromptTextColorScheme;
+    ApplyTintColorScheme;
+    {$IFDEF ANDROID}
+    RecreateNativeView;
+    {$ENDIF}
+  finally
+    EndUpdate;
+  end;
+end;
+
+{****************************************}
+function TALBaseEdit.CreateFill: TALBrush;
+begin
+  Result := TFill.Create;
+end;
+
 {************************************************}
 function TALBaseEdit.CreateStroke: TALStrokeBrush;
 begin
@@ -4670,76 +4478,51 @@ begin
   Result := TStateStyles.Create(Self);
 end;
 
-{*********************************************************}
-function TALBaseEdit.CreateEditControl: TALBaseEditControl;
+{***********************************}
+procedure TALBaseEdit.InitNativeView;
 begin
-  {$IF defined(android)}
-  Result := TALAndroidEditControl.Create(self, false{aIsMultiline}, DefStyleAttr, DefStyleRes);
-  {$ELSEIF defined(ios)}
-  Result := TALIosEditControl.Create(self);
-  {$ELSEIF defined(ALMacOS)}
-  Result := TALMacEditControl.Create(self);
-  {$ELSEIF defined(MSWindows)}
-  Result := TALWinEditControl.Create(self);
-  {$ELSE}
-    Not implemented
-  {$ENDIF}
+  if FNativeView = nil then exit;
+  NativeView.Password := false; // noops operation
+  NativeView.ReturnKeyType := tReturnKeyType.Default;  // noops operation
+  NativeView.KeyboardType := TVirtualKeyboardType.Default; // noops operation
+  NativeView.AutoCapitalizationType := TALAutoCapitalizationType.acNone; // noops operation
+  NativeView.CheckSpelling := True;
+  NativeView.MaxLength := 0; // noops operation
+  NativeView.PromptTextColor := TALphaColors.Null; // noops operation
+  NativeView.TintColor := TALphaColors.Null; // noops operation
+  NativeView.FillColor := $ffffffff; // noops operation
 end;
 
-{************************************}
-procedure TALBaseEdit.InitEditControl;
+{***************************************}
+procedure TALBaseEdit.RecreateNativeView;
 begin
-  fEditControl.Parent := self;
-  FeditControl.Stored := False;
-  FeditControl.SetSubComponent(True);
-  FeditControl.Locked := True;
-  FeditControl.OnReturnKey := nil; // noops operation
-  fEditControl.Align := TALAlignLayout.Client;
-  FeditControl.OnChange := OnChangeImpl;
-  fEditControl.Password := false; // noops operation
-  fEditControl.ReturnKeyType := tReturnKeyType.Default;  // noops operation
-  fEditControl.KeyboardType := TVirtualKeyboardType.Default; // noops operation
-  fEditControl.AutoCapitalizationType := TALAutoCapitalizationType.acNone; // noops operation
-  fEditControl.CheckSpelling := True;
-  fEditControl.MaxLength := 0; // noops operation
-  fEditControl.PromptTextColor := TALphaColors.Null; // noops operation
-  fEditControl.TintColor := TALphaColors.Null; // noops operation
-  fEditControl.FillColor := $ffffffff; // noops operation
-  fEditControl.CanFocus := False;
-  fEditControl.CanParentFocus := True;
-  fEditControl.HitTest := False;
+  if FNativeView = nil then exit;
+  var LPassword := NativeView.Password;
+  var LReturnKeyType := NativeView.ReturnKeyType;
+  var LKeyboardType := NativeView.KeyboardType;
+  var LAutoCapitalizationType := NativeView.AutoCapitalizationType;
+  var LCheckSpelling := NativeView.CheckSpelling;
+  var LMaxLength := NativeView.MaxLength;
+  var LText := NativeView.Text;
+  var LOnChange := fOnChange;
+  fOnChange := nil;
+  inherited;
+  UpdateNativeViewStyle;
+  UpdateEditControlPromptText;
+  NativeView.Password := LPassword;
+  NativeView.ReturnKeyType := LReturnKeyType;
+  NativeView.KeyboardType := LKeyboardType;
+  NativeView.AutoCapitalizationType := LAutoCapitalizationType;
+  NativeView.CheckSpelling := LCheckSpelling;
+  NativeView.MaxLength := LMaxLength;
+  NativeView.Text := LText;
+  UpdateNativeViewVisibility;
+  fOnChange := LOnChange;
 end;
 
 {***************************}
 procedure TALBaseEdit.Loaded;
-
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  procedure _ConvertFontFamily(const AStateStyle: TBaseStateStyle);
-  begin
-    if (AStateStyle.TextSettings.Font.Family <> '') and
-       (not (csDesigning in ComponentState)) then
-      AStateStyle.TextSettings.Font.Family := ALConvertFontFamily(AStateStyle.TextSettings.Font.Family);
-  end;
-
 begin
-  if FEditControl = nil then begin
-    FEditControl := CreateEditControl;
-    InitEditControl;
-  end;
-  //--
-  // csLoading is in ComponentState
-  if (TextSettings.Font.Family <> '') and
-     (not (csDesigning in ComponentState)) then
-    TextSettings.Font.Family := ALConvertFontFamily(TextSettings.Font.Family);
-  //--
-  if (LabelTextSettings.Font.Family <> '') and
-     (not (csDesigning in ComponentState)) then
-    LabelTextSettings.Font.Family := ALConvertFontFamily(LabelTextSettings.Font.Family);
-  //--
-  _ConvertFontFamily(StateStyles.Disabled);
-  _ConvertFontFamily(StateStyles.Hovered);
-  _ConvertFontFamily(StateStyles.Focused);
-  //--
   // AdjustSize will be called in the following call to TextSettingsChanged(TextSettings)
   // therefore, we must deactivate it in the inherited method to avoid calling it twice.
   {$IF defined(debug)}
@@ -4773,48 +4556,10 @@ begin
   //--
   TextSettingsChanged(TextSettings);
   //--
-  //UpdateEditControlStyle => Already called in TextSettingsChanged
+  //UpdateNativeViewStyle => Already called in TextSettingsChanged
   //--
   UpdateEditControlPromptText;
   UpdateNativeViewVisibility;
-  {$IF not defined(ALDPK)}
-  if NativeView.visible then begin
-    // Because AncestorParentChanged is not called during loading,
-    // we must call NativeView.SetVisible(true) in TALBaseEdit.Loaded
-    // to hide the NativeView in case a parent control is hidden.
-    NativeView.SetVisible(true);
-  end;
-  {$ENDIF}
-end;
-
-{*********************************************************}
-procedure TALBaseEdit.SetDefStyleAttr(const Value: String);
-begin
-  if Value <> fDefStyleAttr then begin
-    fDefStyleAttr := Value;
-    {$IFDEF ANDROID}
-    if not (csLoading in componentState) then begin
-      ALFreeAndNil(fEditControl);
-      FEditControl := CreateEditControl;
-      InitEditControl;
-    end;
-    {$ENDIF}
-  end;
-end;
-
-{********************************************************}
-procedure TALBaseEdit.SetDefStyleRes(const Value: String);
-begin
-  if Value <> fDefStyleRes then begin
-    fDefStyleRes := Value;
-    {$IFDEF ANDROID}
-    if not (csLoading in componentState) then begin
-      ALFreeAndNil(fEditControl);
-      FEditControl := CreateEditControl;
-      InitEditControl;
-    end;
-    {$ENDIF}
-  end;
 end;
 
 {******************************************}
@@ -4825,92 +4570,148 @@ end;
 
 {********************}
 {$IF defined(android)}
-function TALBaseEdit.GetEditControl: TALBaseEditControl;
+Function TALBaseEdit.CreateNativeView: TALAndroidNativeView;
 begin
-  if FEditControl = nil then begin
-    FEditControl := CreateEditControl;
-    InitEditControl;
-  end;
-  Result := FEditControl;
+  result := TALAndroidEditView.create(self, false{FIsMultiline}, DefStyleAttr, DefStyleRes);
 end;
 {$ENDIF}
 
 {********************}
 {$IF defined(android)}
-function TALBaseEdit.GetNativeView: TALAndroidNativeView;
+function TALBaseEdit.GetNativeView: TALAndroidEditView;
 begin
-  result := EditControl.NativeView;
+  result := TALAndroidEditView(inherited NativeView);
 end;
 {$ENDIF}
 
 {****************}
 {$IF defined(IOS)}
-function TALBaseEdit.GetEditControl: TALBaseEditControl;
+Function TALBaseEdit.CreateNativeView: TALIosNativeView;
 begin
-  if FEditControl = nil then begin
-    FEditControl := CreateEditControl;
-    InitEditControl;
-  end;
-  Result := FEditControl;
+
+  // [NOTE] This workaround is no longer necessary, as the delphi framework (e.g., the virtual
+  // keyboard service) already instantiates a UITextField internally during app startup,
+  // which ensures that the Objective-C class is properly loaded and registered by the Delphi runtime.
+  //
+  // Originally, we had to create a UITextField instance explicitly to force the Objective-C class
+  // (UITextField) to be registered. Without this, calling `TALIosWebView(inherited GetNativeView)`
+  // could raise the following error:
+  //   Unhandled Exception | Item not found
+  //   At address: $0000000100365670
+  //   (Generics.Collections.TDictionary<TTypeInfo*, TRegisteredDelphiClass*>.GetItem)
+  //
+  // Attempting to register the class manually like this:
+  //   RegisterObjectiveCClass(TUITextField, TypeInfo(UITextField));
+  // also fails with:
+  //   Unhandled Exception | Method function someUITextFieldMethod of class TUITextField not found
+  //   At address: $00000001XXXXXXX
+  //   (Macapi.Objectivec.TRegisteredDelphiClass.RegisterClass)
+  //
+  // Attempting to register our own wrapper class:
+  //   RegisterObjectiveCClass(TALIosWebView, TypeInfo(IALIosWebView));
+  // fails as well, with:
+  //   Unhandled Exception | Objective-C class UITextField could not be found
+  //   At address: $00000001046CA014
+  //   (Macapi.Objectivec.ObjectiveCClassNotFound)
+  //
+  // The only reliable workaround is to instantiate a UITextField explicitly to force
+  // the UIKit framework to be loaded and the class to be registered:
+  //
+  //if not IsUITextFieldClassRegistered then begin
+  //  var LUITextField := TUITextField.Wrap(TUITextField.Alloc.initWithFrame(CGRectMake(0, 0, 0, 0)));
+  //  LUITextField.release;
+  //  IsUITextFieldClassRegistered := True;
+  //end;
+
+  result := TALIosEditView.create(self);
+
 end;
 {$ENDIF}
 
 {****************}
 {$IF defined(IOS)}
-function TALBaseEdit.GetNativeView: TALIosNativeView;
+function TALBaseEdit.GetNativeView: TALIosBaseEditView;
 begin
-  result := EditControl.NativeView;
+  result := TALIosBaseEditView(inherited NativeView);
 end;
 {$ENDIF}
 
 {********************}
 {$IF defined(ALMacOS)}
-function TALBaseEdit.GetEditControl: TALBaseEditControl;
+Function TALBaseEdit.CreateNativeView: TALMacNativeView;
 begin
-  if FEditControl = nil then begin
-    FEditControl := CreateEditControl;
-    InitEditControl;
-  end;
-  Result := FEditControl;
+  result := TALMacEditView.create(self);
 end;
 {$ENDIF}
 
 {********************}
 {$IF defined(ALMacOS)}
-function TALBaseEdit.GetNativeView: TALMacNativeView;
+function TALBaseEdit.GetNativeView: TALMacBaseEditView;
 begin
-  result := EditControl.NativeView;
+  result := TALMacBaseEditView(inherited NativeView);
 end;
 {$ENDIF}
 
 {**********************}
 {$IF defined(MSWindows)}
-function TALBaseEdit.GetEditControl: TALBaseEditControl;
+Function TALBaseEdit.CreateNativeView: TALWinNativeView;
 begin
-  if FEditControl = nil then begin
-    FEditControl := CreateEditControl;
-    InitEditControl;
-  end;
-  Result := FEditControl;
+  {$IF defined(ALDPK)}
+  Result := nil;
+  {$ELSE}
+  result := TALWinEditView.create(self);
+  {$ENDIF}
 end;
 {$ENDIF}
 
 {**********************}
 {$IF defined(MSWindows)}
-function TALBaseEdit.GetNativeView: TALWinNativeView;
+function TALBaseEdit.GetNativeView: TALWinEditView;
 begin
-  result := EditControl.NativeView;
+  result := TALWinEditView(inherited NativeView);
 end;
 {$ENDIF}
+
+{*****************************}
+procedure TALBaseEdit.DoChange;
+begin
+  if (csLoading in componentState) then exit;
+  var LIsTextEmpty := GetText = '';
+  if (LIsTextEmpty <> FIsTextEmpty) and
+     (HasOpacityLabelTextAnimation) then begin
+    FIsTextEmpty := LIsTextEmpty;
+    FlabelTextAnimation.StopAtCurrent;
+    FlabelTextAnimation.Inverse := FIsTextEmpty;
+    if FIsTextEmpty then FlabelTextAnimation.Duration := 0.1
+    else FlabelTextAnimation.Duration := 0.2;
+    FLabelTextAnimation.Start;
+    repaint;
+  end
+  else
+    FIsTextEmpty := LIsTextEmpty;
+  if assigned(fOnChange) then
+    fOnChange(self);
+end;
+
+{********************************}
+procedure TALBaseEdit.DoReturnKey;
+begin
+  if assigned(fOnReturnKey) then
+    fOnReturnKey(self);
+end;
 
 {****************************}
 procedure TALBaseEdit.DoEnter;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALBaseEdit.DoEnter', 'control.name: ' + Name);
+  //ALLog(Classname + '.DoEnter', 'control.name: ' + Name);
   {$ENDIF}
+  if FNativeViewFrozenByPaint then begin
+    UnfreezeNativeView;
+    FNativeViewFrozenByPaint := False;
+  end;
   inherited DoEnter;
-  StateStyles.startTransition;
+  StateStyles.Transition.start;
   //--
   if (GetIsTextEmpty) and
      (HasTranslationLabelTextAnimation) then begin
@@ -4920,15 +4721,11 @@ begin
     FLabelTextAnimation.Start;
   end;
   //--
-  {$IF not defined(ALDPK)}
-  if HasNativeView then
-    NativeView.SetFocus;
-  {$ENDIF}
   {$IF defined(android)}
-  if IsFocused then begin
+  if (NativeView <> nil) and (IsFocused) then begin
     ALVirtualKeyboardVisible := True;
     {$IF defined(DEBUG)}
-    ALLog('TALBaseEdit.showVirtualKeyboard', 'control.name: ' + Name);
+    //ALLog(Classname + '.showVirtualKeyboard', 'control.name: ' + Name);
     {$ENDIF}
     MainActivity.getVirtualKeyboard.showFor(NativeView.View);
   end;
@@ -4939,10 +4736,10 @@ end;
 procedure TALBaseEdit.DoExit;
 begin
   {$IF defined(DEBUG)}
-  ALLog('TALBaseEdit.DoExit', 'control.name: ' + Name);
+  //ALLog(Classname + '.DoExit', 'control.name: ' + Name);
   {$ENDIF}
   inherited DoExit;
-  StateStyles.startTransition;
+  StateStyles.Transition.start;
   UpdateNativeViewVisibility;
   //--
   if (GetIsTextEmpty) and
@@ -4953,74 +4750,80 @@ begin
     FLabelTextAnimation.Start;
   end;
   //--
-  {$IF not defined(ALDPK)}
-  if HasNativeView then
-    NativeView.ResetFocus;
-  {$ENDIF}
   {$IF defined(android)}
-  ALVirtualKeyboardVisible := False;
-  TThread.ForceQueue(nil,
-    procedure
-    begin
-      If not ALVirtualKeyboardVisible then begin
-        {$IF defined(DEBUG)}
-        ALLog('TALBaseEdit.hideVirtualKeyboard');
-        {$ENDIF}
-        MainActivity.getVirtualKeyboard.hide;
-      end;
-    end);
+  if NativeView <> nil then begin
+    ALVirtualKeyboardVisible := False;
+    TThread.ForceQueue(nil,
+      procedure
+      begin
+        If not ALVirtualKeyboardVisible then begin
+          {$IF defined(DEBUG)}
+          //ALLog(Classname + '.hideVirtualKeyboard');
+          {$ENDIF}
+          MainActivity.getVirtualKeyboard.hide;
+        end;
+      end);
+  end;
   {$ENDIF}
 end;
 
-{*******************************************}
-procedure TALBaseEdit.UpdateEditControlStyle;
+{******************************************}
+procedure TALBaseEdit.UpdateNativeViewStyle;
 begin
 
   if (csLoading in ComponentState) then exit;
 
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentAdjustedStyle);
 
-  // FillColor
-  if LStateStyle <> nil then begin
-    var LStateLayerColor: TAlphaColor;
-    var LStateLayerOpacity: Single;
-    if LStateStyle.StateLayer.UseContentColor then begin
-      LStateLayerColor := LStateStyle.TextSettings.Font.Color;
-      LStateLayerOpacity := LStateStyle.StateLayer.Opacity;
-    end
-    else begin
-      LStateLayerColor := LStateStyle.StateLayer.Color;
-      LStateLayerOpacity := LStateStyle.StateLayer.Opacity;
-    end;
-    EditControl.FillColor := ALBlendColor(LStateStyle.Fill.Color, LStateLayerColor, LStateLayerOpacity);
-  end
-  else EditControl.FillColor := Fill.Color;
-  // PromptTextColor
-  if LStateStyle <> nil then EditControl.PromptTextColor := LStateStyle.PromptTextColor
-  else EditControl.PromptTextColor := PromptTextColor;
-  // TintColor
-  if LStateStyle <> nil then EditControl.TintColor := LStateStyle.TintColor
-  else EditControl.TintColor := TintColor;
-  // TextSettings
-  if LStateStyle <> nil then EditControl.TextSettings.Assign(LStateStyle.TextSettings)
-  else EditControl.TextSettings.Assign(TextSettings);
+  if NativeView <> nil then begin
 
+    // FillColor
+    if LStateStyle <> nil then begin
+      var LStateLayerColor: TAlphaColor;
+      var LStateLayerOpacity: Single;
+      if LStateStyle.StateLayer.UseContentColor then begin
+        LStateLayerColor := LStateStyle.TextSettings.Font.Color;
+        LStateLayerOpacity := LStateStyle.StateLayer.Opacity;
+      end
+      else begin
+        LStateLayerColor := LStateStyle.StateLayer.Color;
+        LStateLayerOpacity := LStateStyle.StateLayer.Opacity;
+      end;
+      NativeView.FillColor := ALBlendColor(LStateStyle.Fill.Color, LStateLayerColor, LStateLayerOpacity);
+    end
+    else NativeView.FillColor := Fill.Color;
+    // PromptTextColor
+    if LStateStyle <> nil then NativeView.PromptTextColor := LStateStyle.PromptTextColor
+    else NativeView.PromptTextColor := PromptTextColor;
+    // TintColor
+    if LStateStyle <> nil then NativeView.TintColor := LStateStyle.TintColor
+    else NativeView.TintColor := TintColor;
+    // TextSettings
+    if LStateStyle <> nil then NativeView.TextSettings.Assign(LStateStyle.TextSettings)
+    else NativeView.TextSettings.Assign(TextSettings);
+
+  end
+  else begin
+
+    // FillColor
+    if LStateStyle <> nil then begin
+      var LStateLayerColor: TAlphaColor;
+      var LStateLayerOpacity: Single;
+      if LStateStyle.StateLayer.UseContentColor then begin
+        LStateLayerColor := LStateStyle.TextSettings.Font.Color;
+        LStateLayerOpacity := LStateStyle.StateLayer.Opacity;
+      end
+      else begin
+        LStateLayerColor := LStateStyle.StateLayer.Color;
+        LStateLayerOpacity := LStateStyle.StateLayer.Opacity;
+      end;
+      FDummyFillColor := ALBlendColor(LStateStyle.Fill.Color, LStateLayerColor, LStateLayerOpacity);
+    end
+    else FDummyFillColor := Fill.Color;
+
+  end;
   repaint;
 
-end;
-
-{************************************************}
-function TALBaseEdit.GetControlType: TControlType;
-begin
-  // We need ControlType because in function TFMXViewBase.canBecomeFirstResponder: Boolean;
-  // we use it in IsNativeControl to determine if it's a native control or not
-  Result := TControlType.Platform;
-end;
-
-{**************************************************************}
-procedure TALBaseEdit.SetControlType(const Value: TControlType);
-begin
-  // The ControlType cannot be changed
 end;
 
 {***************************************************************}
@@ -5069,7 +4872,7 @@ begin
     end;
     {$ENDIF}
   end;
-  StateStyles.startTransition;
+  StateStyles.Transition.start;
 end;
 
 {****************************************************************}
@@ -5094,7 +4897,11 @@ procedure TALBaseEdit.TextSettingsChanged(Sender: TObject);
       if APrevStateStyle.TextSettings.font.Weight = AToStateStyle.TextSettings.font.Weight then AToStateStyle.TextSettings.font.Weight := TextSettings.font.Weight;
       if APrevStateStyle.TextSettings.font.Slant = AToStateStyle.TextSettings.font.Slant then AToStateStyle.TextSettings.font.Slant := TextSettings.font.Slant;
       if APrevStateStyle.TextSettings.font.Stretch = AToStateStyle.TextSettings.font.Stretch then AToStateStyle.TextSettings.font.Stretch := TextSettings.font.Stretch;
-      if APrevStateStyle.TextSettings.font.Color = AToStateStyle.TextSettings.font.Color then AToStateStyle.TextSettings.font.Color := TextSettings.font.Color;
+      if (APrevStateStyle.TextSettings.font.Color = AToStateStyle.TextSettings.font.Color) and
+         (APrevStateStyle.TextSettings.font.ColorKey = AToStateStyle.TextSettings.font.ColorKey) then begin
+        AToStateStyle.TextSettings.font.Color := TextSettings.font.Color;
+        AToStateStyle.TextSettings.font.ColorKey := TextSettings.font.ColorKey;
+      end;
 
     end;
 
@@ -5104,6 +4911,7 @@ procedure TALBaseEdit.TextSettingsChanged(Sender: TObject);
     APrevStateStyle.TextSettings.font.Slant := TextSettings.font.Slant;
     APrevStateStyle.TextSettings.font.Stretch := TextSettings.font.Stretch;
     APrevStateStyle.TextSettings.font.Color := TextSettings.font.Color;
+    APrevStateStyle.TextSettings.font.ColorKey := TextSettings.font.ColorKey;
 
   end;
   {$ENDIF}
@@ -5118,60 +4926,8 @@ begin
   {$ENDIF}
   if csLoading in componentState then exit;
   ClearBufPromptTextDrawable;
-  UpdateEditControlStyle;
+  UpdateNativeViewStyle;
   AdjustSize;
-end;
-
-{****************************************************}
-procedure TALBaseEdit.SetXRadius(const Value: Single);
-
-  {~~~~~~~~~~~~~~~~~~}
-  {$IF defined(ALDPK)}
-  procedure _PropagateChanges(const APrevStateStyle: TBaseStateStyle; const AToStateStyle: TBaseStateStyle);
-  begin
-    if (not (csLoading in ComponentState)) and
-       (not AToStateStyle.StateLayer.HasFill) then begin
-      if (SameValue(APrevStateStyle.StateLayer.XRadius, AToStateStyle.StateLayer.XRadius, TEpsilon.Vector)) then AToStateStyle.StateLayer.XRadius := XRadius;
-    end;
-    APrevStateStyle.StateLayer.XRadius := XRadius;
-  end;
-  {$ENDIF}
-
-begin
-  inherited;
-  {$IF defined(ALDPK)}
-  if (StateStyles <> nil) and (FPrevStateStyles <> nil) then begin
-    _PropagateChanges(FPrevStateStyles.Disabled, StateStyles.Disabled);
-    _PropagateChanges(FPrevStateStyles.Hovered, StateStyles.Hovered);
-    _PropagateChanges(FPrevStateStyles.Focused, StateStyles.Focused);
-  end;
-  {$ENDIF}
-end;
-
-{****************************************************}
-procedure TALBaseEdit.SetYRadius(const Value: Single);
-
-  {~~~~~~~~~~~~~~~~~~}
-  {$IF defined(ALDPK)}
-  procedure _PropagateChanges(const APrevStateStyle: TBaseStateStyle; const AToStateStyle: TBaseStateStyle);
-  begin
-    if (not (csLoading in ComponentState)) and
-       (not AToStateStyle.StateLayer.HasFill) then begin
-      if (SameValue(APrevStateStyle.StateLayer.YRadius, AToStateStyle.StateLayer.YRadius, TEpsilon.Vector)) then AToStateStyle.StateLayer.YRadius := YRadius;
-    end;
-    APrevStateStyle.StateLayer.YRadius := YRadius;
-  end;
-  {$ENDIF}
-
-begin
-  inherited;
-  {$IF defined(ALDPK)}
-  if (StateStyles <> nil) and (FPrevStateStyles <> nil) then begin
-    _PropagateChanges(FPrevStateStyles.Disabled, StateStyles.Disabled);
-    _PropagateChanges(FPrevStateStyles.Hovered, StateStyles.Hovered);
-    _PropagateChanges(FPrevStateStyles.Focused, StateStyles.Focused);
-  end;
-  {$ENDIF}
 end;
 
 {**************************************************************************}
@@ -5196,7 +4952,11 @@ procedure TALBaseEdit.LabelTextSettingsChanged(Sender: TObject);
       if APrevStateStyle.LabelTextSettings.font.Weight = AToStateStyle.LabelTextSettings.font.Weight then AToStateStyle.LabelTextSettings.font.Weight := LabelTextSettings.font.Weight;
       if APrevStateStyle.LabelTextSettings.font.Slant = AToStateStyle.LabelTextSettings.font.Slant then AToStateStyle.LabelTextSettings.font.Slant := LabelTextSettings.font.Slant;
       if APrevStateStyle.LabelTextSettings.font.Stretch = AToStateStyle.LabelTextSettings.font.Stretch then AToStateStyle.LabelTextSettings.font.Stretch := LabelTextSettings.font.Stretch;
-      if APrevStateStyle.LabelTextSettings.font.Color = AToStateStyle.LabelTextSettings.font.Color then AToStateStyle.LabelTextSettings.font.Color := LabelTextSettings.font.Color;
+      if (APrevStateStyle.LabelTextSettings.font.Color = AToStateStyle.LabelTextSettings.font.Color) and
+         (APrevStateStyle.LabelTextSettings.font.ColorKey = AToStateStyle.LabelTextSettings.font.ColorKey) then begin
+        AToStateStyle.LabelTextSettings.font.Color := LabelTextSettings.font.Color;
+        AToStateStyle.LabelTextSettings.font.ColorKey := LabelTextSettings.font.ColorKey;
+      end;
 
     end;
 
@@ -5206,6 +4966,7 @@ procedure TALBaseEdit.LabelTextSettingsChanged(Sender: TObject);
     APrevStateStyle.LabelTextSettings.font.Slant := LabelTextSettings.font.Slant;
     APrevStateStyle.LabelTextSettings.font.Stretch := LabelTextSettings.font.Stretch;
     APrevStateStyle.LabelTextSettings.font.Color := LabelTextSettings.font.Color;
+    APrevStateStyle.LabelTextSettings.font.ColorKey := LabelTextSettings.font.ColorKey;
 
   end;
   {$ENDIF}
@@ -5248,7 +5009,11 @@ procedure TALBaseEdit.SupportingTextSettingsChanged(Sender: TObject);
       if APrevStateStyle.SupportingTextSettings.font.Weight = AToStateStyle.SupportingTextSettings.font.Weight then AToStateStyle.SupportingTextSettings.font.Weight := SupportingTextSettings.font.Weight;
       if APrevStateStyle.SupportingTextSettings.font.Slant = AToStateStyle.SupportingTextSettings.font.Slant then AToStateStyle.SupportingTextSettings.font.Slant := SupportingTextSettings.font.Slant;
       if APrevStateStyle.SupportingTextSettings.font.Stretch = AToStateStyle.SupportingTextSettings.font.Stretch then AToStateStyle.SupportingTextSettings.font.Stretch := SupportingTextSettings.font.Stretch;
-      if APrevStateStyle.SupportingTextSettings.font.Color = AToStateStyle.SupportingTextSettings.font.Color then AToStateStyle.SupportingTextSettings.font.Color := SupportingTextSettings.font.Color;
+      if (APrevStateStyle.SupportingTextSettings.font.Color = AToStateStyle.SupportingTextSettings.font.Color) and
+         (APrevStateStyle.SupportingTextSettings.font.ColorKey = AToStateStyle.SupportingTextSettings.font.ColorKey) then begin
+        AToStateStyle.SupportingTextSettings.font.Color := SupportingTextSettings.font.Color;
+        AToStateStyle.SupportingTextSettings.font.ColorKey := SupportingTextSettings.font.ColorKey;
+      end;
 
     end;
 
@@ -5258,6 +5023,7 @@ procedure TALBaseEdit.SupportingTextSettingsChanged(Sender: TObject);
     APrevStateStyle.SupportingTextSettings.font.Slant := SupportingTextSettings.font.Slant;
     APrevStateStyle.SupportingTextSettings.font.Stretch := SupportingTextSettings.font.Stretch;
     APrevStateStyle.SupportingTextSettings.font.Color := SupportingTextSettings.font.Color;
+    APrevStateStyle.SupportingTextSettings.font.ColorKey := SupportingTextSettings.font.ColorKey;
 
   end;
   {$ENDIF}
@@ -5286,44 +5052,56 @@ procedure TALBaseEdit.StateStylesChanged(Sender: TObject);
 begin
   clearBufDrawable;
   DisabledOpacity := StateStyles.Disabled.opacity;
-  UpdateEditControlStyle;
+  UpdateNativeViewStyle;
   Repaint;
 end;
 
 {*************************************************}
 procedure TALBaseEdit.SetText(const Value: String);
 begin
-  EditControl.Text := Value;
-  {$IF defined(ALDPK)}
-  ClearBufPromptTextDrawable;
-  ClearBufLabelTextDrawable;
-  repaint;
-  {$ENDIF}
+  if NativeView <> nil then begin
+    NativeView.Text := Value;
+    UpdateNativeViewVisibility;
+  end
+  else begin
+    FDummyText := Value;
+    ClearBufPromptTextDrawable;
+    ClearBufLabelTextDrawable;
+    repaint;
+  end;
 end;
 
 {***********************************}
 function TALBaseEdit.getText: String;
 begin
-  result := EditControl.Text;
+  if NativeView <> nil then
+    result := NativeView.Text
+  else
+    result := FDummyText;
+end;
+
+{*************************************************}
+function TALBaseEdit.ShouldHideNativeView: Boolean;
+begin
+  result := {$IF defined(ALDPK)}true or{$ENDIF}
+            (not Enabled) or
+            ((GetIsTextEmpty) and (HasTranslationLabelTextAnimation) and (not IsFocused))
 end;
 
 {***********************************************}
 procedure TALBaseEdit.UpdateNativeViewVisibility;
 begin
-  if {$IF defined(ALDPK)}true or{$ENDIF}
-     (not Enabled) or
-     ((GetIsTextEmpty) and (HasTranslationLabelTextAnimation) and (not IsFocused)) then
-    EditControl.RemoveNativeView
-  else if not FNativeViewRemoved then
-    EditControl.AddNativeView;
+  if ShouldHideNativeView then HideNativeView
+  else ShowNativeView;
 end;
 
 {************************************************}
 procedure TALBaseEdit.UpdateEditControlPromptText;
 begin
-  if HasTranslationLabelTextAnimation then EditControl.PromptText := ''
-  else if FPromptText<>'' then EditControl.PromptText := FPromptText
-  else EditControl.PromptText := FLabelText;
+  if NativeView = nil then exit;
+  if HasTranslationLabelTextAnimation then NativeView.PromptText := ''
+  else if FPromptText<>'' then NativeView.PromptText := FPromptText
+  else NativeView.PromptText := FLabelText;
 end;
 
 {*****************************************}
@@ -5336,8 +5114,8 @@ end;
 procedure TALBaseEdit.setPromptText(const Value: String);
 begin
   if FPromptText <> Value then begin
-    ClearBufPromptTextDrawable;
     FPromptText := Value;
+    ClearBufPromptTextDrawable;
     UpdateEditControlPromptText;
     UpdateNativeViewVisibility;
     repaint;
@@ -5350,13 +5128,29 @@ begin
   result := FPromptTextColor;
 end;
 
+{*************************************************}
+function TALBaseEdit.GetPromptTextColorKey: String;
+begin
+  result := FPromptTextColorKey;
+end;
+
 {*****************************************************************}
 procedure TALBaseEdit.setPromptTextColor(const Value: TAlphaColor);
 begin
   if FPromptTextColor <> Value then begin
-    ClearBufPromptTextDrawable;
     FPromptTextColor := Value;
-    UpdateEditControlStyle;
+    FPromptTextColorKey := '';
+    ClearBufPromptTextDrawable;
+    UpdateNativeViewStyle;
+  end;
+end;
+
+{***************************************************************}
+procedure TALBaseEdit.setPromptTextColorKey(const Value: String);
+begin
+  if FPromptTextColorKey <> Value then begin
+    FPromptTextColorKey := Value;
+    ApplyPromptTextColorScheme;
   end;
 end;
 
@@ -5364,9 +5158,9 @@ end;
 procedure TALBaseEdit.setLabelText(const Value: String);
 begin
   if FLabelText <> Value then begin
+    FLabelText := Value;
     ClearBufPromptTextDrawable;
     ClearBufLabelTextDrawable;
-    FLabelText := Value;
     UpdateEditControlPromptText;
     UpdateNativeViewVisibility;
     if FLabelTextSettings.Layout = TLabelTextLayout.Inline then
@@ -5379,8 +5173,8 @@ end;
 procedure TALBaseEdit.setSupportingText(const Value: String);
 begin
   if FSupportingText <> Value then begin
-    ClearBufSupportingTextDrawable;
     FSupportingText := Value;
+    ClearBufSupportingTextDrawable;
     Repaint;
   end;
 end;
@@ -5391,86 +5185,141 @@ begin
   result := FTintColor;
 end;
 
+{*******************************************}
+function TALBaseEdit.GetTintColorKey: String;
+begin
+  result := FTintColorKey;
+end;
+
 {***********************************************************}
 procedure TALBaseEdit.setTintColor(const Value: TAlphaColor);
 begin
   if FTintColor <> Value then begin
     FTintColor := Value;
-    UpdateEditControlStyle;
+    FTintColorKey := '';
+    UpdateNativeViewStyle;
+  end;
+end;
+
+{*********************************************************}
+procedure TALBaseEdit.setTintColorKey(const Value: String);
+begin
+  if FTintColorKey <> Value then begin
+    FTintColorKey := Value;
+    ApplyTintColorScheme;
   end;
 end;
 
 {*****************************************************************}
 procedure TALBaseEdit.SetKeyboardType(Value: TVirtualKeyboardType);
 begin
-  EditControl.KeyboardType := Value;
+  if NativeView <> nil then
+    NativeView.KeyboardType := Value
+  else
+    FDummyKeyboardType := Value
 end;
 
 {*********************************************************}
 function TALBaseEdit.GetKeyboardType: TVirtualKeyboardType;
 begin
-  result := EditControl.KeyboardType;
+  if NativeView <> nil then
+    result := NativeView.KeyboardType
+  else
+    result := FDummyKeyboardType
 end;
 
 {************************************************************************}
 function TALBaseEdit.GetAutoCapitalizationType: TALAutoCapitalizationType;
 begin
-  result := EditControl.AutoCapitalizationType;
+  if NativeView <> nil then
+    result := NativeView.AutoCapitalizationType
+  else
+    result := FDummyAutoCapitalizationType;
 end;
 
 {**************************************************************************************}
 procedure TALBaseEdit.setAutoCapitalizationType(const Value: TALAutoCapitalizationType);
 begin
-  EditControl.AutoCapitalizationType := Value;
+  if NativeView <> nil then
+    NativeView.AutoCapitalizationType := Value
+  else
+    FDummyAutoCapitalizationType := Value
 end;
 
 {******************************************************}
 procedure TALBaseEdit.SetPassword(const Value: Boolean);
 begin
-  EditControl.Password := Value;
+  if NativeView <> nil then
+    NativeView.Password := Value
+  else
+    FDummyPassword := Value;
+  var LText := Text;
+  if LText <> '' then
+    setSelection(length(LText));
   clearBufPromptTextDrawable;
 end;
 
 {****************************************}
 function TALBaseEdit.GetPassword: Boolean;
 begin
-  result := EditControl.Password;
+  if NativeView <> nil then
+    result := NativeView.Password
+  else
+    result := FDummyPassword
 end;
 
 {***********************************************************}
 procedure TALBaseEdit.SetCheckSpelling(const Value: Boolean);
 begin
-  EditControl.CheckSpelling := Value;
+  if NativeView <> nil then
+    NativeView.CheckSpelling := Value
+  else
+    FDummyCheckSpelling := Value
 end;
 
 {*********************************************}
 function TALBaseEdit.GetCheckSpelling: Boolean;
 begin
-  result := EditControl.CheckSpelling;
+  if NativeView <> nil then
+    result := NativeView.CheckSpelling
+  else
+    result := FDummyCheckSpelling
 end;
 
 {************************************************************}
 procedure TALBaseEdit.SetReturnKeyType(Value: TReturnKeyType);
 begin
-  EditControl.ReturnKeyType := Value;
+  if NativeView <> nil then
+    NativeView.ReturnKeyType := Value
+  else
+    FDummyReturnKeyType := Value
 end;
 
 {****************************************************}
 function TALBaseEdit.GetReturnKeyType: TReturnKeyType;
 begin
-  result := EditControl.ReturnKeyType;
+  if NativeView <> nil then
+    result := NativeView.ReturnKeyType
+  else
+    result := FDummyReturnKeyType;
 end;
 
 {*******************************************************}
 procedure TALBaseEdit.SetMaxLength(const Value: integer);
 begin
-  EditControl.MaxLength := Value;
+  if NativeView <> nil then
+    NativeView.MaxLength := Value
+  else
+    FDummyMaxLength := Value
 end;
 
 {*****************************************}
 function TALBaseEdit.GetMaxLength: integer;
 begin
-  result := EditControl.MaxLength;
+  if NativeView <> nil then
+    result := NativeView.MaxLength
+  else
+    result := FDummyMaxLength;
 end;
 
 {*******************************************}
@@ -5486,51 +5335,12 @@ begin
   {$ENDIF}
 end;
 
-{**************************************************}
-procedure TALBaseEdit.OnChangeImpl(Sender: TObject);
-begin
-  if (csLoading in componentState) then exit;
-  var LIsTextEmpty := GetText = '';
-  if (LIsTextEmpty <> FIsTextEmpty) and
-     (HasOpacityLabelTextAnimation) then begin
-    FIsTextEmpty := LIsTextEmpty;
-    FlabelTextAnimation.StopAtCurrent;
-    FlabelTextAnimation.Inverse := FIsTextEmpty;
-    if FIsTextEmpty then FlabelTextAnimation.Duration := 0.1
-    else FlabelTextAnimation.Duration := 0.2;
-    FLabelTextAnimation.Start;
-    repaint;
-  end
-  else
-    FIsTextEmpty := LIsTextEmpty;
-  if assigned(fOnChange) then
-    fOnChange(self);
-end;
-
-{*****************************************************}
-procedure TALBaseEdit.OnReturnKeyImpl(Sender: TObject);
-begin
-  {$IF defined(DEBUG)}
-  if (csLoading in componentState) then raise Exception.Create('Error B1A3CE09-A6C4-44F5-92D1-E32112A7AAE2');
-  {$ENDIF}
-  if assigned(fOnReturnKey) then
-    fOnReturnKey(self);
-end;
-
-{**************************************************************}
-procedure TALBaseEdit.SetOnReturnKey(const Value: TNotifyEvent);
-begin
-  fOnReturnKey := Value;
-  if assigned(fOnReturnKey) then EditControl.onReturnKey := OnReturnKeyImpl
-  else EditControl.onReturnKey := nil;
-end;
-
 {***********************************}
 procedure TALBaseEdit.EnabledChanged;
 begin
   Inherited;
   if (csLoading in componentState) then exit;
-  UpdateEditControlStyle;
+  UpdateNativeViewStyle;
   UpdateNativeViewVisibility;
 end;
 
@@ -5559,7 +5369,7 @@ end;
 procedure TALBaseEdit.FillChanged(Sender: TObject);
 begin
   inherited;
-  UpdateEditControlStyle;
+  UpdateNativeViewStyle;
 end;
 
 {************************************************}
@@ -5572,7 +5382,8 @@ begin
 
   if (not ALIsDrawableNull(ABufDrawable)) then exit;
 
-  var LMaxSize := TSizeF.Create(Width-padding.Left-padding.Right, 65535);
+  var LNativeAbsoluteRect := GetNativeViewAbsoluteRect;
+  var LMaxSize := TSizeF.Create(LNativeAbsoluteRect.Width, LNativeAbsoluteRect.Height);
 
   //init ABufDrawableRect
   ABufDrawableRect := TRectF.Create(0, 0, LMaxSize.cX, LMaxSize.cY);
@@ -5582,7 +5393,7 @@ begin
   Try
 
     LOptions.Scale := ALGetScreenScale;
-    LOptions.AlignToPixel := IsPixelAlignmentEnabled;
+    LOptions.AlignToPixel := AutoAlignToPixel;
     //LOptions.Opacity: Single; // Default = 1
     //--
     LOptions.FontFamily := Afont.Family;
@@ -5597,7 +5408,7 @@ begin
     //LOptions.DecorationThicknessMultiplier := ADecoration.ThicknessMultiplier;
     //LOptions.DecorationColor := ADecoration.Color;
     //--
-    //LOptions.EllipsisText := TextSettings.Ellipsis;
+    LOptions.EllipsisText := '';
     //LOptions.EllipsisInheritSettings := TextSettings.EllipsisSettings.inherit;
     //--
     //LOptions.EllipsisFontFamily := AEllipsisfont.Family;
@@ -5612,9 +5423,9 @@ begin
     //LOptions.EllipsisDecorationThicknessMultiplier := AEllipsisDecoration.ThicknessMultiplier;
     //LOptions.EllipsisDecorationColor := AEllipsisDecoration.Color;
     //--
-    LOptions.AutoSize := True;
+    LOptions.AutoSize := TALAutoSizeMode.Both;
     //--
-    LOptions.MaxLines := 1;
+    //LOptions.MaxLines := 65535;
     //LOptions.LineHeightMultiplier := TextSettings.LineHeightMultiplier;
     //LOptions.LetterSpacing := TextSettings.LetterSpacing;
     //LOptions.Trimming := TextSettings.Trimming;
@@ -5631,13 +5442,13 @@ begin
     //LOptions.FillGradientColors: TArray<TAlphaColor>; // Default = [];
     //LOptions.FillGradientOffsets: TArray<Single>; // Default = [];
     //LOptions.FillResourceName: String; // default = ''
+    //LOptions.FillResourceStream: TStream; // default = nil
     //LOptions.FillMaskResourceName: String; // default = ''
-    //LOptions.FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     //LOptions.FillBackgroundMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageNoRadius: Boolean; // default = False
     //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
-    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(0.5,0.5)
     //LOptions.FillBlurRadius: single; // default = 0
     //--
     //LOptions.StateLayerOpacity: Single; // Default = 0
@@ -5712,7 +5523,7 @@ begin
   Try
 
     LOptions.Scale := ALGetScreenScale;
-    LOptions.AlignToPixel := IsPixelAlignmentEnabled;
+    LOptions.AlignToPixel := AutoAlignToPixel;
     //LOptions.Opacity: Single; // Default = 1
     //--
     LOptions.FontFamily := Afont.Family;
@@ -5742,12 +5553,11 @@ begin
     //LOptions.EllipsisDecorationThicknessMultiplier := AEllipsisDecoration.ThicknessMultiplier;
     //LOptions.EllipsisDecorationColor := AEllipsisDecoration.Color;
     //--
-    LOptions.AutoSize := True;
+    LOptions.AutoSize := TALAutoSizeMode.Both;
     //--
     LOptions.MaxLines := LabelTextSettings.MaxLines;
     LOptions.LineHeightMultiplier := LabelTextSettings.LineHeightMultiplier;
     LOptions.LetterSpacing := LabelTextSettings.LetterSpacing;
-    LOptions.Trimming := LabelTextSettings.Trimming;
     //LOptions.FailIfTextBroken: boolean; // default = false
     //--
     if TFillTextFlag.RightToLeft in FillTextFlags then LOptions.Direction := TALTextDirection.RightToLeft
@@ -5761,13 +5571,13 @@ begin
     //LOptions.FillGradientColors: TArray<TAlphaColor>; // Default = [];
     //LOptions.FillGradientOffsets: TArray<Single>; // Default = [];
     //LOptions.FillResourceName: String; // default = ''
+    //LOptions.FillResourceStream: TStream; // default = nil
     //LOptions.FillMaskResourceName: String; // default = ''
-    //LOptions.FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     //LOptions.FillBackgroundMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageNoRadius: Boolean; // default = False
     //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
-    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(0.5,0.5)
     //LOptions.FillBlurRadius: single; // default = 0
     //--
     //LOptions.StateLayerOpacity: Single; // Default = 0
@@ -5842,7 +5652,7 @@ begin
   Try
 
     LOptions.Scale := ALGetScreenScale;
-    LOptions.AlignToPixel := IsPixelAlignmentEnabled;
+    LOptions.AlignToPixel := AutoAlignToPixel;
     //LOptions.Opacity: Single; // Default = 1
     //--
     LOptions.FontFamily := Afont.Family;
@@ -5872,12 +5682,11 @@ begin
     //LOptions.EllipsisDecorationThicknessMultiplier := AEllipsisDecoration.ThicknessMultiplier;
     //LOptions.EllipsisDecorationColor := AEllipsisDecoration.Color;
     //--
-    LOptions.AutoSize := True;
+    LOptions.AutoSize := TALAutoSizeMode.Both;
     //--
     LOptions.MaxLines := SupportingTextSettings.MaxLines;
     LOptions.LineHeightMultiplier := SupportingTextSettings.LineHeightMultiplier;
     LOptions.LetterSpacing := SupportingTextSettings.LetterSpacing;
-    LOptions.Trimming := SupportingTextSettings.Trimming;
     //LOptions.FailIfTextBroken: boolean; // default = false
     //--
     if TFillTextFlag.RightToLeft in FillTextFlags then LOptions.Direction := TALTextDirection.RightToLeft
@@ -5891,13 +5700,13 @@ begin
     //LOptions.FillGradientColors: TArray<TAlphaColor>; // Default = [];
     //LOptions.FillGradientOffsets: TArray<Single>; // Default = [];
     //LOptions.FillResourceName: String; // default = ''
+    //LOptions.FillResourceStream: TStream; // default = nil
     //LOptions.FillMaskResourceName: String; // default = ''
-    //LOptions.FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     //LOptions.FillBackgroundMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageMargins: TRectF; // default = TRectF.Empty
     //LOptions.FillImageNoRadius: Boolean; // default = False
     //LOptions.FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
-    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    //LOptions.FillCropCenter: TpointF; // default = TPointF.create(0.5,0.5)
     //LOptions.FillBlurRadius: single; // default = 0
     //--
     //LOptions.StateLayerOpacity: Single; // Default = 0
@@ -6024,6 +5833,7 @@ begin
   if ALIsDrawableNull(FBufPromptTextDrawable) then begin
     var LFont := TextSettings.Font;
     var LPrevFontColor := LFont.Color;
+    var LPrevFontColorKey := LFont.ColorKey;
     var LPrevFontOnchanged: TNotifyEvent := LFont.OnChanged;
     LFont.OnChanged := nil;
     if LUsePromptTextColor then begin
@@ -6041,6 +5851,7 @@ begin
         Lfont); // const AFont: TALFont;
     finally
       Lfont.Color := LPrevFontColor;
+      Lfont.ColorKey := LPrevFontColorKey;
       LFont.OnChanged := LPrevFontOnchanged;
     end;
   end;
@@ -6053,6 +5864,7 @@ begin
   LStateStyle.SupersedeNoChanges(true{ASaveState});
   try
     var LPrevFontColor := LStateStyle.TextSettings.font.Color;
+    var LPrevFontColorKey := LStateStyle.TextSettings.font.ColorKey;
     var LPrevFontOnchanged: TNotifyEvent;
     LPrevFontOnchanged := LStateStyle.TextSettings.OnChanged;
     LStateStyle.TextSettings.OnChanged := nil;
@@ -6072,6 +5884,7 @@ begin
         LStateStyle.TextSettings.font); // const AFont: TALFont;
     finally
       LStateStyle.TextSettings.font.Color := LPrevFontColor;
+      LStateStyle.TextSettings.font.ColorKey := LPrevFontColorKey;
       LStateStyle.TextSettings.OnChanged := LPrevFontOnchanged;
     end;
   finally
@@ -6216,24 +6029,24 @@ end;
 {$IF NOT DEFINED(ALSkiaCanvas)}
 function TALBaseEdit.GetRenderTargetRect(const ARect: TrectF): TRectF;
 begin
-  if StateStyles.IsTransitionAnimationRunning then begin
+  if StateStyles.Transition.Running then begin
     Result := ARect;
-    if StateStyles.TransitionFrom <> nil then begin
+    if StateStyles.Transition.FromStateStyle <> nil then begin
       var LFromSurfaceRect := ALGetShapeSurfaceRect(
                                 ARect, // const ARect: TRectF;
-                                _TALBaseStateStyleAccessProtected(StateStyles.TransitionFrom).Fill, // const AFill: TALBrush;
-                                nil, // const AFillResourceStream: TStream;
-                                _TALBaseStateStyleAccessProtected(StateStyles.TransitionFrom).StateLayer, // const AStateLayer: TALStateLayer;
-                                _TALBaseStateStyleAccessProtected(StateStyles.TransitionFrom).Shadow); // const AShadow: TALShadow): TRectF;
+                                AutoAlignToPixel, // const AAlignToPixel: Boolean;
+                                _TALBaseStateStyleProtectedAccess(StateStyles.Transition.FromStateStyle).Fill, // const AFill: TALBrush;
+                                _TALBaseStateStyleProtectedAccess(StateStyles.Transition.FromStateStyle).StateLayer, // const AStateLayer: TALStateLayer;
+                                _TALBaseStateStyleProtectedAccess(StateStyles.Transition.FromStateStyle).Shadow); // const AShadow: TALShadow): TRectF;
       Result := TRectF.Union(Result, LFromSurfaceRect); // add the extra space needed to draw the shadow/statelayer
     end;
-    if StateStyles.TransitionTo <> nil then begin
+    if StateStyles.Transition.ToStateStyle <> nil then begin
       var LToSurfaceRect := ALGetShapeSurfaceRect(
                               ARect, // const ARect: TRectF;
-                              _TALBaseStateStyleAccessProtected(StateStyles.TransitionTo).Fill, // const AFill: TALBrush;
-                              nil, // const AFillResourceStream: TStream;
-                              _TALBaseStateStyleAccessProtected(StateStyles.TransitionTo).StateLayer, // const AStateLayer: TALStateLayer;
-                              _TALBaseStateStyleAccessProtected(StateStyles.TransitionTo).Shadow); // const AShadow: TALShadow): TRectF;
+                              AutoAlignToPixel, // const AAlignToPixel: Boolean;
+                              _TALBaseStateStyleProtectedAccess(StateStyles.Transition.ToStateStyle).Fill, // const AFill: TALBrush;
+                              _TALBaseStateStyleProtectedAccess(StateStyles.Transition.ToStateStyle).StateLayer, // const AStateLayer: TALStateLayer;
+                              _TALBaseStateStyleProtectedAccess(StateStyles.Transition.ToStateStyle).Shadow); // const AShadow: TALShadow): TRectF;
       Result := TRectF.Union(Result, LToSurfaceRect); // add the extra space needed to draw the shadow/statelayer
     end;
   end
@@ -6242,16 +6055,16 @@ begin
     if LStateStyle <> nil then begin
       Result := ALGetShapeSurfaceRect(
                   ARect, // const ARect: TRectF;
+                  AutoAlignToPixel, // const AAlignToPixel: Boolean;
                   LStateStyle.Fill, // const AFill: TALBrush;
-                  nil, // const AFillResourceStream: TStream;
                   LStateStyle.StateLayer, // const AStateLayer: TALStateLayer;
                   LStateStyle.Shadow); // const AShadow: TALShadow): TRectF;
     end
     else begin
       Result := ALGetShapeSurfaceRect(
                   ARect, // const ARect: TRectF;
+                  AutoAlignToPixel, // const AAlignToPixel: Boolean;
                   Fill, // const AFill: TALBrush;
-                  nil, // const AFillResourceStream: TStream;
                   nil, // const AStateLayer: TALStateLayer;
                   Shadow); // const AShadow: TALShadow): TRectF;
     end;
@@ -6263,6 +6076,31 @@ end;
 procedure TALBaseEdit.Paint;
 begin
 
+  // Simulate z-order handling:
+  // Freeze the native view when it moves out of the visible area.
+  // • Top overflow: freeze only if the control’s top differs from the
+  //   form’s top (otherwise z-order simulation is not required).
+  // • Bottom overflow: freeze only when the control is not focused, since
+  //   a focused edit is already obscured by the virtual keyboard.
+  var LAbsoluteDisplayedRect := GetAbsoluteDisplayedRect;
+  var LAbsoluteRect := AbsoluteRect;
+  var LHasTopOffset := not sameValue(LAbsoluteDisplayedRect.Top, LAbsoluteRect.top, TEpsilon.Position);
+  If (not LAbsoluteDisplayedRect.EqualsTo(LAbsoluteRect)) and
+     ((LHasTopOffset and (CompareValue(LAbsoluteDisplayedRect.Top, 0, TEpsilon.Position) >= 0)) or
+      ((not LHasTopOffset) and (not IsFocused))) then begin
+    if not FNativeViewFrozenByPaint then begin
+      FNativeViewFrozenByPaint := True;
+      if IsFocused then resetfocus;
+      FreezeNativeView;
+    end
+  end
+  else begin
+    if FNativeViewFrozenByPaint then begin
+      FNativeViewFrozenByPaint := False;
+      UnfreezeNativeView;
+    end;
+  end;
+
   StateStyles.UpdateLastPaintedRawStyle;
   MakeBufDrawable;
   var LStateStyle := TBaseStateStyle(StateStyles.GetCurrentRawStyle);
@@ -6270,7 +6108,7 @@ begin
   {$REGION 'Background'}
   var LDrawable: TALDrawable;
   var LDrawableRect: TRectF;
-  if StateStyles.IsTransitionAnimationRunning then begin
+  if StateStyles.Transition.Running then begin
     LDrawable := ALNullDrawable;
     LDrawableRect := TRectF.Empty;
   end
@@ -6310,7 +6148,7 @@ begin
       try
 
         TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-          .SetAlignToPixel(IsPixelAlignmentEnabled)
+          .SetAlignToPixel(AutoAlignToPixel)
           .SetDstRect(LocalRect)
           .SetOpacity(AbsoluteOpacity)
           .SetFill(LCurrentAdjustedStateStyle.Fill)
@@ -6339,7 +6177,7 @@ begin
 
         TALDrawRectangleHelper.Create(RenderTargetCanvas)
           .SetScale(ALGetScreenScale)
-          .SetAlignToPixel(IsPixelAlignmentEnabled)
+          .SetAlignToPixel(AutoAlignToPixel)
           .SetDstRect(LocalRect)
           .SetFill(LCurrentAdjustedStateStyle.Fill)
           .SetStateLayer(LCurrentAdjustedStateStyle.StateLayer, LCurrentAdjustedStateStyle.TextSettings.Font.Color)
@@ -6422,16 +6260,18 @@ begin
     LLabelTextDrawableRect := BufLabelTextDrawableRect;
   end;
   //--
+  var LNativeViewBoundsRect := GetNativeViewBoundsRect;
+  //--
   if LabelTextSettings.Layout = TLabelTextLayout.Inline then
     LLabelTextDrawableRect.SetLocation(
-      EditControl.Left + LabelTextSettings.Margins.Left,
-      Padding.top+FeditControl.Margins.top-LLabelTextDrawableRect.Height-LabelTextSettings.Margins.Bottom)
+      LNativeViewBoundsRect.Left + LabelTextSettings.Margins.Left,
+      Padding.top+NativeViewMargins.top-LLabelTextDrawableRect.Height-LabelTextSettings.Margins.Bottom)
   else
     LLabelTextDrawableRect.SetLocation(
       padding.Left + LabelTextSettings.Margins.Left,
       0-LLabelTextDrawableRect.Height-LabelTextSettings.Margins.Bottom);
   //--
-  if (GetIsTextEmpty and HasTranslationLabelTextAnimation and (hasNativeView)) or
+  if (GetIsTextEmpty and HasTranslationLabelTextAnimation and (IsNativeViewVisible)) or
      ((Labeltext <> '') and (prompttext <> '') and (prompttext <> labeltext)) or
      (not GetIsTextEmpty) or
      (GetIsTextEmpty and HasOpacityLabelTextAnimation and FLabelTextAnimation.Running) then begin
@@ -6442,7 +6282,10 @@ begin
       if not LRect.IsEmpty then begin
         LRect := ALAlignToPixelRound(LRect, Canvas.Matrix, Canvas.Scale, TEpsilon.position);
         Canvas.Fill.Kind := TBrushKind.Solid;
-        Canvas.Fill.Color := EditControl.FillColor;
+        if NativeView <> nil then
+          Canvas.Fill.Color := NativeView.FillColor
+        else
+          Canvas.Fill.Color := FDummyFillColor;
         Canvas.FillRect(LRect, ALIfThen(FLabelTextAnimation.Running, Min(AbsoluteOpacity,FlabelTextAnimation.CurrentValue*AbsoluteOpacity*2), AbsoluteOpacity));
       end;
     end;
@@ -6457,7 +6300,7 @@ begin
 
   {$REGION 'PromptText'}
   if (not Enabled) or
-     (GetIsTextEmpty and HasTranslationLabelTextAnimation and (not hasNativeView))
+     (GetIsTextEmpty and HasTranslationLabelTextAnimation and (not IsNativeViewVisible))
      {$IF defined(ALDPK)}or true{$ENDIF} then begin
     var LPromptTextDrawable: TALDrawable;
     var LPromptTextDrawableRect: TRectF;
@@ -6476,28 +6319,28 @@ begin
     //--
     Var LPos: TpointF;
     case TextSettings.HorzAlign of
-      TALTextHorzAlign.Center: LPos.X := EditControl.Position.X + ((EditControl.width - LPromptTextDrawableRect.Width) / 2);
-      TALTextHorzAlign.Leading: LPos.X := EditControl.Position.X;
-      TALTextHorzAlign.Trailing: LPos.X := EditControl.Position.X + EditControl.Width - LPromptTextDrawableRect.Width;
-      TALTextHorzAlign.Justify: LPos.X := EditControl.Position.X;
+      TALTextHorzAlign.Center: LPos.X := LNativeViewBoundsRect.Left + ((LNativeViewBoundsRect.Width - LPromptTextDrawableRect.Width) / 2);
+      TALTextHorzAlign.Leading: LPos.X := LNativeViewBoundsRect.Left;
+      TALTextHorzAlign.Trailing: LPos.X := LNativeViewBoundsRect.Left + LNativeViewBoundsRect.Width - LPromptTextDrawableRect.Width;
+      TALTextHorzAlign.Justify: LPos.X := LNativeViewBoundsRect.Left;
       else
         raise Exception.Create('Error EC344A62-E381-4126-A0EB-12BFC91E3664');
     end;
     if GetIsTextEmpty and (HasTranslationLabelTextAnimation) then begin
       if LabelTextSettings.Layout = TLabelTextLayout.Inline then begin
         case TextSettings.VertAlign of
-          TALTextVertAlign.Center: LPos.y := LLabelTextDrawableRect.Top + ((EditControl.Height + LLabelTextDrawableRect.Height + LabelTextSettings.Margins.Bottom - LPromptTextDrawableRect.Height) / 2);
-          TALTextVertAlign.Leading: LPos.y := EditControl.Position.y;
-          TALTextVertAlign.Trailing: LPos.y := EditControl.Position.y + EditControl.Height - LPromptTextDrawableRect.Height;
+          TALTextVertAlign.Center: LPos.y := LLabelTextDrawableRect.Top + ((LNativeViewBoundsRect.Height + LLabelTextDrawableRect.Height + LabelTextSettings.Margins.Bottom - LPromptTextDrawableRect.Height) / 2);
+          TALTextVertAlign.Leading: LPos.y := LNativeViewBoundsRect.Top;
+          TALTextVertAlign.Trailing: LPos.y := LNativeViewBoundsRect.Top + LNativeViewBoundsRect.Height - LPromptTextDrawableRect.Height;
           Else
             Raise Exception.Create('Error 28B2F8BC-B4C5-4F22-8E21-681AA1CA3C23')
         end;
       end
       else if LabelTextSettings.Layout = TLabelTextLayout.floating then begin
         case TextSettings.VertAlign of
-          TALTextVertAlign.Center: LPos.y := EditControl.Position.y + ((EditControl.Height - LPromptTextDrawableRect.Height) / 2);
-          TALTextVertAlign.Leading: LPos.y := EditControl.Position.y;
-          TALTextVertAlign.Trailing: LPos.y := EditControl.Position.y + EditControl.Height - LPromptTextDrawableRect.Height;
+          TALTextVertAlign.Center: LPos.y := LNativeViewBoundsRect.Top + ((LNativeViewBoundsRect.Height - LPromptTextDrawableRect.Height) / 2);
+          TALTextVertAlign.Leading: LPos.y := LNativeViewBoundsRect.Top;
+          TALTextVertAlign.Trailing: LPos.y := LNativeViewBoundsRect.Top + LNativeViewBoundsRect.Height - LPromptTextDrawableRect.Height;
           Else
             Raise Exception.Create('Error 28B2F8BC-B4C5-4F22-8E21-681AA1CA3C23')
         end;
@@ -6518,7 +6361,10 @@ begin
           if not LRect.IsEmpty then begin
             LRect := ALAlignToPixelRound(LRect, Canvas.Matrix, Canvas.Scale, TEpsilon.position);
             Canvas.Fill.Kind := TBrushKind.Solid;
-            Canvas.Fill.Color := EditControl.FillColor;
+            if NativeView <> nil then
+              Canvas.Fill.Color := NativeView.FillColor
+            else
+              Canvas.Fill.Color := FDummyFillColor;
             Canvas.FillRect(LRect, 1);
           end;
         end;
@@ -6537,9 +6383,9 @@ begin
     end
     else begin
       case TextSettings.VertAlign of
-        TALTextVertAlign.Center: LPos.y := EditControl.Position.y + ((EditControl.Height - LPromptTextDrawableRect.Height) / 2);
-        TALTextVertAlign.Leading: LPos.y := EditControl.Position.y;
-        TALTextVertAlign.Trailing: LPos.y := EditControl.Position.y + EditControl.Height - LPromptTextDrawableRect.Height;
+        TALTextVertAlign.Center: LPos.y := LNativeViewBoundsRect.Top + ((LNativeViewBoundsRect.Height - LPromptTextDrawableRect.Height) / 2);
+        TALTextVertAlign.Leading: LPos.y := LNativeViewBoundsRect.Top;
+        TALTextVertAlign.Trailing: LPos.y := LNativeViewBoundsRect.Top + LNativeViewBoundsRect.Height - LPromptTextDrawableRect.Height;
         Else
           Raise Exception.Create('Error 84D5B492-1F70-43A0-AB68-D30C70D260BC')
       end;
@@ -6578,60 +6424,102 @@ begin
 
 end;
 
-{******************************************}
-function TALBaseEdit.HasNativeView: Boolean;
+{***********************************}
+Procedure TALBaseEdit.ShowNativeView;
 begin
-  result := EditControl.HasNativeView;
+  if NativeView = nil then exit;
+  if NativeView.visible then exit;
+  if IsNativeViewFrozen then exit;
+  if ShouldHideNativeView then Exit;
+  inherited;
+  {$IF defined(android)}
+  if IsFocused then begin
+    ALVirtualKeyboardVisible := True;
+    {$IF defined(DEBUG)}
+    ALLog(Classname + '.showVirtualKeyboard', 'control.name: ' + Name);
+    {$ENDIF}
+    MainActivity.getVirtualKeyboard.showFor(NativeView.View);
+  end;
+  {$ENDIF}
 end;
 
-{**********************************}
-Procedure TALBaseEdit.AddNativeView;
+{***********************************}
+Procedure TALBaseEdit.HideNativeView;
 begin
-  FNativeViewRemoved := False;
-  UpdateNativeViewVisibility;
-end;
-
-{*************************************}
-Procedure TALBaseEdit.RemoveNativeView;
-begin
-  FNativeViewRemoved := True;
-  ResetFocus;
-  EditControl.RemoveNativeView;
+  if NativeView = nil then exit;
+  if not NativeView.visible then exit;
+  {$IF defined(android)}
+  if IsFocused then begin
+    ALVirtualKeyboardVisible := False;
+    TThread.ForceQueue(nil,
+      procedure
+      begin
+        If not ALVirtualKeyboardVisible then begin
+          {$IF defined(DEBUG)}
+          ALLog(Classname + '.hideVirtualKeyboard');
+          {$ENDIF}
+          MainActivity.getVirtualKeyboard.hide;
+        end;
+      end);
+  end;
+  {$ENDIF}
+  inherited;
 end;
 
 {******************************************************************************}
 Procedure TALBaseEdit.SetSelection(const AStart: integer; const AStop: Integer);
 begin
-  EditControl.SetSelection(AStart, AStop);
+  if NativeView <> nil then
+    NativeView.SetSelection(AStart, AStop);
 end;
 
 {********************************************************}
 Procedure TALBaseEdit.SetSelection(const AIndex: integer);
 begin
-  EditControl.SetSelection(AIndex);
+  if NativeView <> nil then
+    NativeView.SetSelection(AIndex);
 end;
 
 {*****************************************}
 function TALBaseEdit.getLineCount: integer;
 begin
-  Result := EditControl.getLineCount;
+  if NativeView <> nil then
+    Result := NativeView.getLineCount
+  else
+    Result := 1;
 end;
 
 {*****************************************}
 function TALBaseEdit.getLineHeight: single;
 begin
-  result := EditControl.getLineHeight;
+  if NativeView <> nil then result := NativeView.getLineHeight
+  else begin
+    {$IF not defined(MSWindows)}
+    var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(textsettings.font.size, textsettings.LineHeightMultiplier);
+    if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0 then result := textsettings.Font.Size * LTmpLineHeightMultiplier
+    else begin
+    {$ENDIF}
+      var LfontMetrics := ALGetFontMetrics(
+                            ALResolveFontFamily(TextSettings.Font.Family), // const AFontFamily: String;
+                            TextSettings.Font.Size, // const AFontSize: single;
+                            TextSettings.Font.Weight, // const AFontWeight: TFontWeight;
+                            TextSettings.Font.Slant); // const AFontSlant: TFontSlant;
+      result := -LfontMetrics.Ascent + LfontMetrics.Descent + LfontMetrics.Leading;
+    {$IF not defined(MSWindows)}
+    end;
+    {$ENDIF}
+  end;
 end;
 
 {*********************************************}
 constructor TALEdit.Create(AOwner: TComponent);
 begin
   inherited;
-  FAutoSize := True;
+  FAutoSize := TALAutoSizeMode.Both;
 end;
 
-{**************************************************}
-function TALEdit.HasUnconstrainedAutosizeX: Boolean;
+{******************************************************}
+function TALEdit.HasUnconstrainedAutosizeWidth: Boolean;
 begin
   result := False;
 end;
@@ -6641,7 +6529,6 @@ procedure TALEdit.AdjustSize;
 begin
   if (not (csLoading in ComponentState)) and // loaded will call again AdjustSize
      (not (csDestroying in ComponentState)) and // if csDestroying do not do autosize
-     (scene <> nil) and // SetNewScene will call again AdjustSize
      (TNonReentrantHelper.EnterSection(FIsAdjustingSize)) then begin // non-reantrant
     try
 
@@ -6653,7 +6540,7 @@ begin
         FAdjustSizeOnEndUpdate := False;
 
       {$IF defined(debug)}
-      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeX)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeY));
+      //ALLog(ClassName + '.AdjustSize', 'Name: ' + Name + ' | HasUnconstrainedAutosize(X/Y) : '+ALBoolToStrW(HasUnconstrainedAutosizeWidth)+'/'+ALBoolToStrW(HasUnconstrainedAutosizeHeight));
       {$ENDIF}
 
       Var LInlinedLabelText := (LabelText <> '') and (LabelTextSettings.Layout = TLabelTextLayout.Inline);
@@ -6667,10 +6554,10 @@ begin
         if (TSide.left in Sides) then   LStrokeSize.left :=   max(Stroke.Thickness - Padding.left,   0);
       end;
 
-      if HasUnconstrainedAutosizeY then begin
+      if HasUnconstrainedAutosizeHeight then begin
 
         var LLineHeight: Single := GetLineHeight;
-        if IsPixelAlignmentEnabled then LLineHeight := ALAlignDimensionToPixelRound(LLineHeight, ALGetScreenScale, TEpsilon.Position);
+        if AutoAlignToPixel then LLineHeight := ALAlignDimensionToPixelRound(LLineHeight, ALGetScreenScale, TEpsilon.Position);
 
         If LInlinedLabelText then begin
           SetFixedSizeBounds(
@@ -6727,16 +6614,48 @@ begin
       LMarginRect.Right :=  Max(LMarginRect.Right  + LStrokeSize.Right,  0);
       LMarginRect.Bottom := Max(LMarginRect.Bottom + LStrokeSize.Bottom, 0);
 
-      if IsPixelAlignmentEnabled then
+      if AutoAlignToPixel then
         LMarginRect := ALAlignEdgesToPixelRound(LMarginRect, ALGetScreenScale, TEpsilon.Position);
 
-      EditControl.Margins.Rect := LMarginRect;
+      NativeViewMargins.Rect := LMarginRect;
 
     finally
       TNonReentrantHelper.LeaveSection(FIsAdjustingSize)
     end;
   end;
 end;
+
+{********************}
+{$IF defined(android)}
+Function TALDummyEdit.CreateNativeView: TALAndroidNativeView;
+begin
+  result := nil;
+end;
+{$ENDIF}
+
+{****************}
+{$IF defined(IOS)}
+Function TALDummyEdit.CreateNativeView: TALIosNativeView;
+begin
+  result := nil;
+end;
+{$ENDIF}
+
+{********************}
+{$IF defined(ALMacOS)}
+Function TALDummyEdit.CreateNativeView: TALMacNativeView;
+begin
+  result := nil;
+end;
+{$ENDIF}
+
+{**********************}
+{$IF defined(MSWindows)}
+Function TALDummyEdit.CreateNativeView: TALWinNativeView;
+begin
+  Result := nil;
+end;
+{$ENDIF}
 
 {*****************}
 procedure Register;
@@ -6750,6 +6669,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Edit','initialization');
+  {$ENDIF}
   RegisterFmxClasses([TALEdit]);
 
 end.

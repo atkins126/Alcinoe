@@ -37,7 +37,7 @@ uses
   iOSapi.Foundation,
   iOSapi.AVFoundation,
   iOSapi.CoreVideo,
-  Alcinoe.iOSapi.AVFoundation,
+  iOSapi.AVFAudio,
   Alcinoe.iOSapi.CoreVideo,
   Alcinoe.FMX.Ani,
   {$endIF}
@@ -45,8 +45,9 @@ uses
   System.Skia.API,
   {$ENDIF}
   FMX.Platform,
+  Alcinoe.Common,
   Alcinoe.FMX.CacheEngines,
-  Alcinoe.fmx.Common,
+  Alcinoe.FMX.Common,
   Alcinoe.FMX.Types3D,
   Alcinoe.FMX.Graphics,
   Alcinoe.FMX.Controls,
@@ -64,9 +65,8 @@ const
   vpsPrepared = 2;
   vpsStarted = 3;
   vpsPaused = 4;
-  vpsStopped = 5;
-  vpsPlaybackCompleted = 6;
-  vpsError = 7;
+  vpsPlaybackCompleted = 5;
+  vpsError = 6;
 
 type
 
@@ -93,12 +93,12 @@ type
     destructor Destroy; override;
     function GetCurrentPosition: Int64; virtual; abstract;
     function GetDuration: Int64; virtual; abstract;
+    function GetVideoRotationDegrees: Integer; virtual; abstract;
     function GetVideoHeight: Integer; virtual; abstract;
     function GetVideoWidth: Integer; virtual; abstract;
     procedure Prepare(Const ADataSource: String); virtual; abstract;
     procedure Start; virtual; abstract;
     procedure Pause; virtual; abstract;
-    procedure Stop; virtual; abstract;
     procedure SeekTo(const msec: Int64); virtual; abstract;
     property State: Integer read GetState;
     property IsPlaying: boolean read GetIsPlaying;
@@ -133,12 +133,12 @@ type
     constructor Create; override;
     function GetCurrentPosition: Int64; override;
     function GetDuration: Int64; override;
+    function GetVideoRotationDegrees: Integer; override;
     function GetVideoHeight: Integer; override;
     function GetVideoWidth: Integer; override;
     procedure Prepare(Const ADataSource: String); override;
     procedure Start; override;
     procedure Pause; override;
-    procedure Stop; override;
     procedure SeekTo(const msec: Int64); override;
   end;
 
@@ -216,6 +216,7 @@ type
     {$ENDIF}
     fDrawable: TALDrawable;
     FDrawableReady: Boolean;
+    FVideoRotationDegrees: Integer;
     fVideoWidth: Integer;
     fVideoHeight: Integer;
     fState: Integer;
@@ -238,12 +239,12 @@ type
     destructor Destroy; override;
     function GetCurrentPosition: Int64; override;
     function GetDuration: Int64; override;
+    function GetVideoRotationDegrees: Integer; override;
     function GetVideoHeight: Integer; override;
     function GetVideoWidth: Integer; override;
     procedure Prepare(Const ADataSource: String); override;
     procedure Start; override;
     procedure Pause; override;
-    procedure Stop; override;
     procedure SeekTo(const msec: Int64); override;
   end;
   {$endIF}
@@ -317,7 +318,7 @@ type
     class var AppAudioSessionActivated: Boolean;
   private
     FPlayer: AVPlayer;
-    FPlayerItem: ALAVPlayerItem;
+    FPlayerItem: AVPlayerItem;
     FPlayerItemVideoOutput: AVPlayerItemVideoOutput;
     fDisplayLink: CADisplayLink;
     fDisplayLinkListener: TDisplayLinkListener;
@@ -333,6 +334,9 @@ type
     fOpenGLVideoTextureCacheRef: CVOpenGLESTextureCacheRef;
     fMetalTextureRef: CVMetalTextureRef;
     fMetalVideoTextureCacheRef: CVMetalTextureCacheRef;
+    FVideoRotationDegrees: Integer;
+    fVideoWidth: Integer;
+    fVideoHeight: Integer;
     fState: Integer;
     FAutoStartWhenPrepared: Boolean;
     fLooping: boolean;
@@ -359,12 +363,12 @@ type
     destructor Destroy; override;
     function GetCurrentPosition: Int64; override;
     function GetDuration: Int64; override;
+    function GetVideoRotationDegrees: Integer; override;
     function GetVideoHeight: Integer; override;
     function GetVideoWidth: Integer; override;
     procedure Prepare(Const ADataSource: String); override;
     procedure Start; override;
     procedure Pause; override;
-    procedure Stop; override;
     procedure SeekTo(const msec: Int64); override;
   end;
   {$endIF}
@@ -400,6 +404,9 @@ type
   private
     FEngineIndex: Integer;
     FCoreVideoPlayer: TALBaseVideoPlayer;
+    FLooping: Boolean;
+    FPlaybackSpeed: single;
+    FVolume: Single;
   protected
     function GetState: Integer; override;
     function GetIsPlaying: boolean; override;
@@ -415,12 +422,12 @@ type
     destructor Destroy; override;
     function GetCurrentPosition: Int64; override;
     function GetDuration: Int64; override;
+    function GetVideoRotationDegrees: Integer; override;
     function GetVideoHeight: Integer; override;
     function GetVideoWidth: Integer; override;
     procedure Prepare(Const ADataSource: String); override;
     procedure Start; override;
     procedure Pause; override;
-    procedure Stop; override;
     procedure SeekTo(const msec: Int64); override;
   end;
 
@@ -470,12 +477,12 @@ type
         SetPlaybackSpeed,
         GetCurrentPosition,
         GetDuration,
+        GetVideoRotationDegrees,
         GetVideoHeight,
         GetVideoWidth,
         Prepare,
         Start,
         Pause,
-        Stop,
         SeekTo);
       // --------
       // TRequest
@@ -559,12 +566,12 @@ type
     procedure SetPlaybackSpeed(const AEngineIndex: Integer; const Value: single);
     function GetCurrentPosition(const AEngineIndex: Integer): Int64;
     function GetDuration(const AEngineIndex: Integer): Int64;
+    function GetVideoRotationDegrees(const AEngineIndex: Integer): Integer;
     function GetVideoHeight(const AEngineIndex: Integer): Integer;
     function GetVideoWidth(const AEngineIndex: Integer): Integer;
     procedure Prepare(const AEngineIndex: Integer; Const ADataSource: String);
     procedure Start(const AEngineIndex: Integer); overload;
     procedure Pause(const AEngineIndex: Integer);
-    procedure Stop(const AEngineIndex: Integer);
     procedure SeekTo(const AEngineIndex: Integer; const msec: Int64);
   end;
 
@@ -573,23 +580,35 @@ type
   TALVideoPlayerSurface = class(TALControl)
   public
     type
-      TAutoStartMode = (None, WhenPrepared, WhenDisplayed);
+      TAutoStartMode = (
+        /// <summary>
+        ///   Only prepare is called when a data source is set.
+        /// </summary>
+        None,
+        /// <summary>
+        ///   Prepare and start are called automatically as soon as a data source is set.
+        /// </summary>
+        WhenPrepared,
+        /// <summary>
+        ///   Prepare and start are called when the control is displayed,
+        ///   and unprepare is called when the control is no longer visible.
+        /// </summary>
+        WhenDisplayed);
   protected
     type
-      TPreviewDownloadContext = Class(TObject)
+      TPreviewDownloadContext = Class(TALWorkerContext)
       private
-        Lock: TObject;
-        FreeByThread: Boolean;
+        function GetOwner: TALVideoPlayerSurface;
       public
-        Owner: TALVideoPlayerSurface;
         Rect: TRectF;
         Scale: Single;
         AlignToPixel: Boolean;
         ResourceName: String;
         ResourceStream: TStream;
         WrapMode: TALImageWrapMode;
-        constructor Create(const AOwner: TALVideoPlayerSurface); virtual;
+        constructor Create(const AOwner: TALVideoPlayerSurface); reintroduce; virtual;
         destructor Destroy; override;
+        Property Owner: TALVideoPlayerSurface read GetOwner;
       End;
   private
     class var AutoStartedVideoPlayerSurface: TALVideoPlayerSurface;
@@ -598,11 +617,14 @@ type
     FDataSource: String; // 8 bytes
     fPreviewResourceName: String; // 8 bytes
     FBackgroundColor: TAlphaColor; // 4 bytes
+    FBackgroundColorKey: String; // 8 bytes
     FLoadingColor: TAlphaColor; // 4 bytes
+    FLoadingColorKey: String; // 4 bytes
     FInternalState: Integer; // 4 Bytes
     FIsFirstFrame: Boolean; // 1 Byte
     FAutoStartMode: TAutoStartMode; // 1 Byte
-    FWrapMode: TALImageWrapMode; // 1 bytes
+    FWrapMode: TALImageWrapMode; // 1 byte
+    FApplyMetadataOrientation: Boolean; // 1 bytes
     FCacheIndex: Integer; // 4 bytes
     FCacheEngine: TALBufDrawableCacheEngine; // 8 bytes
     FPreviewDownloadContext: TPreviewDownloadContext; // [MultiThread] | 8 bytes
@@ -613,6 +635,7 @@ type
     procedure setPreviewResourceName(const Value: String);
     procedure SetDataSource(const Value: String);
     procedure SetWrapMode(const Value: TALImageWrapMode);
+    procedure SetApplyMetadataOrientation(const Value: Boolean);
     function GetState: Integer;
     procedure SetAutoStartMode(const Value: TAutoStartMode);
     function GetIsPlaying: boolean;
@@ -630,8 +653,14 @@ type
     procedure SetOnCompletionEvent(const Value: TNotifyEvent);
     function GetOnVideoSizeChangedEvent: TALVideoSizeChangedEvent;
     procedure SetOnVideoSizeChangedEvent(const Value: TALVideoSizeChangedEvent);
+    procedure setBackgroundColor(const Value: TAlphaColor);
+    procedure setBackgroundColorKey(const Value: String);
+    procedure setLoadingColor(const Value: TAlphaColor);
+    procedure setLoadingColorKey(const Value: String);
     function IsBackgroundColorStored: Boolean;
+    function IsBackgroundColorKeyStored: Boolean;
     function IsLoadingColorStored: Boolean;
+    function IsLoadingColorKeyStored: Boolean;
     function IsFadeInDurationStored: Boolean;
     function IsDataSourceStored: Boolean;
     function IsPlaybackSpeedStored: Boolean;
@@ -639,15 +668,19 @@ type
   protected
     fBufDrawable: TALDrawable; // 8 bytes
     fBufDrawableRect: TRectF; // 16 bytes
+    procedure ApplyLoadingColorScheme; virtual;
+    procedure ApplyBackgroundColorScheme; virtual;
     function GetCacheSubIndex: Integer; virtual;
     function GetDoubleBuffered: boolean; override;
     function GetDefaultBackgroundColor: TalphaColor; virtual;
+    function GetDefaultBackgroundColorKey: String; virtual;
     function GetDefaultLoadingColor: TalphaColor; virtual;
+    function GetDefaultLoadingColorKey: String; virtual;
     function GetDefaultFadeInDuration: Single; virtual;
     procedure CancelPreviewDownload;
     class function CanStartPreviewDownload(var AContext: Tobject): boolean; virtual; // [MultiThread]
     class procedure HandlePreviewDownloadSuccess(const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject); virtual; // [MultiThread]
-    class procedure HandlePreviewDownloadError(const AErrMessage: string; var AContext: Tobject); virtual; // [MultiThread]
+    class procedure HandlePreviewDownloadError(const AResponse: IHTTPResponse; const AErrMessage: string; var AContext: Tobject); virtual; // [MultiThread]
     class function GetPreviewDownloadPriority(const AContext: Tobject): Int64; virtual; // [MultiThread]
     class Procedure CreateBufDrawable(var AContext: TObject); overload; virtual; // [MultiThread]
     class Procedure CreateBufDrawable(
@@ -662,19 +695,25 @@ type
     procedure Paint; override;
     procedure Loaded; override;
     procedure DoResized; override;
+    procedure Prepare; virtual;
+    procedure Unprepare; virtual;
     property VideoPlayerEngine: TALBaseVideoPlayer read fVideoPlayerEngine;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure BeforeDestruction; override;
-    function IsReadyToDisplay: Boolean; override;
+    function IsReadyToDisplay(const AStrict: Boolean = False): Boolean; override;
+    procedure ApplyColorScheme; override;
     procedure MakeBufDrawable; override;
     procedure ClearBufDrawable; override;
     property DefaultBackgroundColor: TAlphaColor read GetDefaultBackgroundColor;
+    property DefaultBackgroundColorKey: String read GetDefaultBackgroundColorKey;
     property DefaultLoadingColor: TAlphaColor read GetDefaultLoadingColor;
+    property DefaultLoadingColorKey: String read GetDefaultLoadingColorKey;
     property DefaultFadeInDuration: Single read GetDefaultFadeInDuration;
     function GetCurrentPosition: Int64;
     function GetDuration: Int64;
+    function GetVideoRotationDegrees: Integer;
     function GetVideoHeight: Integer;
     function GetVideoWidth: Integer;
     procedure Start;
@@ -696,11 +735,14 @@ type
     property Anchors;
     //property AutoSize;
     property AutoStartMode: TAutoStartMode read FAutoStartMode write SetAutoStartMode default TAutoStartMode.None;
-    property BackgroundColor: TAlphaColor read fBackgroundColor write fBackgroundColor Stored IsBackgroundColorStored;
-    property LoadingColor: TAlphaColor read FLoadingColor write FLoadingColor Stored IsLoadingColorStored;
+    property BackgroundColor: TAlphaColor read fBackgroundColor write SetBackgroundColor Stored IsBackgroundColorStored;
+    property BackgroundColorKey: String read fBackgroundColorKey write SetBackgroundColorKey Stored IsBackgroundColorKeyStored;
+    property LoadingColor: TAlphaColor read FLoadingColor write SetLoadingColor Stored IsLoadingColorStored;
+    property LoadingColorKey: String read FLoadingColorKey write SetLoadingColorKey Stored IsLoadingColorKeyStored;
     //property CanFocus;
     //property CanParentFocus;
     //property DisableFocusEffect;
+    property ClickSound;
     property ClipChildren;
     //property ClipParent;
     property Cursor;
@@ -729,6 +771,7 @@ type
     // In debug mode, the image is loaded from a file located in the /Resources/ sub-folder of the
     // project directory (with the extensions .png or .jpg).
     property PreviewResourceName: String read fPreviewResourceName write setPreviewResourceName;
+    property ApplyMetadataOrientation: Boolean read FApplyMetadataOrientation write SetApplyMetadataOrientation default false;
     property RotationAngle;
     //property RotationCenter;
     property Pivot;
@@ -756,7 +799,7 @@ type
     property OnMouseMove;
     property OnMouseWheel;
     property OnClick;
-    //property OnDblClick;
+    property OnDblClick;
     //property OnKeyDown;
     //property OnKeyUp;
     property OnPainting;
@@ -785,31 +828,33 @@ uses
   iOSapi.UIKit,
   iOSapi.CoreMedia,
   iOSapi.OpenGLES,
+  iOSapi.CoreGraphics,
   Macapi.Helpers,
   Macapi.ObjCRuntime,
   FMX.Context.GLES.iOS,
   FMX.Context.Metal,
-  Alcinoe.iOSApi.Foundation,
-  Alcinoe.iOSapi.QuartzCore,
   {$ENDIF}
   {$IF defined(ALSkiaCanvas)}
   FMX.Skia.Canvas,
   {$ENDIF}
-  {$IF defined(MSWindows)}
-  Winapi.Windows,
-  FMX.Platform.Win,
-  {$ENDIF}
   {$IFDEF ALDPK}
   DesignIntf,
   {$ENDIF}
+  FMX.Forms,
   Fmx.graphics,
   Fmx.types,
   fmx.controls,
   fmx.Types3d,
+  Alcinoe.url,
+  Alcinoe.FMX.Styles,
+  Alcinoe.Localization,
   Alcinoe.StringUtils,
-  Alcinoe.HTTP.Client,
-  Alcinoe.HTTP.Client.Net.Pool,
-  Alcinoe.Common;
+  Alcinoe.HTTP.Client.Net.Pool;
+
+{$IF defined(ANDROID) or defined(IOS)}
+var
+  ALVideoPlayerEventLock: TLightweightMREW;
+{$ENDIF}
 
 {************************************}
 constructor TALBaseVideoPlayer.Create;
@@ -915,6 +960,12 @@ begin
   result := 0;
 end;
 
+{************************************************************}
+function TALDummyVideoPlayer.GetVideoRotationDegrees: Integer;
+begin
+  result := 0;
+end;
+
 {***************************************************}
 function TALDummyVideoPlayer.GetVideoHeight: Integer;
 begin
@@ -942,11 +993,6 @@ procedure TALDummyVideoPlayer.Pause;
 begin
 end;
 
-{*********************************}
-procedure TALDummyVideoPlayer.Stop;
-begin
-end;
-
 {******************************************************}
 procedure TALDummyVideoPlayer.SeekTo(const msec: Int64);
 begin
@@ -966,95 +1012,111 @@ end;
 procedure TALAndroidVideoPlayer.TFrameAvailableListener.onFrameAvailable(surfaceTexture: JSurfaceTexture);
 begin
 
-  {$IF defined(DEBUG)}
-  //ALLog('TALAndroidVideoPlayer.TFrameAvailableListener.onFrameAvailable');
-  {$ENDIF}
-
-  // https://developer.android.com/reference/android/graphics/SurfaceTexture.html
-  // SurfaceTexture objects may be created on any thread. However, updateTexImage() may only be called on the
-  // thread with the OpenGL ES context that contains the texture object. The frame-available callback is
-  // called on an arbitrary thread, so unless special care is taken, updateTexImage() should not be called
-  // directly from the callback.
+  // The TALAndroidVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always executed on the main thread (since the handler
+  // passed to setOnFrameAvailableListener is bound to the main looper).
   //
-  // Based on this, it appears that updateTexImage can be invoked from a thread other than the current thread.
-  // This operation seems to be thread safe—multithreaded OpenGL usage is already in place; however, since
-  // updateTexImage takes only about 1ms, there is little advantage in running it on a different thread than
-  // the main thread (which already holds the OpenGL ES context).
+  // This creates a potential race condition: `Destroy` could be executing in parallel
+  // with this callback, leading to access of a half-freed object.
   //
-  // NOTE: Since setOnFrameAvailableListener(SurfaceTexture.OnFrameAvailableListener listener, Handler handler)
-  // is called with handler = TJHandler.JavaClass.init(TJLooper.javaclass.getMainLooper()), this event will always be
-  // dispatched on the main UI thread.
+  // To guard against that, we acquire a read lock here. The `Destroy` method must
+  // acquire a write lock to ensure exclusive access before releasing resources.
+  ALVideoPlayerEventLock.BeginRead;
+  try
 
-  //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
-  if fVideoPlayerEngine = nil then begin
-    ALLog('TALAndroidVideoPlayer.TFrameAvailableListener.onFrameAvailable', 'fVideoPlayerEngine = nil', TALLogType.warn);
-    exit;
-  end;
+    {$IF defined(DEBUG)}
+    //ALLog('TALAndroidVideoPlayer.TFrameAvailableListener.onFrameAvailable');
+    {$ENDIF}
 
-  fVideoPlayerEngine.fSurfaceTexture.updateTexImage;
+    // https://developer.android.com/reference/android/graphics/SurfaceTexture.html
+    // SurfaceTexture objects may be created on any thread. However, updateTexImage() may only be called on the
+    // thread with the OpenGL ES context that contains the texture object. The frame-available callback is
+    // called on an arbitrary thread, so unless special care is taken, updateTexImage() should not be called
+    // directly from the callback.
+    //
+    // Based on this, it appears that updateTexImage can be invoked from a thread other than the current thread.
+    // This operation seems to be thread safe—multithreaded OpenGL usage is already in place; however, since
+    // updateTexImage takes only about 1ms, there is little advantage in running it on a different thread than
+    // the main thread (which already holds the OpenGL ES context).
+    //
+    // NOTE: Since setOnFrameAvailableListener(SurfaceTexture.OnFrameAvailableListener listener, Handler handler)
+    // is called with handler = TJHandler.JavaClass.init(TJLooper.javaclass.getMainLooper()), this event will always be
+    // dispatched on the main UI thread.
 
-  {$IF defined(ALSkiaCanvas)}
-  if GlobalUseVulkan then begin
-    // not yet supported
-    // https://stackoverflow.com/questions/78854486/how-to-create-a-vulkan-vkimage-from-an-android-surfacetexture-bound-to-exoplayer
-  end
-  else begin
-    if (fVideoPlayerEngine.fGrBackEndTexture = 0) or
-       (gr4d_backendtexture_get_width(fVideoPlayerEngine.fGrBackEndTexture) <> fVideoPlayerEngine.fVideoWidth) or
-       (gr4d_backendtexture_get_height(fVideoPlayerEngine.fGrBackEndTexture) <> fVideoPlayerEngine.fVideoHeight) then begin
-      if fVideoPlayerEngine.fGrBackEndTexture <> 0 then
-        gr4d_backendtexture_destroy(fVideoPlayerEngine.fGrBackEndTexture);
-      var LGLTextureinfo: gr_gl_textureinfo_t;
-      LGLTextureinfo.target := GL_TEXTURE_EXTERNAL_OES;
-      LGLTextureinfo.id := fVideoPlayerEngine.FTexture.Handle;
-      LGLTextureinfo.format := GL_RGBA8_OES;
-      fVideoPlayerEngine.fGrBackEndTexture := ALSkCheckHandle(
-                                                gr4d_backendtexture_create_gl(
-                                                  fVideoPlayerEngine.fVideoWidth, // width,
-                                                  fVideoPlayerEngine.fVideoHeight, // height: int32_t;
-                                                  false, // is_mipmapped: _bool;
-                                                  @LGLTextureinfo)); // const texture_info: pgr_gl_textureinfo_t
+    //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALAndroidVideoPlayer.TFrameAvailableListener.onFrameAvailable', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
     end;
-    var LImageInfo := ALGetSkImageinfo(0, 0);
-    ALFreeAndNilDrawable(fVideoPlayerEngine.fDrawable);
-    fVideoPlayerEngine.fDrawable := sk4d_image_make_from_texture(
-                                      TGrCanvas.SharedContext.GrDirectContext.handle, // context: gr_directcontext_t;
-                                      fVideoPlayerEngine.fGrBackEndTexture, // const texture: gr_backendtexture_t;
-                                      gr_surfaceorigin_t.TOP_LEFT_GR_SURFACEORIGIN, // origin: gr_surfaceorigin_t;
-                                      LImageInfo.color_type, // color_type: sk_colortype_t;
-                                      LImageInfo.alpha_type, //: sk_alphatype_t;
-                                      LImageInfo.color_space, // color_space: sk_colorspace_t): sk_image_t; cdecl;
-                                      nil, // proc: sk_image_texture_release_proc;
-                                      nil); // proc_context: Pointer
+
+    fVideoPlayerEngine.fSurfaceTexture.updateTexImage;
+
+    {$IF defined(ALSkiaCanvas)}
+    if GlobalUseVulkan then begin
+      // not yet supported
+      // https://stackoverflow.com/questions/78854486/how-to-create-a-vulkan-vkimage-from-an-android-surfacetexture-bound-to-exoplayer
+    end
+    else begin
+      if (fVideoPlayerEngine.fGrBackEndTexture = 0) or
+         (gr4d_backendtexture_get_width(fVideoPlayerEngine.fGrBackEndTexture) <> fVideoPlayerEngine.fVideoWidth) or
+         (gr4d_backendtexture_get_height(fVideoPlayerEngine.fGrBackEndTexture) <> fVideoPlayerEngine.fVideoHeight) then begin
+        if fVideoPlayerEngine.fGrBackEndTexture <> 0 then
+          gr4d_backendtexture_destroy(fVideoPlayerEngine.fGrBackEndTexture);
+        var LGLTextureinfo: gr_gl_textureinfo_t;
+        LGLTextureinfo.target := GL_TEXTURE_EXTERNAL_OES;
+        LGLTextureinfo.id := fVideoPlayerEngine.FTexture.Handle;
+        LGLTextureinfo.format := GL_RGBA8_OES;
+        fVideoPlayerEngine.fGrBackEndTexture := ALSkCheckHandle(
+                                                  gr4d_backendtexture_create_gl(
+                                                    fVideoPlayerEngine.fVideoWidth, // width,
+                                                    fVideoPlayerEngine.fVideoHeight, // height: int32_t;
+                                                    false, // is_mipmapped: _bool;
+                                                    @LGLTextureinfo)); // const texture_info: pgr_gl_textureinfo_t
+      end;
+      var LImageInfo := ALGetSkImageinfo(0, 0);
+      ALFreeAndNilDrawable(fVideoPlayerEngine.fDrawable);
+      fVideoPlayerEngine.fDrawable := sk4d_image_make_from_texture(
+                                        TGrCanvas.SharedContext.GrDirectContext.handle, // context: gr_directcontext_t;
+                                        fVideoPlayerEngine.fGrBackEndTexture, // const texture: gr_backendtexture_t;
+                                        gr_surfaceorigin_t.TOP_LEFT_GR_SURFACEORIGIN, // origin: gr_surfaceorigin_t;
+                                        LImageInfo.color_type, // color_type: sk_colortype_t;
+                                        LImageInfo.alpha_type, //: sk_alphatype_t;
+                                        LImageInfo.color_space, // color_space: sk_colorspace_t): sk_image_t; cdecl;
+                                        nil, // proc: sk_image_texture_release_proc;
+                                        nil); // proc_context: Pointer
+      fVideoPlayerEngine.FDrawableReady := (fVideoPlayerEngine.fVideoWidth > 0) and
+                                           (fVideoPlayerEngine.fVideoHeight > 0);
+    end;
+    {$ELSE}
+    if (fVideoPlayerEngine.fDrawable.Width <> fVideoPlayerEngine.fVideoWidth) or
+       (fVideoPlayerEngine.fDrawable.Height <> fVideoPlayerEngine.fVideoHeight) then begin
+      {$IFNDEF ALCompilerVersionSupported130}
+        {$MESSAGE WARN 'Check if FMX.Types3D.TTexture.SetSize is still the same and adjust the IFDEF'}
+      {$ENDIF}
+      // we can't use setsize because it's will finalise the texture
+      // but with/height are used only in
+      // procedure TCanvasHelper.TexRect(const DestCorners, SrcCorners: TCornersF; const Texture: TTexture; const Color1, Color2, Color3, Color4: TAlphaColor);
+      // begin
+      //   ...
+      //   if (Texture = nil) or (Texture.Width < 1) or (Texture.Height < 1) then Exit
+      //   ...
+      //   InvTexSize := PointF(1 / Texture.Width, 1 / Texture.Height);
+      //   ...
+      // end
+      // so i don't need to finalize the texture !!
+      TALTextureAccessPrivate(fVideoPlayerEngine.fDrawable).FWidth := fVideoPlayerEngine.fVideoWidth;
+      TALTextureAccessPrivate(fVideoPlayerEngine.fDrawable).FHeight := fVideoPlayerEngine.fVideoHeight;
+    end;
     fVideoPlayerEngine.FDrawableReady := (fVideoPlayerEngine.fVideoWidth > 0) and
                                          (fVideoPlayerEngine.fVideoHeight > 0);
-  end;
-  {$ELSE}
-  if (fVideoPlayerEngine.fDrawable.Width <> fVideoPlayerEngine.fVideoWidth) or
-     (fVideoPlayerEngine.fDrawable.Height <> fVideoPlayerEngine.fVideoHeight) then begin
-    {$IFNDEF ALCompilerVersionSupported123}
-      {$MESSAGE WARN 'Check if FMX.Types3D.TTexture.SetSize is still the same and adjust the IFDEF'}
     {$ENDIF}
-    // we can't use setsize because it's will finalise the texture
-    // but with/height are used only in
-    // procedure TCanvasHelper.TexRect(const DestCorners, SrcCorners: TCornersF; const Texture: TTexture; const Color1, Color2, Color3, Color4: TAlphaColor);
-    // begin
-    //   ...
-    //   if (Texture = nil) or (Texture.Width < 1) or (Texture.Height < 1) then Exit
-    //   ...
-    //   InvTexSize := PointF(1 / Texture.Width, 1 / Texture.Height);
-    //   ...
-    // end
-    // so i don't need to finalize the texture !!
-    TALTextureAccessPrivate(fVideoPlayerEngine.fDrawable).FWidth := fVideoPlayerEngine.fVideoWidth;
-    TALTextureAccessPrivate(fVideoPlayerEngine.fDrawable).FHeight := fVideoPlayerEngine.fVideoHeight;
-  end;
-  fVideoPlayerEngine.FDrawableReady := (fVideoPlayerEngine.fVideoWidth > 0) and
-                                       (fVideoPlayerEngine.fVideoHeight > 0);
-  {$ENDIF}
 
-  if assigned(fVideoPlayerEngine.fOnFrameAvailableEvent) then
-    fVideoPlayerEngine.fOnFrameAvailableEvent(fVideoPlayerEngine);
+    if assigned(fVideoPlayerEngine.fOnFrameAvailableEvent) then
+      fVideoPlayerEngine.fOnFrameAvailableEvent(fVideoPlayerEngine);
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
+  end;
 
 end;
 
@@ -1149,34 +1211,51 @@ end;
 procedure TALAndroidVideoPlayer.TPlayerListener.onPlayerStateChanged(playWhenReady: boolean; playbackState: Integer);
 begin
 
-  //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
-  if fVideoPlayerEngine = nil then begin
-    ALLog('TALAndroidVideoPlayer.TPlayerListener.onPlayerStateChanged', 'fVideoPlayerEngine = nil', TALLogType.warn);
-    exit;
+  // The TALAndroidVideoPlayer instance may be destroyed from a background thread,
+  // and this callback may also be invoked from a non-main thread — it executes on
+  // the same thread (Looper) that was used to create the ExoPlayer instance.
+  //
+  // This introduces a potential race condition: the player might be in the process
+  // of being destroyed while this callback accesses its members, leading to unsafe
+  // memory access.
+  //
+  // To prevent this, we acquire a read lock here. The Destroy method acquires a
+  // write lock to ensure exclusive access before freeing any shared resources.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALAndroidVideoPlayer.TPlayerListener.onPlayerStateChanged', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    //int STATE_IDLE = 1;  => The player does not have any media to play.
+    //int STATE_BUFFERING = 2; => The player is not able to immediately play from its current position. This state typically occurs when more data needs to be loaded.
+    //int STATE_READY = 3; => The player is able to immediately play from its current position. The player will be playing if getPlayWhenReady() is true, and paused otherwise.
+    //int STATE_ENDED = 4; => The player has finished playing the media.
+
+    {$IF defined(DEBUG)}
+    //ALLog(
+    //  'TALAndroidVideoPlayer.TPlayerListener.onPlayerStateChanged',
+    //  'playWhenReady: ' + ALBoolToStrW(playWhenReady) + ' | ' +
+    //  'playbackState: ' + ALIntToStrW(playbackState));
+    {$ENDIF}
+
+    if (playbackState = TJPlayer.JavaClass.STATE_READY) and
+       (fVideoPlayerEngine.SetState(vpsPrepared, vpsPreparing)) and
+       (assigned(fVideoPlayerEngine.fOnPreparedEvent)) then begin
+      fVideoPlayerEngine.fOnPreparedEvent(fVideoPlayerEngine);
+      If fVideoPlayerEngine.FAutoStartWhenPrepared then fVideoPlayerEngine.start;
+    end;
+
+    if (playbackState = TJPlayer.JavaClass.STATE_ENDED) and
+       (fVideoPlayerEngine.SetState(vpsPlaybackCompleted, vpsStarted)) and
+        assigned(fVideoPlayerEngine.fOnCompletionEvent) then fVideoPlayerEngine.fOnCompletionEvent(fVideoPlayerEngine);
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
   end;
-
-  //int STATE_IDLE = 1;  => The player does not have any media to play.
-  //int STATE_BUFFERING = 2; => The player is not able to immediately play from its current position. This state typically occurs when more data needs to be loaded.
-  //int STATE_READY = 3; => The player is able to immediately play from its current position. The player will be playing if getPlayWhenReady() is true, and paused otherwise.
-  //int STATE_ENDED = 4; => The player has finished playing the media.
-
-  {$IF defined(DEBUG)}
-  //ALLog(
-  //  'TALAndroidVideoPlayer.TPlayerListener.onPlayerStateChanged',
-  //  'playWhenReady: ' + ALBoolToStrW(playWhenReady) + ' | ' +
-  //  'playbackState: ' + ALIntToStrW(playbackState));
-  {$ENDIF}
-
-  if (playbackState = TJPlayer.JavaClass.STATE_READY) and
-     (fVideoPlayerEngine.SetState(vpsPrepared, vpsPreparing)) and
-     (assigned(fVideoPlayerEngine.fOnPreparedEvent)) then begin
-    fVideoPlayerEngine.fOnPreparedEvent(fVideoPlayerEngine);
-    If fVideoPlayerEngine.FAutoStartWhenPrepared then fVideoPlayerEngine.start;
-  end;
-
-  if (playbackState = TJPlayer.JavaClass.STATE_ENDED) and
-     (fVideoPlayerEngine.SetState(vpsPlaybackCompleted, vpsStarted)) and
-      assigned(fVideoPlayerEngine.fOnCompletionEvent) then fVideoPlayerEngine.fOnCompletionEvent(fVideoPlayerEngine);
 
 end;
 
@@ -1232,18 +1311,34 @@ end;
 procedure TALAndroidVideoPlayer.TPlayerListener.onPlayerError(error: JPlaybackException);
 begin
 
-  //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
-  if fVideoPlayerEngine = nil then begin
-    ALLog('TALAndroidVideoPlayer.TPlayerListener.onPlayerError', 'fVideoPlayerEngine = nil', TALLogType.warn);
-    exit;
+  // The TALAndroidVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always executed on the main thread (since the handler
+  // passed to setOnFrameAvailableListener is bound to the main looper).
+  //
+  // This creates a potential race condition: `Destroy` could be executing in parallel
+  // with this callback, leading to access of a half-freed object.
+  //
+  // To guard against that, we acquire a read lock here. The `Destroy` method must
+  // acquire a write lock to ensure exclusive access before releasing resources.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALAndroidVideoPlayer.TPlayerListener.onPlayerError', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    {$IF defined(DEBUG)}
+    ALLog('TALAndroidVideoPlayer.TPlayerListener.onPlayerError', TalLogType.error);
+    {$ENDIF}
+
+    if fVideoPlayerEngine.SetState(vpsError) and
+       assigned(fVideoPlayerEngine.fOnErrorEvent) then fVideoPlayerEngine.fOnErrorEvent(fVideoPlayerEngine);
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
   end;
-
-  {$IF defined(DEBUG)}
-  ALLog('TALAndroidVideoPlayer.TPlayerListener.onPlayerError', TalLogType.error);
-  {$ENDIF}
-
-  if fVideoPlayerEngine.SetState(vpsError) and
-     assigned(fVideoPlayerEngine.fOnErrorEvent) then fVideoPlayerEngine.fOnErrorEvent(fVideoPlayerEngine);
 
 end;
 
@@ -1355,23 +1450,51 @@ end;
 procedure TALAndroidVideoPlayer.TPlayerListener.onVideoSizeChanged(videoSize: JVideoSize);
 begin
 
-  //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
-  if fVideoPlayerEngine = nil then begin
-    ALLog('TALAndroidVideoPlayer.TPlayerListener.onVideoSizeChanged', 'fVideoPlayerEngine = nil', TALLogType.warn);
-    exit;
+  // The TALAndroidVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always executed on the main thread (since the handler
+  // passed to setOnFrameAvailableListener is bound to the main looper).
+  //
+  // This creates a potential race condition: `Destroy` could be executing in parallel
+  // with this callback, leading to access of a half-freed object.
+  //
+  // To guard against that, we acquire a read lock here. The `Destroy` method must
+  // acquire a write lock to ensure exclusive access before releasing resources.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALAndroidVideoPlayer.TPlayerListener.onVideoSizeChanged', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    {$IF defined(DEBUG)}
+    //ALLog(
+    //  'TALAndroidVideoPlayer.TPlayerListener.onVideoSizeChanged',
+    //  'width: ' + ALIntToStrW(videoSize.width) + ' | ' +
+    //  'height: ' + ALIntToStrW(videoSize.height));
+    {$ENDIF}
+
+    // The clockwise rotation that should be applied to the video for it to be rendered in the correct
+    // orientation, or 0 if unknown or not applicable. Only 0, 90, 180 and 270 are supported.
+    var LVideoFormat := fVideoPlayerEngine.fExoPlayer.getVideoFormat;
+    if LVideoFormat = nil then fVideoPlayerEngine.FVideoRotationDegrees := 0
+    else fVideoPlayerEngine.FVideoRotationDegrees := LVideoFormat.rotationDegrees;
+    if (fVideoPlayerEngine.FVideoRotationDegrees = 90) or
+       (fVideoPlayerEngine.FVideoRotationDegrees = 270) then begin
+      fVideoPlayerEngine.FVideoWidth := videoSize.height;
+      fVideoPlayerEngine.fVideoHeight := videoSize.width;
+    end
+    else begin
+      fVideoPlayerEngine.FVideoWidth := videoSize.width;
+      fVideoPlayerEngine.fVideoHeight := videoSize.height;
+    end;
+    if assigned(fVideoPlayerEngine.fOnVideoSizeChangedEvent) then
+      fVideoPlayerEngine.fOnVideoSizeChangedEvent(fVideoPlayerEngine, videoSize.width, videoSize.height);
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
   end;
-
-  {$IF defined(DEBUG)}
-  //ALLog(
-  //  'TALAndroidVideoPlayer.TPlayerListener.onVideoSizeChanged',
-  //  'width: ' + ALIntToStrW(videoSize.width) + ' | ' +
-  //  'height: ' + ALIntToStrW(videoSize.height));
-  {$ENDIF}
-
-  fVideoPlayerEngine.FVideoWidth := videoSize.width;
-  fVideoPlayerEngine.fVideoHeight := videoSize.height;
-  if assigned(fVideoPlayerEngine.fOnVideoSizeChangedEvent) then
-    fVideoPlayerEngine.fOnVideoSizeChangedEvent(fVideoPlayerEngine, videoSize.width, videoSize.height);
 
 end;
 
@@ -1420,6 +1543,7 @@ constructor TALAndroidVideoPlayer.Create;
 begin
   inherited;
   //--
+  FVideoRotationDegrees := 0;
   fVideoWidth := 0;
   fVideoHeight := 0;
   fState := vpsIdle;
@@ -1461,11 +1585,16 @@ end;
 {***************************************}
 destructor TALAndroidVideoPlayer.Destroy;
 begin
-  Stop;
+  fExoPlayer.stop;
   //--
-  //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
-  fOnFrameAvailableListener.FVideoPlayerEngine := nil;
-  FPlayerListener.FVideoPlayerEngine := nil;
+  ALVideoPlayerEventLock.BeginWrite;
+  try
+    //https://stackoverflow.com/questions/48577801/java-arc-on-the-top-of-delphi-invoke-error-method-xxx-not-found
+    fOnFrameAvailableListener.FVideoPlayerEngine := nil;
+    FPlayerListener.FVideoPlayerEngine := nil;
+  finally
+    ALVideoPlayerEventLock.endWrite;
+  end;
   fSurfaceTexture.setOnFrameAvailableListener(nil);
   fExoPlayer.removeListener(FPlayerListener);
   //--
@@ -1582,7 +1711,7 @@ end;
 {*******************************************************}
 function TALAndroidVideoPlayer.GetCurrentPosition: Int64;
 begin
-  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
@@ -1593,7 +1722,7 @@ end;
 {************************************************}
 function TALAndroidVideoPlayer.GetDuration: Int64;
 begin
-  if not (GetState in [vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
@@ -1602,10 +1731,20 @@ begin
   Result := fExoPlayer.GetDuration;
 end;
 
+{**************************************************************}
+function TALAndroidVideoPlayer.GetVideoRotationDegrees: Integer;
+begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
+    result := 0;
+    exit;
+  end;
+  Result := fVideoRotationDegrees;
+end;
+
 {*****************************************************}
 function TALAndroidVideoPlayer.GetVideoHeight: Integer;
 begin
-  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
@@ -1615,7 +1754,7 @@ end;
 {****************************************************}
 function TALAndroidVideoPlayer.GetVideoWidth: Integer;
 begin
-  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
@@ -1664,23 +1803,6 @@ begin
   fExoPlayer.setPlayWhenReady(false);
 end;
 
-{***********************************}
-procedure TALAndroidVideoPlayer.stop;
-begin
-  FAutoStartWhenPrepared := False;
-  if not SetState(vpsStopped, [vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then exit;
-  {$IF defined(DEBUG)}
-  ALLog('TALAndroidVideoPlayer.stop');
-  {$ENDIF}
-  // Stops playback. Use setPlayWhenReady(false) rather than this method if the intention
-  // is to pause playback.
-  // Calling this method will cause the playback state to transition to STATE_IDLE. The
-  // player instance can still be used, and release() must still be called on the player if
-  // it's no longer required.
-  // Calling this method does not reset the playback position.
-  fExoPlayer.stop;
-end;
-
 {********************************************************}
 procedure TALAndroidVideoPlayer.SeekTo(const msec: Int64);
 begin
@@ -1704,10 +1826,37 @@ end;
 {******************************************************************}
 procedure TALIOSVideoPlayer.TDisplayLinkListener.displayLinkUpdated;
 begin
-  {$IFDEF DEBUG}
-  //ALLog('TALIOSVideoPlayer.TDisplayLinkListener.displayLinkUpdated');
-  {$ENDIF}
-  fVideoPlayerEngine.DoOnFrameRefresh;
+
+  // The TALIOSVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always invoked on the main thread.
+  //
+  // This introduces a potential race condition: the object might be partially
+  // destroyed while this method is still executing, leading to unsafe access.
+  //
+  // To prevent that, we acquire a read lock here. The Destroy method must acquire
+  // a write lock to ensure exclusive access before releasing resources.
+  //
+  // This mirrors the same protective mechanism used on Android. In practice,
+  // iOS may already internally synchronize access (as we’ve never observed
+  // a concurrent destroy during this callback), but applying the lock here
+  // is inexpensive and adds an extra layer of safety.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALIOSVideoPlayer.TDisplayLinkListener.displayLinkUpdated', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    {$IFDEF DEBUG}
+    //ALLog('TALIOSVideoPlayer.TDisplayLinkListener.displayLinkUpdated');
+    {$ENDIF}
+    fVideoPlayerEngine.DoOnFrameRefresh;
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
+  end;
+
 end;
 
 {****************************************************************************}
@@ -1726,25 +1875,54 @@ end;
 {********************************************************************************************************************************************}
 procedure TALIOSVideoPlayer.TKVODelegate.observeValueForKeyPath(keyPath: NSString; ofObject: Pointer; change: NSDictionary; context: Pointer);
 begin
-  var LkeyPath := NSStrToStr(keyPath);
-  if LkeyPath = 'presentationSize' then begin
-    var LNewSizeValue := iOSapi.UIKit.TNSValue.Wrap(change.objectForKey((NSKeyValueChangeNewKey as ILocalObject).GetObjectID)).CGSizeValue;
-    {$IF defined(DEBUG)}
-    //ALLog(
-    //  'TALIOSVideoPlayer.TKVODelegate.observeValueForKeyPath',
-    //  'presentationSize | ' +
-    //  'width: ' + ALFloatToStrW(LNewSizeValue.width, AlDefaultFormatSettingsW) + ' | ' +
-    //  'height: ' + ALFloatToStrW(LNewSizeValue.height, AlDefaultFormatSettingsW));
-    {$ENDIF}
-    if assigned(fVideoPlayerEngine.fOnVideoSizeChangedEvent) then
-      fVideoPlayerEngine.fOnVideoSizeChangedEvent(fVideoPlayerEngine, round(LNewSizeValue.width), round(LNewSizeValue.height));
-  end
-  else if LkeyPath = 'status' then begin
-    {$IF defined(DEBUG)}
-    //ALLog('TALIOSVideoPlayer.TKVODelegate.observeValueForKeyPath', 'status');
-    {$ENDIF}
-    fVideoPlayerEngine.DoOnReady;
+
+  // The TALIOSVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always invoked on the main thread.
+  //
+  // This introduces a potential race condition: the object might be partially
+  // destroyed while this method is still executing, leading to unsafe access.
+  //
+  // To prevent that, we acquire a read lock here. The Destroy method must acquire
+  // a write lock to ensure exclusive access before releasing resources.
+  //
+  // This mirrors the same protective mechanism used on Android. In practice,
+  // iOS may already internally synchronize access (as we’ve never observed
+  // a concurrent destroy during this callback), but applying the lock here
+  // is inexpensive and adds an extra layer of safety.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALIOSVideoPlayer.TKVODelegate.observeValueForKeyPath', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    var LkeyPath := NSStrToStr(keyPath);
+    if LkeyPath = 'presentationSize' then begin
+      var LNewSizeValue := iOSapi.UIKit.TNSValue.Wrap(change.objectForKey(NSStringToID(NSKeyValueChangeNewKey))).CGSizeValue;
+      fVideoPlayerEngine.fVideoHeight := round(LNewSizeValue.height);
+      fVideoPlayerEngine.fVideoWidth := round(LNewSizeValue.width);
+      {$IF defined(DEBUG)}
+      //ALLog(
+      //  'TALIOSVideoPlayer.TKVODelegate.observeValueForKeyPath',
+      //  'presentationSize | ' +
+      //  'width: ' + ALFloatToStrW(LNewSizeValue.width) + ' | ' +
+      //  'height: ' + ALFloatToStrW(LNewSizeValue.height));
+      {$ENDIF}
+      if assigned(fVideoPlayerEngine.fOnVideoSizeChangedEvent) then
+        fVideoPlayerEngine.fOnVideoSizeChangedEvent(fVideoPlayerEngine, fVideoPlayerEngine.fVideoWidth, fVideoPlayerEngine.fVideoHeight);
+    end
+    else if LkeyPath = 'status' then begin
+      {$IF defined(DEBUG)}
+      //ALLog('TALIOSVideoPlayer.TKVODelegate.observeValueForKeyPath', 'status');
+      {$ENDIF}
+      fVideoPlayerEngine.DoOnReady;
+    end;
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
   end;
+
 end;
 
 {*******************************************************************************************************}
@@ -1758,10 +1936,37 @@ end;
 //Posted when the item has played to its end time.
 procedure TALIOSVideoPlayer.TNotificationsDelegate.ItemDidPlayToEndTime;
 begin
-  {$IF defined(DEBUG)}
-  //allog('TALIOSVideoPlayer.ItemDidPlayToEndTime');
-  {$ENDIF}
-  fVideoPlayerEngine.DoOnItemDidPlayToEndTime;
+
+  // The TALIOSVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always invoked on the main thread.
+  //
+  // This introduces a potential race condition: the object might be partially
+  // destroyed while this method is still executing, leading to unsafe access.
+  //
+  // To prevent that, we acquire a read lock here. The Destroy method must acquire
+  // a write lock to ensure exclusive access before releasing resources.
+  //
+  // This mirrors the same protective mechanism used on Android. In practice,
+  // iOS may already internally synchronize access (as we’ve never observed
+  // a concurrent destroy during this callback), but applying the lock here
+  // is inexpensive and adds an extra layer of safety.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALIOSVideoPlayer.TNotificationsDelegate.ItemDidPlayToEndTime', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    {$IF defined(DEBUG)}
+    //allog('TALIOSVideoPlayer.ItemDidPlayToEndTime');
+    {$ENDIF}
+    fVideoPlayerEngine.DoOnItemDidPlayToEndTime;
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
+  end;
+
 end;
 
 {****************************************************}
@@ -1770,10 +1975,37 @@ end;
 //the problem—see AVPlayerItemFailedToPlayToEndTimeErrorKey.
 procedure TALIOSVideoPlayer.TNotificationsDelegate.ItemFailedToPlayToEndTime;
 begin
-  {$IF defined(DEBUG)}
-  allog('TALIOSVideoPlayer.ItemFailedToPlayToEndTime', TALLogType.Error);
-  {$ENDIF}
-  fVideoPlayerEngine.DoOnItemFailedToPlayToEndTime;
+
+  // The TALIOSVideoPlayer instance may be destroyed from a background thread,
+  // while this callback is always invoked on the main thread.
+  //
+  // This introduces a potential race condition: the object might be partially
+  // destroyed while this method is still executing, leading to unsafe access.
+  //
+  // To prevent that, we acquire a read lock here. The Destroy method must acquire
+  // a write lock to ensure exclusive access before releasing resources.
+  //
+  // This mirrors the same protective mechanism used on Android. In practice,
+  // iOS may already internally synchronize access (as we’ve never observed
+  // a concurrent destroy during this callback), but applying the lock here
+  // is inexpensive and adds an extra layer of safety.
+  ALVideoPlayerEventLock.BeginRead;
+  try
+
+    if fVideoPlayerEngine = nil then begin
+      ALLog('TALIOSVideoPlayer.TNotificationsDelegate.ItemFailedToPlayToEndTime', 'fVideoPlayerEngine = nil', TALLogType.warn);
+      exit;
+    end;
+
+    {$IF defined(DEBUG)}
+    allog('TALIOSVideoPlayer.ItemFailedToPlayToEndTime', TALLogType.Error);
+    {$ENDIF}
+    fVideoPlayerEngine.DoOnItemFailedToPlayToEndTime;
+
+  finally
+    ALVideoPlayerEventLock.EndRead;
+  end;
+
 end;
 
 {****************************************************************}
@@ -1826,6 +2058,9 @@ constructor TALIOSVideoPlayer.Create;
 begin
   inherited;
   //--
+  FVideoRotationDegrees := 0;
+  fVideoWidth := 0;
+  fVideoHeight := 0;
   fState := vpsIdle;
   FAutoStartWhenPrepared := False;
   fLooping := False;
@@ -1837,16 +2072,16 @@ begin
   fOnVideoSizeChangedEvent := nil;
   //--
   if not AppAudioSessionActivated then begin
-    Tmonitor.Enter(AppAudioSessionLock);
+    ALMonitorEnter(AppAudioSessionLock{$IF defined(DEBUG)}, 'TALIOSVideoPlayer.Create'{$ENDIF});
     Try
       if not AppAudioSessionActivated then begin
         AppAudioSessionActivated := True;
-        var LAudioSession := TAVAudioSession.Wrap(TAVAudioSession.OCClass.sharedInstance);
+        var LAudioSession := TAVAudioSession.OCClass.sharedInstance;
         LAudioSession.setCategory(AVAudioSessionCategoryPlayback, nil);
         LAudioSession.setActive(True, nil);
       end;
     finally
-      TMonitor.Exit(AppAudioSessionLock);
+      ALMonitorExit(AppAudioSessionLock{$IF defined(DEBUG)}, 'TALIOSVideoPlayer.Create'{$ENDIF});
     end;
   end;
   //--
@@ -1861,8 +2096,8 @@ begin
   FDrawableReady := False;
   //--
   If GlobalUseMetal then begin
-    fOpenGlVideoTextureCacheRef := 0;
-    fMetalTextureRef := 0;
+    fOpenGlVideoTextureCacheRef := nil;
+    fMetalTextureRef := nil;
     if CVMetalTextureCacheCreate(
          kCFAllocatorDefault, // allocator: The memory allocator for the texture.
          nil, // cacheAttributes: A dictionary specifying options for the cache’s behavior, or NULL to use default options. For applicable keys and values, see Cache Attributes.
@@ -1872,7 +2107,7 @@ begin
   end
   else begin
     fMetalvideoTextureCacheRef := nil;
-    fOpenGLTextureRef := 0;
+    fOpenGLTextureRef := nil;
     if CVOpenGLESTextureCacheCreate(
          kCFAllocatorDefault, // allocator: The CFAllocatorRef to use for allocating the texture cache. This parameter can be NULL.
          nil, // cacheAttributes: A CFDictionaryRef containing the attributes of the texture cache itself. This parameter can be NULL.
@@ -1882,7 +2117,7 @@ begin
   end;
   //--
   fDisplayLinkListener := TDisplayLinkListener.Create(self);
-  fDisplayLink := TCADisplayLink.Wrap(TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated')));
+  fDisplayLink := TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated'));
   fDisplayLink.retain;
   if GlobalUseMetal then begin
     // In OpenGL, the animation appears more jerky when using
@@ -1892,12 +2127,13 @@ begin
       LFrameRateRange.minimum := ALMinimumFramesPerSecond;
       LFrameRateRange.maximum := ALMaximumFramesPerSecond;
       LFrameRateRange.preferred := ALPreferredFramesPerSecond;
-      TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFrameRateRange(LFrameRateRange);
+      fDisplayLink.setPreferredFrameRateRange(LFrameRateRange);
     end
     else
-      TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
+      fDisplayLink.setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
   end;
-  fDisplayLink.addToRunLoop(TNSRunLoop.Wrap(TNSRunLoop.OCClass.mainRunLoop), NSRunLoopCommonModes); // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+  // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+  fDisplayLink.addToRunLoop(TNSRunLoop.OCClass.mainRunLoop, NSRunLoopCommonModes);
   fDisplayLink.setPaused(true);
   //--
   FPlayer := nil;
@@ -1911,7 +2147,16 @@ end;
 {***********************************}
 destructor TALIOSVideoPlayer.Destroy;
 begin
-  Stop;
+  ALVideoPlayerEventLock.BeginWrite;
+  try
+    fDisplayLinkListener.FVideoPlayerEngine := nil;
+    if FNotificationsDelegate <> nil then
+      FNotificationsDelegate.FVideoPlayerEngine := nil;
+    if FKVODelegate <> nil then
+      FKVODelegate.FVideoPlayerEngine := nil;
+  finally
+    ALVideoPlayerEventLock.endWrite;
+  end;
   //--
   // Removes the display link from all run loop modes.
   // Removing the display link from all run loop modes causes it to be released by the run loop. The display link also releases the target.
@@ -1921,18 +2166,21 @@ begin
   AlFreeAndNil(fDisplayLinkListener);
   //--
   if fNotificationsDelegate <> nil then begin
-    TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).removeObserver(FNotificationsDelegate.GetObjectID);
+    TNSNotificationCenter.OCClass.defaultCenter.removeObserver(FNotificationsDelegate.GetObjectID);
     AlFreeAndNil(FNotificationsDelegate);
   end;
   //--
   if FPlayer <> nil then begin
+    FPlayer.Pause;
     FPlayer.removeObserver(TNSObject.Wrap(FKVODelegate.GetObjectID), StrToNSStr('status'));
+    FPlayer.replaceCurrentItemWithPlayerItem(nil);
     FPlayer.release;
     FPlayer := nil;
   end;
   //--
   if FPlayerItem <> nil then begin
     FPlayerItem.removeObserver(TNSObject.Wrap(FKVODelegate.GetObjectID), StrToNSStr('status'));
+    FPlayerItem.removeObserver(TNSObject.Wrap(FKVODelegate.GetObjectID), StrToNSStr('presentationSize'));
     FPlayerItem.release;
     FPlayerItem := nil;
   end;
@@ -1948,20 +2196,20 @@ begin
   alfreeAndNil(fDrawable);
   {$ENDIF}
   //--
-  if fOpenGLTextureRef <> 0 then CFRelease(pointer(fOpenGLTextureRef));
+  if fOpenGLTextureRef <> nil then CFRelease(fOpenGLTextureRef);
   // The texture cache automatically flushes currently unused resources when you call the
   // CVOpenGLESTextureCacheCreateTextureFromImage function, but can you can also flush the
   // cache explicitly by calling this function. The EAGLContext associated with the cache
   // may be used to delete or unbind textures.
-  if fOpenGLvideoTextureCacheRef <> 0 then begin
+  if fOpenGLvideoTextureCacheRef <> nil then begin
     CVOpenGLESTextureCacheFlush(fOpenGLvideoTextureCacheRef, 0);
-    CFrelease(pointer(fOpenGLVideoTextureCacheRef));
+    CFrelease(fOpenGLVideoTextureCacheRef);
   end;
   //--
-  if fMetalTextureRef <> 0 then CFRelease(pointer(fMetalTextureRef));
+  if fMetalTextureRef <> nil then CFRelease(fMetalTextureRef);
   If fMetalvideoTextureCacheRef <> nil then begin
     CVMetalTextureCacheFlush(fMetalvideoTextureCacheRef, 0);
-    CFrelease(pointer(fMetalVideoTextureCacheRef));
+    CFrelease(fMetalVideoTextureCacheRef);
   end;
   //--
   if FPlayerItemVideoOutput <> nil then begin
@@ -2003,7 +2251,7 @@ begin
     // NODE: A pixel buffer containing the image data to display or nil if nothing should be displayed at the specified time.
     //       The caller is responsible for calling CVBufferRelease on the returned data when it is no longer needed.
     var LPixelBuffer := FPlayerItemVideoOutput.copyPixelBufferForItemTime(T, nil);
-    if LPixelBuffer = 0 then begin // could be nil if nothing should be displayed
+    if LPixelBuffer = nil then begin // could be nil if nothing should be displayed
       {$IFDEF DEBUG}
       ALLog('TALIOSVideoPlayer.DoOnFrameRefresh', 'copyPixelBufferForItemTime:nil', TalLogType.warn);
       {$ENDIF}
@@ -2157,7 +2405,7 @@ begin
         end;
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        {$IFNDEF ALCompilerVersionSupported123}
+        {$IFNDEF ALCompilerVersionSupported130}
           {$MESSAGE WARN 'Check if FMX.Types3D.TTexture.SetSize is still the same and adjust the IFDEF'}
         {$ENDIF}
         // we can't use setsize because it's will finalise the texture
@@ -2179,10 +2427,10 @@ begin
 
       {$ENDIF}
 
-      if LPrevMetalTextureRef <> 0 then
-        CfRElease(pointer(LPrevMetalTextureRef));
-      if LPrevOpenGLTextureRef <> 0 then
-        CfRElease(pointer(LPrevOpenGLTextureRef));
+      if LPrevMetalTextureRef <> nil then
+        CfRElease(LPrevMetalTextureRef);
+      if LPrevOpenGLTextureRef <> nil then
+        CfRElease(LPrevOpenGLTextureRef);
 
       if assigned(FonFrameAvailableEvent) then
         FonFrameAvailableEvent(self);
@@ -2264,13 +2512,29 @@ begin
     ALLog('TALIOSVideoPlayer.DoOnReady', 'Ready');
     {$ENDIF}
 
+    fVideoRotationDegrees := 0;
+    var LAsset := FPlayerItem.asset;
+    if LAsset = nil then exit;
+    var LTracks := FPlayerItem.asset.tracksWithMediaType(AVMediaTypeVideo);
+    if (LTracks <> nil) and (LTracks.count > 0) then begin
+      var LTrack := TAVAssetTrack.Wrap(LTracks.objectAtIndex(0));
+      var LpreferredTransform := LTrack.preferredTransform;
+      var LRadians: Double := ArcTan2(LpreferredTransform.b, LpreferredTransform.a);
+      fVideoRotationDegrees := Round(LRadians * 180 / PI);
+      if fVideoRotationDegrees < 0 then fVideoRotationDegrees := fVideoRotationDegrees + 360;
+      fVideoRotationDegrees := fVideoRotationDegrees mod 360; // 0, 90, 180, 270 (typically)
+    end;
+
+    fVideoHeight := round(FPlayerItem.presentationSize.height);
+    fVideoWidth := round(FPlayerItem.presentationSize.width);
+
     //i need to do this here because of bug like :
     //https://forums.developer.apple.com/thread/27589
     //http://stackoverflow.com/questions/24800742/iosavplayeritemvideooutput-hasnewpixelbufferforitemtime-doesnt-work-correctly
     if FPlayerItemVideoOutput = nil then begin
       var LPixelBufferAttributes: NSMutableDictionary := TNSMutableDictionary.Create;
       try
-        LPixelBufferAttributes.setObject(TNSNumber.OCClass.numberWithInt(kCVPixelFormatType_32BGRA), Pointer(kCVPixelBufferPixelFormatTypeKey));
+        LPixelBufferAttributes.setObject(NSObjectToID(TNSNumber.OCClass.numberWithInt(kCVPixelFormatType_32BGRA)), kCVPixelBufferPixelFormatTypeKey);
         // Initializes and returns a video output object using the specified
         // pixel buffer attributes.
         // The pixel buffer attributes required for video output. For a list
@@ -2281,7 +2545,6 @@ begin
         LPixelBufferAttributes.release;
         LPixelBufferAttributes := nil;
       end;
-      FPlayerItemVideoOutput.retain;
       FPlayerItem.addOutput(FPlayerItemVideoOutput);
     end;
 
@@ -2417,7 +2680,7 @@ end;
 //Returns the current time of the current player item.
 function TALIOSVideoPlayer.GetCurrentPosition: Int64;
 begin
-  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
@@ -2428,7 +2691,7 @@ end;
 {********************************************}
 function TALIOSVideoPlayer.GetDuration: Int64;
 begin
-  if not (GetState in [vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
@@ -2436,26 +2699,34 @@ begin
   else result := 0;
 end;
 
-{*************************************************}
-function TALIOSVideoPlayer.GetVideoHeight: Integer;
+{**********************************************************}
+function TALIOSVideoPlayer.GetVideoRotationDegrees: Integer;
 begin
-  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
-  if FPlayerItem <> nil then Result := round(FPlayerItem.presentationSize.height)
-  else result := 0;
+  result := fVideoRotationDegrees;
+end;
+
+{*************************************************}
+function TALIOSVideoPlayer.GetVideoHeight: Integer;
+begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
+    result := 0;
+    exit;
+  end;
+  Result := fVideoHeight;
 end;
 
 {************************************************}
 function TALIOSVideoPlayer.GetVideoWidth: Integer;
 begin
-  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsStopped, vpsPlaybackCompleted]) then begin
+  if not (GetState in [vpsIdle, vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then begin
     result := 0;
     exit;
   end;
-  if FPlayerItem <> nil then Result := round(FPlayerItem.presentationSize.width)
-  else result := 0;
+  Result := fVideoWidth;
 end;
 
 {*************************************************************}
@@ -2466,14 +2737,23 @@ begin
   {$ENDIF}
   if not SetState(vpsPreparing, vpsIdle) then raise Exception.Create('Prepare can be call only in the idle state');
   //--
-  var P: Pointer;
-  if AlIsHttpOrHttpsUrl(ADataSource) then P := TNSUrl.OCClass.URLWithString(StrToNSStr(ADataSource)) // Creates and returns an NSURL object initialized with a provided URL string
-  else P := TNSUrl.OCClass.fileURLWithPath(StrToNSStr(ADataSource)); // Initializes and returns a newly created NSURL object as a file URL with a specified path.
-  if P = nil then begin
+  {$IFNDEF ALCompilerVersionSupported130}
+    {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4401 is corrected, if yes replace P: Pointer by LURL: NSUrl, and adjust the IFDEF'}
+  {$ENDIF}
+  var LURL: NSURL;
+  if AlIsHttpOrHttpsOrFileUrl(ADataSource) then LURL := TNSUrl.Wrap(TNSUrl.OCClass.URLWithString(StrToNSStr(ADataSource))) // file:///private/var/mobile/Containers/Data/Application/60A33449-8FC7-4856-93E2-59F0C2D31258/tmp/.com.apple.Foundation.NSItemProvider.8lWULS/IMG_0084.mov
+  else begin
+    var LPath := StrToNSStr(ADataSource); // /private/var/mobile/Containers/Data/Application/0E36F73C-10B8-4047-A4A1-34EE38567FDD/tmp/38C9EB5E67AAF011BA8F25B41B5A9FDF.mov
+    var LStdPath := LPath.stringByStandardizingPath; // /var/mobile/Containers/Data/Application/C49B025A-DD1C-4608-A9EC-02001F868CB4/tmp/0294975468AAF011A54D39642644413B.mov
+    LURL := TNSUrl.Wrap(TNSUrl.OCClass.fileURLWithPath(LStdPath));
+  end;
+  if LURL = nil then begin
     ALLog('TALIOSVideoPlayer.Prepare', 'Failed to create NSURL from the provided data source (%s)', [ADataSource], TALLogType.ERROR);
     exit;
   end;
-  var LURL := TNSUrl.Wrap(P);
+  // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+  // No release required for LURL because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+  //
   // return A new player item, Prepared to use URL.
   // This method immediately returns the item, but with the status AVPlayerItemStatusUnknown.
   // Associating the player item with an AVPlayer immediately begins enqueuing its media
@@ -2482,21 +2762,19 @@ begin
   // URL contains no valid data or otherwise can't be used by the player item, its status
   // later changes to AVPlayerItemStatusFailed. You can determine the nature of the failure
   // by querying the player item’s error property.
-  FPlayerItem := TALAVPlayerItem.Wrap(TAVPlayerItem.OCClass.playerItemWithURL(LURL));
+  FPlayerItem := TAVPlayerItem.Wrap(TAVPlayerItem.OCClass.playerItemWithURL(LURL));
   FPlayerItem.retain;
-  //aURL.release;   | >> we can't do this else we will have an eaccessViolation when we will free the FPlayerItem
-  //aURL := nil;    | >> http://stackoverflow.com/questions/42222508/why-we-need-to-do-retain-for-objective-c-object-field
   //--
   FPlayer := TAVPlayer.Wrap(TAVPlayer.OCClass.playerWithPlayerItem(FPlayerItem)); // Returns a new player initialized to play the specified player item.
   FPlayer.retain;
   //--
   fNotificationsDelegate := TNotificationsDelegate.Create(Self);
-  TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemDidPlayToEndTime'), StringToID('AVPlayerItemDidPlayToEndTimeNotification'), NSObjectToID(FPlayerItem));
-  TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemFailedToPlayToEndTime'), StringToID('AVPlayerItemFailedToPlayToEndTimeNotification'), NSObjectToID(FPlayerItem));
-  TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemTimeJumped'), StringToID('AVPlayerItemTimeJumpedNotification'), NSObjectToID(FPlayerItem));
-  TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemPlaybackStalled'), StringToID('AVPlayerItemPlaybackStalledNotification'), NSObjectToID(FPlayerItem));
-  TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemNewAccessLogEntry'), StringToID('AVPlayerItemNewAccessLogEntryNotification'), NSObjectToID(FPlayerItem));
-  TNSNotificationCenter.Wrap(TNSNotificationCenter.OCClass.defaultCenter).addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemNewErrorLogEntry'), StringToID('AVPlayerItemNewErrorLogEntryNotification'), NSObjectToID(FPlayerItem));
+  TNSNotificationCenter.OCClass.defaultCenter.addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemDidPlayToEndTime'), StrToNSStr('AVPlayerItemDidPlayToEndTimeNotification'), NSObjectToID(FPlayerItem));
+  TNSNotificationCenter.OCClass.defaultCenter.addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemFailedToPlayToEndTime'), StrToNSStr('AVPlayerItemFailedToPlayToEndTimeNotification'), NSObjectToID(FPlayerItem));
+  TNSNotificationCenter.OCClass.defaultCenter.addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemTimeJumped'), StrToNSStr('AVPlayerItemTimeJumpedNotification'), NSObjectToID(FPlayerItem));
+  TNSNotificationCenter.OCClass.defaultCenter.addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemPlaybackStalled'), StrToNSStr('AVPlayerItemPlaybackStalledNotification'), NSObjectToID(FPlayerItem));
+  TNSNotificationCenter.OCClass.defaultCenter.addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemNewAccessLogEntry'), StrToNSStr('AVPlayerItemNewAccessLogEntryNotification'), NSObjectToID(FPlayerItem));
+  TNSNotificationCenter.OCClass.defaultCenter.addObserver(fNotificationsDelegate.GetObjectID, sel_getUid('ItemNewErrorLogEntry'), StrToNSStr('AVPlayerItemNewErrorLogEntryNotification'), NSObjectToID(FPlayerItem));
   //--
   FKVODelegate := TKVODelegate.Create(Self);
   FPlayer.addObserver(
@@ -2547,20 +2825,6 @@ begin
   fDisplayLink.setPaused(True);
 end;
 
-{*******************************}
-procedure TALIOSVideoPlayer.Stop;
-begin
-  FAutoStartWhenPrepared := False;
-  if not SetState(vpsStopped, [vpsPrepared, vpsStarted, vpsPaused, vpsPlaybackCompleted]) then exit;
-  {$IF defined(DEBUG)}
-  ALLog('TALIOSVideoPlayer.Stop');
-  {$ENDIF}
-  // Pauses playback of the current item.
-  // Calling this method is the same as setting the rate to 0.0.
-  FPlayer.Pause;
-  fDisplayLink.setPaused(True);
-end;
-
 {****************************************************}
 procedure TALIOSVideoPlayer.SeekTo(const msec: Int64);
 begin
@@ -2577,12 +2841,16 @@ begin
   inherited;
   FEngineIndex := TALVideoPlayerControllerThread.Instance.AcquireEngine(Self);
   FCoreVideoPlayer := nil;
+  FLooping := False;
+  FPlaybackSpeed := 1;
+  FVolume := 1;
 end;
 
 {*************************************}
 destructor TALAsyncVideoPlayer.Destroy;
 begin
-  TALVideoPlayerControllerThread.Instance.ReleaseEngine(FEngineIndex);
+  if TALVideoPlayerControllerThread.HasInstance then
+    TALVideoPlayerControllerThread.Instance.ReleaseEngine(FEngineIndex);
   inherited;
 end;
 
@@ -2601,36 +2869,39 @@ end;
 {***********************************************}
 function TALAsyncVideoPlayer.GetLooping: Boolean;
 begin
-  Result := TALVideoPlayerControllerThread.Instance.GetLooping(FEngineIndex);
+  Result := FLooping;
 end;
 
 {*************************************************************}
 procedure TALAsyncVideoPlayer.SetLooping(const Value: Boolean);
 begin
+  FLooping := Value;
   TALVideoPlayerControllerThread.Instance.SetLooping(FEngineIndex, Value);
 end;
 
 {*********************************************}
 function TALAsyncVideoPlayer.GetVolume: Single;
 begin
-  Result := TALVideoPlayerControllerThread.Instance.GetVolume(FEngineIndex);
+  Result := FVolume;
 end;
 
 {***********************************************************}
 procedure TALAsyncVideoPlayer.SetVolume(const Value: Single);
 begin
+  FVolume := Value;
   TALVideoPlayerControllerThread.Instance.SetVolume(FEngineIndex, Value);
 end;
 
 {****************************************************}
 function TALAsyncVideoPlayer.GetPlaybackSpeed: single;
 begin
-  Result := TALVideoPlayerControllerThread.Instance.GetPlaybackSpeed(FEngineIndex);
+  Result := FPlaybackSpeed;
 end;
 
 {******************************************************************}
 procedure TALAsyncVideoPlayer.SetPlaybackSpeed(const Value: single);
 begin
+  FPlaybackSpeed := Value;
   TALVideoPlayerControllerThread.Instance.SetPlaybackSpeed(FEngineIndex, Value);
 end;
 
@@ -2653,6 +2924,12 @@ end;
 function TALAsyncVideoPlayer.GetDuration: Int64;
 begin
   Result := TALVideoPlayerControllerThread.Instance.GetDuration(FEngineIndex);
+end;
+
+{************************************************************}
+function TALAsyncVideoPlayer.GetVideoRotationDegrees: Integer;
+begin
+  Result := TALVideoPlayerControllerThread.Instance.GetVideoRotationDegrees(FEngineIndex);
 end;
 
 {***************************************************}
@@ -2683,12 +2960,6 @@ end;
 procedure TALAsyncVideoPlayer.Pause;
 begin
   TALVideoPlayerControllerThread.Instance.Pause(FEngineIndex);
-end;
-
-{*********************************}
-procedure TALAsyncVideoPlayer.Stop;
-begin
-  TALVideoPlayerControllerThread.Instance.Stop(FEngineIndex);
 end;
 
 {******************************************************}
@@ -2756,8 +3027,10 @@ end;
 destructor TALVideoPlayerControllerThread.Destroy;
 begin
   Terminate;
+  If Suspended then start;
   {$IF defined(android)}
-  FLooper.quit;
+  if FLooper <> nil then
+    FLooper.quit;
   WaitFor;
   ALFreeAndNil(FHandlerCallback);
   FHandler := nil;
@@ -2807,21 +3080,23 @@ end;
 {***********************************************}
 procedure TALVideoPlayerControllerThread.Execute;
 begin
-  {$IF defined(android)}
-  TJLooper.JavaClass.Prepare;
-  FLooper := TJLooper.JavaClass.myLooper;
-  FHandlerCallback := TALVideoPlayerControllerThread.THandlerCallback.Create(Self);
-  FHandler := TJHandler.JavaClass.init(FLooper, FHandlerCallback);
-  FReady := True;
-  FHandler.sendEmptyMessage(0{what});
-  TJLooper.JavaClass.loop;
-  {$ELSE}
-  FReady := True;
-  While not terminated do begin
-    ProcessCommandQueue;
-    FSignal.WaitFor(INFINITE);
+  if not terminated then begin
+    {$IF defined(android)}
+    TJLooper.JavaClass.Prepare;
+    FLooper := TJLooper.JavaClass.myLooper;
+    FHandlerCallback := TALVideoPlayerControllerThread.THandlerCallback.Create(Self);
+    FHandler := TJHandler.JavaClass.init(FLooper, FHandlerCallback);
+    FReady := True;
+    FHandler.sendEmptyMessage(0{what});
+    TJLooper.JavaClass.loop;
+    {$ELSE}
+    FReady := True;
+    While not terminated do begin
+      ProcessCommandQueue;
+      FSignal.WaitFor(INFINITE);
+    end;
+    {$ENDIF}
   end;
-  {$ENDIF}
 end;
 
 {***********************************************************}
@@ -2830,105 +3105,116 @@ begin
   While true do begin
 
     var LCommand: TCommand;
-    Tmonitor.Enter(FCommandQueue);
+    ALMonitorEnter(FCommandQueue{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ProcessCommandQueue (1)'{$ENDIF});
     Try
       if FCommandQueue.Count = 0 then
         Exit;
       LCommand := FCommandQueue.Dequeue;
     Finally
-      Tmonitor.Exit(FCommandQueue);
+      ALMonitorExit(FCommandQueue{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ProcessCommandQueue (1)'{$ENDIF});
     End;
 
     var LEngine := GetEngine(LCommand.EngineIndex);
-    case LCommand.Request.Operation of
+    if (LEngine.CoreVideoPlayer <> nil) or
+       (LCommand.Request.Operation in [TOperation.CreateEngine,
+                                       TOperation.ReleaseEngine]) then begin
 
-      TOperation.CreateEngine: begin
-        var LVideoPlayer := TALVideoPlayer.Create;
-        LVideoPlayer.Tag := LCommand.EngineIndex;
-        LVideoPlayer.OnError := DoOnError;
-        LVideoPlayer.OnPrepared := DoOnPrepared;
-        LVideoPlayer.OnFrameAvailable := DoOnFrameAvailable;
-        LVideoPlayer.OnCompletion := DoOnCompletion;
-        LVideoPlayer.OnVideoSizeChanged := DoOnVideoSizeChanged;
-        TMonitor.Enter(LEngine);
-        Try
-          {$IF defined(DEBUG)}
-          if LEngine.EmptySlot then Raise Exception.Create('Error 077B6931-5B11-4DCB-B716-93FB469C3999');
-          if LEngine.CoreVideoPlayer <> nil then Raise Exception.Create('Error 25024169-E620-44E9-A739-8813EDC26D56');
-          {$ENDIF}
-          LEngine.CoreVideoPlayer := LVideoPlayer;
-        Finally
-          Tmonitor.Exit(LEngine);
-        End;
+      case LCommand.Request.Operation of
+
+        TOperation.CreateEngine: begin
+          if LEngine.ProxyVideoPlayer <> nil then begin
+            var LVideoPlayer := TALVideoPlayer.Create;
+            LVideoPlayer.Tag := LCommand.EngineIndex;
+            LVideoPlayer.OnError := DoOnError;
+            LVideoPlayer.OnPrepared := DoOnPrepared;
+            LVideoPlayer.OnFrameAvailable := DoOnFrameAvailable;
+            LVideoPlayer.OnCompletion := DoOnCompletion;
+            LVideoPlayer.OnVideoSizeChanged := DoOnVideoSizeChanged;
+            ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ProcessCommandQueue (2)'{$ENDIF});
+            Try
+              {$IF defined(DEBUG)}
+              if LEngine.EmptySlot then Raise Exception.Create('Error 077B6931-5B11-4DCB-B716-93FB469C3999');
+              if LEngine.CoreVideoPlayer <> nil then Raise Exception.Create('Error 25024169-E620-44E9-A739-8813EDC26D56');
+              {$ENDIF}
+              LEngine.CoreVideoPlayer := LVideoPlayer;
+            Finally
+              ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ProcessCommandQueue (2)'{$ENDIF});
+            End;
+          end;
+        end;
+
+        TOperation.ReleaseEngine: begin
+          var LVideoPlayer: TALBaseVideoPlayer;
+          ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ProcessCommandQueue (3)'{$ENDIF});
+          Try
+            {$IF defined(DEBUG)}
+            if LEngine.EmptySlot then Raise Exception.Create('Error FE6C5764-EFC5-4DE7-815F-4F12B469B2FE');
+            if LEngine.ProxyVideoPlayer <> nil then Raise Exception.Create('Error A6BAEDE9-E779-45E4-9581-7D4851505EF2');
+            {$ENDIF}
+            LVideoPlayer := LEngine.CoreVideoPlayer;
+            LEngine.CoreVideoPlayer := nil;
+            LEngine.EmptySlot := True;
+          Finally
+            ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ProcessCommandQueue (3)'{$ENDIF});
+          End;
+          ALFreeAndNil(LVideoPlayer);
+        end;
+
+        TOperation.GetState:
+          LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetState;
+
+        TOperation.GetIsPlaying:
+          LCommand.Response.Resultboolean := LEngine.CoreVideoPlayer.GetIsPlaying;
+
+        TOperation.GetLooping:
+          LCommand.Response.ResultBoolean := LEngine.CoreVideoPlayer.GetLooping;
+
+        TOperation.SetLooping:
+          LEngine.CoreVideoPlayer.SetLooping(LCommand.Request.Param1Boolean);
+
+        TOperation.GetVolume:
+          LCommand.Response.ResultSingle := LEngine.CoreVideoPlayer.GetVolume;
+
+        TOperation.SetVolume:
+          LEngine.CoreVideoPlayer.SetVolume(LCommand.Request.Param1Single);
+
+        TOperation.GetPlaybackSpeed:
+          LCommand.Response.ResultSingle := LEngine.CoreVideoPlayer.GetPlaybackSpeed;
+
+        TOperation.SetPlaybackSpeed:
+          LEngine.CoreVideoPlayer.SetPlaybackSpeed(LCommand.Request.Param1single);
+
+        TOperation.GetCurrentPosition:
+          LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetCurrentPosition;
+
+        TOperation.GetDuration:
+          LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetDuration;
+
+        TOperation.GetVideoRotationDegrees:
+          LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetVideoRotationDegrees;
+
+        TOperation.GetVideoHeight:
+          LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetVideoHeight;
+
+        TOperation.GetVideoWidth:
+          LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetVideoWidth;
+
+        TOperation.Prepare:
+          LEngine.CoreVideoPlayer.Prepare(LCommand.Request.Param1String);
+
+        TOperation.Start:
+          LEngine.CoreVideoPlayer.Start;
+
+        TOperation.Pause:
+          LEngine.CoreVideoPlayer.Pause;
+
+        TOperation.SeekTo:
+          LEngine.CoreVideoPlayer.SeekTo(LCommand.Request.Param1Int64);
+
+        else
+          raise Exception.Create('Error 9911E409-C4EB-432C-A56C-44F9EE3CA8EC');
+
       end;
-
-      TOperation.ReleaseEngine: begin
-        TMonitor.Enter(LEngine);
-        Try
-          {$IF defined(DEBUG)}
-          if LEngine.EmptySlot then Raise Exception.Create('Error FE6C5764-EFC5-4DE7-815F-4F12B469B2FE');
-          if LEngine.ProxyVideoPlayer <> nil then Raise Exception.Create('Error A6BAEDE9-E779-45E4-9581-7D4851505EF2');
-          {$ENDIF}
-          ALFreeAndNil(LEngine.CoreVideoPlayer);
-          LEngine.EmptySlot := True;
-        Finally
-          Tmonitor.Exit(LEngine);
-        End;
-      end;
-
-      TOperation.GetState:
-        LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetState;
-
-      TOperation.GetIsPlaying:
-        LCommand.Response.Resultboolean := LEngine.CoreVideoPlayer.GetIsPlaying;
-
-      TOperation.GetLooping:
-        LCommand.Response.ResultBoolean := LEngine.CoreVideoPlayer.GetLooping;
-
-      TOperation.SetLooping:
-        LEngine.CoreVideoPlayer.SetLooping(LCommand.Request.Param1Boolean);
-
-      TOperation.GetVolume:
-        LCommand.Response.ResultSingle := LEngine.CoreVideoPlayer.GetVolume;
-
-      TOperation.SetVolume:
-        LEngine.CoreVideoPlayer.SetVolume(LCommand.Request.Param1Single);
-
-      TOperation.GetPlaybackSpeed:
-        LCommand.Response.ResultSingle := LEngine.CoreVideoPlayer.GetPlaybackSpeed;
-
-      TOperation.SetPlaybackSpeed:
-        LEngine.CoreVideoPlayer.SetPlaybackSpeed(LCommand.Request.Param1single);
-
-      TOperation.GetCurrentPosition:
-        LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetCurrentPosition;
-
-      TOperation.GetDuration:
-        LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetDuration;
-
-      TOperation.GetVideoHeight:
-        LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetVideoHeight;
-
-      TOperation.GetVideoWidth:
-        LCommand.Response.ResultInt64 := LEngine.CoreVideoPlayer.GetVideoWidth;
-
-      TOperation.Prepare:
-        LEngine.CoreVideoPlayer.Prepare(LCommand.Request.Param1String);
-
-      TOperation.Start:
-        LEngine.CoreVideoPlayer.Start;
-
-      TOperation.Pause:
-        LEngine.CoreVideoPlayer.Pause;
-
-      TOperation.Stop:
-        LEngine.CoreVideoPlayer.Stop;
-
-      TOperation.SeekTo:
-        LEngine.CoreVideoPlayer.SeekTo(LCommand.Request.Param1Int64);
-
-      else
-        raise Exception.Create('Error 9911E409-C4EB-432C-A56C-44F9EE3CA8EC');
 
     end;
 
@@ -2961,11 +3247,11 @@ begin
     LCommand.Request.Param1Boolean := AParamBoolean;
     LCommand.Request.Param1String := AParamString;
 
-    Tmonitor.Enter(FCommandQueue);
+    ALMonitorEnter(FCommandQueue{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.EnqueueCommand'{$ENDIF});
     try
       FCommandQueue.Enqueue(LCommand);
     finally
-      Tmonitor.Exit(FCommandQueue);
+      ALMonitorExit(FCommandQueue{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.EnqueueCommand'{$ENDIF});
     end;
 
     {$IF defined(android)}
@@ -3061,7 +3347,7 @@ begin
   //ALLog('TALVideoPlayerControllerThread.DoOnError');
   {$ENDIF}
   var LEngine := GetEngine(TALBaseVideoPlayer(Sender).tag);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnError (1)'{$ENDIF});
   try
     if LEngine.ProxyVideoPlayer = nil then exit;
     If assigned(LEngine.ProxyVideoPlayer.OnError) then begin
@@ -3075,19 +3361,19 @@ begin
         TThread.Queue(nil,
           procedure
           begin
-            TMonitor.Enter(LEngine);
+            ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnError (2)'{$ENDIF});
             try
               if LEngine.ProxyVideoPlayer <> LProxyVideoPlayer then exit;
               If assigned(LEngine.ProxyVideoPlayer.OnError) then
                 LEngine.ProxyVideoPlayer.OnError(LEngine.ProxyVideoPlayer);
             finally
-              TMonitor.Exit(LEngine);
+              ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnError (2)'{$ENDIF});
             end;
           end);
       end;
     end;
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnError (1)'{$ENDIF});
   end;
 end;
 
@@ -3098,7 +3384,7 @@ begin
   //ALLog('TALVideoPlayerControllerThread.DoOnPrepared');
   {$ENDIF}
   var LEngine := GetEngine(TALBaseVideoPlayer(Sender).tag);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnPrepared (1)'{$ENDIF});
   try
     if LEngine.ProxyVideoPlayer = nil then exit;
     If assigned(LEngine.ProxyVideoPlayer.OnPrepared) then begin
@@ -3112,19 +3398,19 @@ begin
         TThread.Queue(nil,
           procedure
           begin
-            TMonitor.Enter(LEngine);
+            ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnPrepared (2)'{$ENDIF});
             try
               if LEngine.ProxyVideoPlayer <> LProxyVideoPlayer then exit;
               If assigned(LEngine.ProxyVideoPlayer.OnPrepared) then
                 LEngine.ProxyVideoPlayer.OnPrepared(LEngine.ProxyVideoPlayer);
             finally
-              TMonitor.Exit(LEngine);
+              ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnPrepared (2)'{$ENDIF});
             end;
           end);
       end;
     end;
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnPrepared (1)'{$ENDIF});
   end;
 end;
 
@@ -3137,13 +3423,13 @@ begin
     Raise Exception.Create('Error 30414840-A389-48FC-B1C8-2DB3E4B29B70');
   {$ENDIF}
   var LEngine := GetEngine(TALBaseVideoPlayer(Sender).tag);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnFrameAvailable'{$ENDIF});
   try
     if LEngine.ProxyVideoPlayer = nil then exit;
     If assigned(LEngine.ProxyVideoPlayer.OnFrameAvailable) then
       LEngine.ProxyVideoPlayer.OnFrameAvailable(LEngine.ProxyVideoPlayer);
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnFrameAvailable'{$ENDIF});
   end;
 end;
 
@@ -3154,7 +3440,7 @@ begin
   //ALLog('TALVideoPlayerControllerThread.DoOnCompletion');
   {$ENDIF}
   var LEngine := GetEngine(TALBaseVideoPlayer(Sender).tag);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnCompletion (1)'{$ENDIF});
   try
     if LEngine.ProxyVideoPlayer = nil then exit;
     If assigned(LEngine.ProxyVideoPlayer.OnCompletion) then begin
@@ -3168,19 +3454,19 @@ begin
         TThread.Queue(nil,
           procedure
           begin
-            TMonitor.Enter(LEngine);
+            ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnCompletion (2)'{$ENDIF});
             try
               if LEngine.ProxyVideoPlayer <> LProxyVideoPlayer then exit;
               If assigned(LEngine.ProxyVideoPlayer.OnCompletion) then
                 LEngine.ProxyVideoPlayer.OnCompletion(LEngine.ProxyVideoPlayer);
             finally
-              TMonitor.Exit(LEngine);
+              ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnCompletion (2)'{$ENDIF});
             end;
           end);
       end;
     end;
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnCompletion (1)'{$ENDIF});
   end;
 end;
 
@@ -3191,7 +3477,7 @@ begin
   //ALLog('TALVideoPlayerControllerThread.DoOnVideoSizeChanged');
   {$ENDIF}
   var LEngine := GetEngine(TALBaseVideoPlayer(Sender).tag);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnVideoSizeChanged (1)'{$ENDIF});
   try
     if LEngine.ProxyVideoPlayer = nil then exit;
     If assigned(LEngine.ProxyVideoPlayer.OnVideoSizeChanged) then begin
@@ -3205,19 +3491,19 @@ begin
         TThread.Queue(nil,
           procedure
           begin
-            TMonitor.Enter(LEngine);
+            ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnVideoSizeChanged (2)'{$ENDIF});
             try
               if LEngine.ProxyVideoPlayer <> LProxyVideoPlayer then exit;
               If assigned(LEngine.ProxyVideoPlayer.OnVideoSizeChanged) then
                 LEngine.ProxyVideoPlayer.OnVideoSizeChanged(LEngine.ProxyVideoPlayer, width, height);
             finally
-              TMonitor.Exit(LEngine);
+              ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnVideoSizeChanged (2)'{$ENDIF});
             end;
           end);
       end;
     end;
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.DoOnVideoSizeChanged (1)'{$ENDIF});
   end;
 end;
 
@@ -3273,15 +3559,14 @@ end;
 procedure TALVideoPlayerControllerThread.ReleaseEngine(const AEngineIndex: Integer);
 begin
   var LEngine := GetEngine(AEngineIndex);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ReleaseEngine'{$ENDIF});
   try
     {$IF defined(DEBUG)}
-    if LEngine.CoreVideoPlayer = nil then Raise Exception.Create('Error 564F7439-CD74-45BC-B420-A0728B2EA3CB');
     if LEngine.ProxyVideoPlayer = nil then Raise Exception.Create('Error B0E9E26E-959E-4426-B82B-7406DBDDE659');
     {$ENDIF}
     LEngine.ProxyVideoPlayer := nil;
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.ReleaseEngine'{$ENDIF});
   end;
   EnqueueCommand(AEngineIndex, TOperation.ReleaseEngine, False{AWaitResponse});
 end;
@@ -3290,11 +3575,11 @@ end;
 function TALVideoPlayerControllerThread.GetCoreVideoPlayer(const AEngineIndex: Integer): TALBaseVideoPlayer;
 begin
   var LEngine := GetEngine(AEngineIndex);
-  TMonitor.Enter(LEngine);
+  ALMonitorEnter(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.GetCoreVideoPlayer'{$ENDIF});
   try
     Result := LEngine.CoreVideoPlayer;
   finally
-    TMonitor.Exit(LEngine);
+    ALMonitorExit(LEngine{$IF defined(DEBUG)}, 'TALVideoPlayerControllerThread.GetCoreVideoPlayer'{$ENDIF});
   end;
 end;
 
@@ -3358,6 +3643,12 @@ begin
   Result := EnqueueCommand(AEngineIndex, TOperation.GetDuration, True{AWaitResponse}).ResultInt64;
 end;
 
+{****************************************************************************************************}
+function TALVideoPlayerControllerThread.GetVideoRotationDegrees(const AEngineIndex: Integer): Integer;
+begin
+  Result := Integer(EnqueueCommand(AEngineIndex, TOperation.GetVideoRotationDegrees, True{AWaitResponse}).ResultInt64);
+end;
+
 {*******************************************************************************************}
 function TALVideoPlayerControllerThread.GetVideoHeight(const AEngineIndex: Integer): Integer;
 begin
@@ -3388,12 +3679,6 @@ begin
   EnqueueCommand(AEngineIndex, TOperation.Pause, False{AWaitResponse});
 end;
 
-{*************************************************************************}
-procedure TALVideoPlayerControllerThread.Stop(const AEngineIndex: Integer);
-begin
-  EnqueueCommand(AEngineIndex, TOperation.Stop, False{AWaitResponse});
-end;
-
 {**********************************************************************************************}
 procedure TALVideoPlayerControllerThread.SeekTo(const AEngineIndex: Integer; const msec: Int64);
 begin
@@ -3403,24 +3688,26 @@ end;
 {****************************************************************************************************}
 constructor TALVideoPlayerSurface.TPreviewDownloadContext.Create(const AOwner: TALVideoPlayerSurface);
 begin
-  inherited Create;
-  Lock := TObject.Create;
-  FreeByThread := True;
-  Owner := AOwner;
-  Rect := Owner.LocalRect;
+  inherited Create(AOwner);
+  Rect := AOwner.LocalRect;
   Scale := ALGetScreenScale;
-  AlignToPixel := Owner.IsPixelAlignmentEnabled;
-  ResourceName := Owner.PreviewResourceName;
+  AlignToPixel := AOwner.AutoAlignToPixel;
+  ResourceName := AOwner.PreviewResourceName;
   ResourceStream := nil;
-  WrapMode := Owner.WrapMode;
+  WrapMode := AOwner.WrapMode;
 end;
 
 {***************************************************************}
 destructor TALVideoPlayerSurface.TPreviewDownloadContext.Destroy;
 begin
-  ALFreeAndNil(Lock);
   ALFreeAndNil(ResourceStream);
   inherited
+end;
+
+{*************************************************************************************}
+function TALVideoPlayerSurface.TPreviewDownloadContext.GetOwner: TALVideoPlayerSurface;
+begin
+  Result := TALVideoPlayerSurface(FOwner);
 end;
 
 {***********************************************************}
@@ -3436,11 +3723,14 @@ begin
   FDataSource := '';
   fPreviewResourceName := '';
   FBackgroundColor := DefaultBackgroundColor;
+  FBackgroundColorKey := DefaultBackgroundColorKey;
   FLoadingColor := DefaultLoadingColor;
+  FLoadingColorKey := DefaultLoadingColorKey;
   FInternalState := VPSIdle;
   FIsFirstFrame := true;
   FAutoStartMode := TAutoStartMode.None;
   FWrapMode := TALImageWrapMode.Fit;
+  FApplyMetadataOrientation := False;
   FCacheIndex := 0;
   FCacheEngine := nil;
   FPreviewDownloadContext := nil;
@@ -3461,20 +3751,22 @@ end;
 procedure TALVideoPlayerSurface.BeforeDestruction;
 begin
   if BeforeDestructionExecuted then exit;
+  if AutoStartedVideoPlayerSurface = self then AutoStartedVideoPlayerSurface := nil;
   // Unsubscribe from TALScrollCapturedMessage to stop receiving messages.
   // This must be done in BeforeDestruction rather than in Destroy,
   // because the control might be freed in the background via ALFreeAndNil(..., delayed),
   // and BeforeDestruction is guaranteed to execute on the main thread.
   TMessageManager.DefaultManager.Unsubscribe(TApplicationEventMessage, ApplicationEventHandler);
-  Stop;
+  CancelPreviewDownload;
+  ALFreeAndNil(fVideoPlayerEngine);
   inherited;
 end;
 
-{*******************************************************}
-function TALVideoPlayerSurface.IsReadyToDisplay: Boolean;
+{***************************************************************************************}
+function TALVideoPlayerSurface.IsReadyToDisplay(const AStrict: Boolean = False): Boolean;
 begin
   Result := Inherited and
-            (FPreviewDownloadContext = nil) and
+            ((not AStrict) or (FPreviewDownloadContext = nil)) and
             ((FFadeInStartTimeNano <= 0) or
              ((ALElapsedTimeNano - FFadeInStartTimeNano) / ALNanosPerSec > FFadeInDuration));
 end;
@@ -3483,9 +3775,46 @@ end;
 procedure TALVideoPlayerSurface.Loaded;
 begin
   inherited;
-  If FDataSource <> '' then begin
-    FVideoPlayerEngine.Prepare(FDataSource);
+  If (FAutoStartMode <> TAutoStartMode.WhenDisplayed) then begin
+    Prepare;
     if FAutoStartMode = TAutoStartMode.WhenPrepared then start;
+  end;
+end;
+
+{*********************************************************}
+procedure TALVideoPlayerSurface.ApplyBackgroundColorScheme;
+begin
+  if FBackgroundColorKey <> '' then begin
+    var LBackgroundColor := TALStyleManager.Instance.GetColor(FBackgroundColorKey);
+    if FBackgroundColor <> LBackgroundColor then begin
+      FBackgroundColor := LBackgroundColor;
+      Repaint;
+    end;
+  end;
+end;
+
+{******************************************************}
+procedure TALVideoPlayerSurface.ApplyLoadingColorScheme;
+begin
+  if FLoadingColorKey <> '' then begin
+    var LLoadingColor := TALStyleManager.Instance.GetColor(FLoadingColorKey);
+    if FLoadingColor <> LLoadingColor then begin
+      FLoadingColor := LLoadingColor;
+      Repaint;
+    end;
+  end;
+end;
+
+{***********************************************}
+procedure TALVideoPlayerSurface.ApplyColorScheme;
+begin
+  beginUpdate;
+  try
+    inherited;
+    ApplyBackgroundColorScheme;
+    ApplyLoadingColorScheme;
+  finally
+    EndUpdate;
   end;
 end;
 
@@ -3507,10 +3836,22 @@ begin
   Result := TalphaColors.Null;
 end;
 
+{******************************************************************}
+function TALVideoPlayerSurface.GetDefaultBackgroundColorKey: String;
+begin
+  Result := '';
+end;
+
 {*****************************************************************}
 function TALVideoPlayerSurface.GetDefaultLoadingColor: TalphaColor;
 begin
   Result := $FFe0e4e9;
+end;
+
+{***************************************************************}
+function TALVideoPlayerSurface.GetDefaultLoadingColorKey: String;
+begin
+  Result := '';
 end;
 
 {**************************************************************}
@@ -3536,24 +3877,10 @@ begin
     FDataSource := Value;
     {$IF not defined(ALDPK)}
     if not (csLoading in ComponentState) then begin
-      if FInternalState <> vpsIdle then begin
-        var LVideoPlayerEngine: TALBaseVideoPlayer := TALAsyncVideoPlayer.create;
-        LVideoPlayerEngine.Looping := fVideoPlayerEngine.Looping;
-        LVideoPlayerEngine.PlaybackSpeed := fVideoPlayerEngine.PlaybackSpeed;
-        LVideoPlayerEngine.Volume := fVideoPlayerEngine.Volume;
-        LVideoPlayerEngine.OnError := fVideoPlayerEngine.OnError;
-        LVideoPlayerEngine.OnPrepared := fVideoPlayerEngine.OnPrepared;
-        LVideoPlayerEngine.OnCompletion := fVideoPlayerEngine.OnCompletion;
-        LVideoPlayerEngine.OnVideoSizeChanged := fVideoPlayerEngine.OnVideoSizeChanged;
-        LVideoPlayerEngine.OnFrameAvailable := DoOnFrameAvailable;
-        //--
-        ALFreeAndNil(fVideoPlayerEngine);
-        fVideoPlayerEngine := LVideoPlayerEngine;
-      end;
-      if FDataSource <> '' then begin
-        FVideoPlayerEngine.Prepare(FDataSource);
-        if AutoStartMode = TAutoStartMode.WhenPrepared then
-          FVideoPlayerEngine.Start;
+      Unprepare;
+      if (FAutoStartMode <> TAutoStartMode.WhenDisplayed) then begin
+        Prepare;
+        if AutoStartMode = TAutoStartMode.WhenPrepared then Start;
       end;
     end;
     {$ENDIF}
@@ -3566,6 +3893,16 @@ begin
   if FWrapMode <> Value then begin
     ClearBufDrawable;
     FWrapMode := Value;
+    Repaint;
+  end;
+end;
+
+{********************************************************************************}
+procedure TALVideoPlayerSurface.SetApplyMetadataOrientation(const Value: Boolean);
+begin
+  if FApplyMetadataOrientation <> Value then begin
+    ClearBufDrawable;
+    FApplyMetadataOrientation := Value;
     Repaint;
   end;
 end;
@@ -3584,8 +3921,7 @@ begin
     {$IF not defined(ALDPK)}
     If (not (csLoading in ComponentState)) and
        (FAutoStartMode = TAutoStartMode.WhenPrepared) and
-       (DataSource <> '') and
-       (FInternalState = VPSIdle) then Start;
+       (FInternalState = vpsPreparing) then Start;
     {$ENDIF}
   end;
 end;
@@ -3644,6 +3980,12 @@ begin
   Result := fVideoPlayerEngine.GetDuration;
 end;
 
+{**************************************************************}
+function TALVideoPlayerSurface.GetVideoRotationDegrees: Integer;
+begin
+  Result := fVideoPlayerEngine.GetVideoRotationDegrees;
+end;
+
 {*****************************************************}
 function TALVideoPlayerSurface.GetVideoHeight: Integer;
 begin
@@ -3659,7 +4001,8 @@ end;
 {************************************}
 procedure TALVideoPlayerSurface.Start;
 begin
-  if FInternalState = VPSStarted then exit;
+  if FInternalState = vpsIdle then Prepare;
+  if FInternalState in [vpsIdle, VPSStarted] then exit;
   FInternalState := VPSStarted;
   fVideoPlayerEngine.Start;
 end;
@@ -3667,19 +4010,16 @@ end;
 {************************************}
 procedure TALVideoPlayerSurface.Pause;
 begin
-  if FInternalState = VPSPaused then exit;
-  FInternalState := VPSPaused;
   if AutoStartedVideoPlayerSurface = self then AutoStartedVideoPlayerSurface := nil;
+  if FInternalState in [vpsIdle, VPSPaused] then exit;
+  FInternalState := VPSPaused;
   fVideoPlayerEngine.Pause;
 end;
 
 {***********************************}
 procedure TALVideoPlayerSurface.Stop;
 begin
-  if FInternalState = VPSStopped then exit;
-  FInternalState := VPSStopped;
-  if AutoStartedVideoPlayerSurface = self then AutoStartedVideoPlayerSurface := nil;
-  fVideoPlayerEngine.Stop;
+  Unprepare;
 end;
 
 {********************************************************}
@@ -3736,16 +4076,66 @@ begin
   fVideoPlayerEngine.OnVideoSizeChanged := Value;
 end;
 
+{***************************************************************************}
+procedure TALVideoPlayerSurface.setBackgroundColor(const Value: TAlphaColor);
+begin
+  if FBackgroundColor <> Value then begin
+    FBackgroundColor := Value;
+    FBackgroundColorKey := '';
+    Repaint;
+  end;
+end;
+
+{*************************************************************************}
+procedure TALVideoPlayerSurface.setBackgroundColorKey(const Value: String);
+begin
+  if FBackgroundColorKey <> Value then begin
+    FBackgroundColorKey := Value;
+    ApplyBackgroundColorScheme;
+  end;
+end;
+
+{************************************************************************}
+procedure TALVideoPlayerSurface.setLoadingColor(const Value: TAlphaColor);
+begin
+  if FLoadingColor <> Value then begin
+    FLoadingColor := Value;
+    FLoadingColorKey := '';
+    Repaint;
+  end;
+end;
+
+{**********************************************************************}
+procedure TALVideoPlayerSurface.setLoadingColorKey(const Value: String);
+begin
+  if FLoadingColorKey <> Value then begin
+    FLoadingColorKey := Value;
+    ApplyLoadingColorScheme;
+  end;
+end;
+
 {**************************************************************}
 function TALVideoPlayerSurface.IsBackgroundColorStored: Boolean;
 begin
   Result := FBackgroundColor <> DefaultBackgroundColor;
 end;
 
+{*****************************************************************}
+function TALVideoPlayerSurface.IsBackgroundColorKeyStored: Boolean;
+begin
+  Result := FBackgroundColorKey <> DefaultBackgroundColorKey;
+end;
+
 {***********************************************************}
 function TALVideoPlayerSurface.IsLoadingColorStored: Boolean;
 begin
   Result := FLoadingColor <> DefaultLoadingColor;
+end;
+
+{**************************************************************}
+function TALVideoPlayerSurface.IsLoadingColorKeyStored: Boolean;
+begin
+  Result := FLoadingColorKey <> DefaultLoadingColorKey;
 end;
 
 {*************************************************************}
@@ -3779,6 +4169,35 @@ begin
   inherited;
 end;
 
+{**************************************}
+procedure TALVideoPlayerSurface.Prepare;
+begin
+  if (FInternalState = vpsIdle) and (FDataSource <> '') then begin
+    FInternalState := vpsPreparing;
+    FVideoPlayerEngine.Prepare(FDataSource);
+  end;
+end;
+
+{****************************************}
+procedure TALVideoPlayerSurface.UnPrepare;
+begin
+  if AutoStartedVideoPlayerSurface = self then AutoStartedVideoPlayerSurface := nil;
+  if FInternalState <> vpsIdle then begin
+    var LVideoPlayerEngine: TALBaseVideoPlayer := TALAsyncVideoPlayer.create;
+    LVideoPlayerEngine.Looping := fVideoPlayerEngine.Looping;
+    LVideoPlayerEngine.PlaybackSpeed := fVideoPlayerEngine.PlaybackSpeed;
+    LVideoPlayerEngine.Volume := fVideoPlayerEngine.Volume;
+    LVideoPlayerEngine.OnError := fVideoPlayerEngine.OnError;
+    LVideoPlayerEngine.OnPrepared := fVideoPlayerEngine.OnPrepared;
+    LVideoPlayerEngine.OnCompletion := fVideoPlayerEngine.OnCompletion;
+    LVideoPlayerEngine.OnVideoSizeChanged := fVideoPlayerEngine.OnVideoSizeChanged;
+    LVideoPlayerEngine.OnFrameAvailable := DoOnFrameAvailable;
+    ALFreeAndNil(fVideoPlayerEngine);
+    fVideoPlayerEngine := LVideoPlayerEngine;
+  end;
+  FInternalState := vpsIdle;
+end;
+
 {***********************************************}
 procedure TALVideoPlayerSurface.ClearBufDrawable;
 begin
@@ -3800,15 +4219,15 @@ begin
   // to lock its access for reading or updating.
   if FPreviewDownloadContext <> nil then begin
     var LContextToFree: TPreviewDownloadContext;
-    var LLock := FPreviewDownloadContext.lock;
-    TMonitor.Enter(LLock);
+    var LLock := FPreviewDownloadContext.FLock;
+    ALMonitorEnter(LLock{$IF defined(DEBUG)}, 'TALVideoPlayerSurface.CancelPreviewDownload'{$ENDIF});
     try
-      if not FPreviewDownloadContext.FreeByThread then LContextToFree := FPreviewDownloadContext
+      if not FPreviewDownloadContext.FManagedByWorkerThread then LContextToFree := FPreviewDownloadContext
       else LContextToFree := nil;
-      FPreviewDownloadContext.Owner := nil;
+      FPreviewDownloadContext.FOwner := nil;
       FPreviewDownloadContext := nil;
     Finally
-      TMonitor.Exit(LLock);
+      ALMonitorExit(LLock{$IF defined(DEBUG)}, 'TALVideoPlayerSurface.CancelPreviewDownload'{$ENDIF});
     End;
     ALFreeAndNil(LContextToFree);
   end;
@@ -3818,7 +4237,7 @@ end;
 //[MultiThread]
 class function TALVideoPlayerSurface.CanStartPreviewDownload(var AContext: Tobject): boolean;
 begin
-  result := TPreviewDownloadContext(AContext).owner <> nil;
+  result := TPreviewDownloadContext(AContext).FOwner <> nil;
 end;
 
 {*************}
@@ -3826,7 +4245,7 @@ end;
 class procedure TALVideoPlayerSurface.HandlePreviewDownloadSuccess(const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject);
 begin
   var LContext := TPreviewDownloadContext(AContext);
-  if LContext.owner = nil then exit;
+  if LContext.FOwner = nil then exit;
   LContext.ResourceStream := AContentStream;
   TALGraphicThreadPool.Instance.ExecuteProc(
     CreateBufDrawable, // const AProc: TALWorkerThreadProc;
@@ -3838,19 +4257,19 @@ end;
 
 {*************}
 //[MultiThread]
-class procedure TALVideoPlayerSurface.HandlePreviewDownloadError(const AErrMessage: string; var AContext: Tobject);
+class procedure TALVideoPlayerSurface.HandlePreviewDownloadError(const AResponse: IHTTPResponse; const AErrMessage: string; var AContext: Tobject);
 begin
   var LContext := TPreviewDownloadContext(AContext);
-  if LContext.owner = nil then exit;
+  if LContext.FOwner = nil then exit;
   {$IFDEF ALDPK}
-  TMonitor.Enter(LContext.Lock);
+  ALMonitorEnter(LContext.FLock{$IF defined(DEBUG)}, 'TALVideoPlayerSurface.HandlePreviewDownloadError (1)'{$ENDIF});
   try
     if LContext.Owner <> nil then begin
-      LContext.FreeByThread := False;
+      LContext.FManagedByWorkerThread := False;
       AContext := nil; // AContext will be free by CancelResourceDownload
     end;
   finally
-    TMonitor.Exit(LContext.Lock);
+    ALMonitorExit(LContext.FLock{$IF defined(DEBUG)}, 'TALVideoPlayerSurface.HandlePreviewDownloadError (1)'{$ENDIF});
   end;
   exit;
   {$ENDIF}
@@ -3860,14 +4279,14 @@ begin
       'BrokenImage resource is missing or incorrect | ' +
       AErrMessage,
       TalLogType.error);
-    TMonitor.Enter(LContext.Lock);
+    ALMonitorEnter(LContext.FLock{$IF defined(DEBUG)}, 'TALVideoPlayerSurface.HandlePreviewDownloadError (2)'{$ENDIF});
     try
-      if LContext.Owner <> nil then begin
-        LContext.FreeByThread := False;
+      if LContext.FOwner <> nil then begin
+        LContext.FManagedByWorkerThread := False;
         AContext := nil; // AContext will be free by CancelResourceDownload
       end;
     finally
-      TMonitor.Exit(LContext.Lock);
+      ALMonitorExit(LContext.FLock{$IF defined(DEBUG)}, 'TALVideoPlayerSurface.HandlePreviewDownloadError (2)'{$ENDIF});
     end;
     exit;
   end;
@@ -3904,7 +4323,7 @@ end;
 class Procedure TALVideoPlayerSurface.CreateBufDrawable(var AContext: TObject);
 begin
   var LContext := TPreviewDownloadContext(AContext);
-  if LContext.owner = nil then exit;
+  if LContext.FOwner = nil then exit;
   var LBufDrawable: TALDrawable := ALNullDrawable;
   var LBufDrawableRect: TRectF;
   Try
@@ -3919,26 +4338,27 @@ begin
       LContext.WrapMode); // const AWrapMode: TALImageWrapMode;
   except
     On E: Exception do begin
-      HandlePreviewDownloadError(E.Message, AContext);
+      HandlePreviewDownloadError(nil{AResponse}, E.Message, AContext);
       exit;
     end;
   End;
   TThread.queue(nil,
     procedure
     begin
-      if LContext.Owner <> nil then begin
-        if (LContext.Owner.FFadeInDuration > 0) and
+      if LContext.FOwner <> nil then begin
+        var LOwner := LContext.Owner;
+        if (LOwner.FFadeInDuration > 0) and
            (LContext.ResourceName <> ALBrokenImageResourceName) and
            (not ALIsDrawableNull(LBufDrawable)) and
-           (ALIsDrawableNull(LContext.Owner.fVideoPlayerEngine.Drawable)) then
-          LContext.Owner.FFadeInStartTimeNano := ALElapsedTimeNano
+           (ALIsDrawableNull(LOwner.fVideoPlayerEngine.Drawable)) then
+          LOwner.FFadeInStartTimeNano := ALElapsedTimeNano
         else
-          LContext.Owner.FFadeInStartTimeNano := 0;
-        ALFreeAndNilDrawable(LContext.Owner.fBufDrawable);
-        LContext.Owner.fBufDrawable := LBufDrawable;
-        LContext.Owner.FBufDrawableRect := LBufDrawableRect;
-        LContext.Owner.FPreviewDownloadContext := nil;
-        LContext.Owner.Repaint;
+          LOwner.FFadeInStartTimeNano := 0;
+        ALFreeAndNilDrawable(LOwner.fBufDrawable);
+        LOwner.fBufDrawable := LBufDrawable;
+        LOwner.FBufDrawableRect := LBufDrawableRect;
+        LOwner.FPreviewDownloadContext := nil;
+        LOwner.Repaint;
       end;
       ALFreeAndNil(LContext);
     end);
@@ -3977,11 +4397,12 @@ begin
                         AResourceName, // const AResourceName: String;
                         AResourceStream, // const AResourceStream: TStream;
                         '', // AMaskResourceName, // const AMaskResourceName: String;
-                        ALNullBitmap, // AMaskBitmap, // const AMaskBitmap: TALBitmap;
                         AScale, // const AScale: Single;
                         ARect.Width, ARect.Height, // const W, H: single;
+                        False, // const AApplyMetadataOrientation: Boolean;
                         AWrapMode, // const AWrapMode: TALImageWrapMode;
-                        TpointF.Create(-50,-50), // const ACropCenter: TpointF;
+                        TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                        TalphaColors.Null, // const ATintColor: TalphaColor;
                         0, // const ABlurRadius: single;
                         0, // const AXRadius: Single;
                         0); // const AYRadius: Single);
@@ -4025,7 +4446,7 @@ begin
      (ALIsHttpOrHttpsUrl(PreviewResourceName)) then begin
 
     {$IFDEF debug}
-    ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Starting download | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+    ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Starting download | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
     {$endif}
 
     FPreviewDownloadContext := TPreviewDownloadContext.Create(Self);
@@ -4048,7 +4469,7 @@ begin
   end;
 
   {$IFDEF debug}
-  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width, ALDefaultFormatSettingsW)+ ' | Height: ' + ALFloatToStrW(Height, ALDefaultFormatSettingsW));
+  ALLog(Classname + '.MakeBufDrawable', 'Name: ' + Name + ' | Width: ' + ALFloatToStrW(Width)+ ' | Height: ' + ALFloatToStrW(Height));
   {$endif}
 
   CreateBufDrawable(
@@ -4056,7 +4477,7 @@ begin
     FBufDrawableRect, // out ABufDrawableRect: TRectF;
     LocalRect, // const ARect: TRectF;
     ALGetScreenScale, // const AScale: Single;
-    IsPixelAlignmentEnabled, // const AAlignToPixel: Boolean;
+    AutoAlignToPixel, // const AAlignToPixel: Boolean;
     PreviewResourceName, // const AResourceName: String;
     nil, // const AResourceStream: TStream;
     WrapMode); // const AWrapMode: TALImageWrapMode;
@@ -4070,7 +4491,7 @@ begin
     if (M is TApplicationEventMessage) then begin
       case (M as TApplicationEventMessage).Value.Event of
         TApplicationEvent.EnteredBackground,
-        TApplicationEvent.WillTerminate: Pause;
+        TApplicationEvent.WillTerminate: Stop;
       end;
     end;
   end;
@@ -4083,7 +4504,7 @@ begin
   If FAutoStartMode = TAutoStartMode.WhenDisplayed then begin
     // If less than 20% of the surface is visible, then pause this video.
     If (CompareValue(LAbsoluteDisplayedRect.Width * LAbsoluteDisplayedRect.Height, Width * Height * 0.2, TEpsilon.position) <= 0) then
-      Pause;
+      Stop;
   end;
 
   if not LAbsoluteDisplayedRect.IsEmpty then
@@ -4092,6 +4513,33 @@ end;
 
 {************************************}
 procedure TALVideoPlayerSurface.Paint;
+
+  {~~~~~~~~~~~~~~~~~~~~}
+  procedure _Invalidate;
+  begin
+    // We cannot call Repaint from within a paint method,
+    // but we can call Form.Invalidate. We use Form.Invalidate
+    // to avoid using any TALFloatAnimation object
+    {$IF defined(ANDROID)}
+    If Form <> nil then
+      Form.Invalidate;
+    {$ELSE}
+    If Form <> nil then begin
+      var LForm := Form;
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          If (Screen <> nil) then
+            for var I := 0 to Screen.FormCount - 1 do
+              if LForm = Screen.Forms[I] then begin
+                LForm.Invalidate;
+                Break;
+              end;
+        end);
+    end;
+    {$ENDIF}
+  end;
+
 begin
 
   If (FAutoStartMode = TAutoStartMode.WhenDisplayed) and (FInternalState <> VPSStarted) then begin
@@ -4101,7 +4549,7 @@ begin
     If (AutoStartedVideoPlayerSurface <> nil) and
        (AutoStartedVideoPlayerSurface <> self) and
        (CompareValue(LAbsoluteDisplayedRect.Width * LAbsoluteDisplayedRect.Height, Width * Height * 0.8, TEpsilon.position) > 0) then begin
-      AutoStartedVideoPlayerSurface.Pause;
+      AutoStartedVideoPlayerSurface.Stop;
       Start;
       AutoStartedVideoPlayerSurface := Self;
     end
@@ -4134,22 +4582,7 @@ begin
     if LElapsedTime > FFadeInDuration then FFadeInStartTimeNano := 0
     else begin
       LOpacity := LOpacity * (LElapsedTime / FFadeInDuration);
-      // We cannot call Repaint from within a paint method,
-      // but we can call Form.Invalidate. We use Form.Invalidate
-      // to avoid using any TALFloatAnimation object
-      {$IF defined(MSWindows)}
-      If Form <> nil then begin
-        var LWnd := FormToHWND(Form);
-        TThread.ForceQueue(nil,
-          procedure
-          begin
-            Winapi.Windows.InvalidateRect(LWnd, nil, False);
-          end);
-      end;
-      {$ELSE}
-      If Form <> nil then
-        Form.Invalidate;
-      {$ENDIF}
+      _invalidate;
     end;
   end;
 
@@ -4178,7 +4611,7 @@ begin
        (LoadingColor <> TAlphaColors.Null) then begin
       {$IF DEFINED(ALSkiaCanvas)}
       TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(LocalRect)
         .SetOpacity(AbsoluteOpacity)
         .SetFillColor(FloadingColor)
@@ -4193,7 +4626,7 @@ begin
     if BackgroundColor <> TAlphaColors.Null then begin
       {$IF DEFINED(ALSkiaCanvas)}
       TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(LocalRect)
         .SetOpacity(LOpacity)
         .SetFillColor(FBackgroundColor)
@@ -4224,22 +4657,7 @@ begin
       if (FFadeInDuration > 0) and (FFadeInStartTimeNano <= 0) then begin
         FFadeInStartTimeNano := ALElapsedTimeNano;
         LOpacity := 0;
-        // We cannot call Repaint from within a paint method,
-        // but we can call Form.Invalidate. We use Form.Invalidate
-        // to avoid using any TALFloatAnimation object
-        {$IF defined(MSWindows)}
-        If Form <> nil then begin
-          var LWnd := FormToHWND(Form);
-          TThread.ForceQueue(nil,
-            procedure
-            begin
-              Winapi.Windows.InvalidateRect(LWnd, nil, False);
-            end);
-        end;
-        {$ELSE}
-        If Form <> nil then
-          Form.Invalidate;
-        {$ENDIF}
+        _invalidate;
       end;
       FIsFirstFrame := false;
     end;
@@ -4248,7 +4666,7 @@ begin
        (LoadingColor <> TAlphaColors.Null) then begin
       {$IF DEFINED(ALSkiaCanvas)}
       TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(LocalRect)
         .SetOpacity(AbsoluteOpacity)
         .SetFillColor(FloadingColor)
@@ -4263,7 +4681,7 @@ begin
     if BackgroundColor <> TAlphaColors.Null then begin
       {$IF DEFINED(ALSkiaCanvas)}
       TALDrawRectangleHelper.Create(TSkCanvasCustom(Canvas).Canvas.Handle)
-        .SetAlignToPixel(IsPixelAlignmentEnabled)
+        .SetAlignToPixel(AutoAlignToPixel)
         .SetDstRect(LocalRect)
         .SetOpacity(LOpacity)
         .SetFillColor(FBackgroundColor)
@@ -4275,45 +4693,75 @@ begin
       {$ENDIF}
     end;
 
+    var LVideoRotationDegrees := fVideoPlayerEngine.GetVideoRotationDegrees;
+    var LLocalRect: TRectF;
+    if (FApplyMetadataOrientation) and
+       ((LVideoRotationDegrees = 90) or
+        (LVideoRotationDegrees = 270)) then LLocalRect := TRectF.Create(0, 0, Height, Width).CenterAt(LocalRect)
+    else LLocalRect := TRectF.Create(0, 0, Width, Height);
     var LSrcRect: TrectF;
     var LDstRect: TrectF;
     case WrapMode of
-
       TALImageWrapMode.Fit: begin
         LSrcRect := Trectf.Create(
                       0, 0,
                       ALGetDrawableWidth(fVideoPlayerEngine.Drawable),
                       ALGetDrawableHeight(fVideoPlayerEngine.Drawable));
         LDstRect := TRectF.Create(0, 0, ALGetDrawableWidth(fVideoPlayerEngine.Drawable), ALGetDrawableHeight(fVideoPlayerEngine.Drawable)).
-                      FitInto(LocalRect);
+                      FitInto(LLocalRect);
       end;
-
       TALImageWrapMode.Stretch: begin
         LSrcRect := Trectf.Create(
                       0, 0,
                       ALGetDrawableWidth(fVideoPlayerEngine.Drawable),
                       ALGetDrawableHeight(fVideoPlayerEngine.Drawable));
-        LDstRect := LocalRect;
+        LDstRect := LLocalRect;
       end;
-
       TALImageWrapMode.Place: begin
         LSrcRect := Trectf.Create(
                       0, 0,
                       ALGetDrawableWidth(fVideoPlayerEngine.Drawable),
                       ALGetDrawableHeight(fVideoPlayerEngine.Drawable));
         LDstRect := TRectF.Create(0, 0, ALGetDrawableWidth(fVideoPlayerEngine.Drawable), ALGetDrawableHeight(fVideoPlayerEngine.Drawable)).
-                      PlaceInto(LocalRect);
+                      PlaceInto(LLocalRect);
       end;
-
       TALImageWrapMode.FitAndCrop: begin
         LDstRect := TRectF.Create(0, 0, Width, Height);
         LDstRect := ALAlignDimensionToPixelRound(LDstRect, 1{Scale}, TEpsilon.Position);
         LSrcRect := ALRectFitInto(LDstRect, TrectF.Create(0, 0, ALGetDrawableWidth(fVideoPlayerEngine.Drawable), ALGetDrawableHeight(fVideoPlayerEngine.Drawable)));
       end;
-
       else
         Raise Exception.Create('Error B0DE069F-2CFD-4719-9130-0D69A647EE2D')
+    end;
 
+    if FApplyMetadataOrientation then begin
+      if (LVideoRotationDegrees = 180) then begin
+        var LMatrixRotationCenter: TpointF;
+        LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
+        LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
+        var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
+        LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(180)); // matrix.setRotate(180);
+        LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
+        Canvas.SetMatrix(LMatrix);
+      end
+      else if (LVideoRotationDegrees = 270) then begin
+        var LMatrixRotationCenter: TpointF;
+        LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
+        LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
+        var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
+        LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(-90)); // matrix.setRotate(-90);
+        LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
+        Canvas.SetMatrix(LMatrix);
+      end
+      else if (LVideoRotationDegrees = 90) then begin
+        var LMatrixRotationCenter: TpointF;
+        LMatrixRotationCenter.X := (width / 2) + Canvas.Matrix.m31;
+        LMatrixRotationCenter.Y := (height / 2) + Canvas.Matrix.m32;
+        var LMatrix := Canvas.Matrix * TMatrix.CreateTranslation(-LMatrixRotationCenter.X,-LMatrixRotationCenter.Y);
+        LMatrix := LMatrix * TMatrix.CreateRotation(DegToRad(90)); // matrix.setRotate(90);
+        LMatrix := LMatrix * TMatrix.CreateTranslation(LMatrixRotationCenter.X,LMatrixRotationCenter.Y);
+        Canvas.SetMatrix(LMatrix);
+      end;
     end;
 
     ALDrawDrawable(
@@ -4339,10 +4787,14 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.VideoPlayer','initialization');
+  {$ENDIF}
   RegisterFmxClasses([TALVideoPlayerSurface]);
   TALVideoPlayerControllerThread.FInstance := nil;
   TALVideoPlayerControllerThread.CreateInstanceFunc := @TALVideoPlayerControllerThread.CreateInstance;
   TALVideoPlayerSurface.AutoStartedVideoPlayerSurface := Nil;
+  //ALVideoPlayerEventLock := ??; their is no TLightweightMREW.create but instead an ugly class operator TLightweightMREW.Initialize :(
 
   {$REGION 'IOS'}
   {$IF defined(IOS)}
@@ -4353,6 +4805,9 @@ initialization
 
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.VideoPlayer','finalization');
+  {$ENDIF}
   ALFreeAndNil(TALVideoPlayerControllerThread.FInstance);
 
   {$REGION 'IOS'}

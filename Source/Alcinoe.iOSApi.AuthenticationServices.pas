@@ -2,11 +2,12 @@ unit Alcinoe.iOSApi.AuthenticationServices;
 
 interface
 
+{$I Alcinoe.inc}
+
 uses
   Macapi.ObjectiveC,
   iOSapi.CocoaTypes,
-  iOSapi.Foundation,
-  Alcinoe.iOSapi.Foundation;
+  iOSapi.Foundation;
 
 {$M+}
 

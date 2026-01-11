@@ -6,59 +6,82 @@ interface
 
 uses
   System.classes,
-  System.Net.HttpClient,
   System.Net.URLClient,
+  System.Net.HttpClient,
   Alcinoe.Common;
 
 type
+
+  {$IFNDEF ALCompilerVersionSupported130}
+    {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4664 was corrected'}
+    // If https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4664 has been fixed then
+    // replace
+    //   TALNetHttpClientPoolOnSuccessRefProc = reference to procedure (const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject);
+    //   TALNetHttpClientPoolOnSuccessObjProc = procedure (const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject) of object;
+    // with
+    //   TALNetHttpClientPoolOnSuccessRefProc = reference to procedure (const AResponse: IHTTPResponse; var AContext: TObject);
+    //   TALNetHttpClientPoolOnSuccessObjProc = procedure (const AResponse: IHTTPResponse; var AContext: TObject) of object;
+    // You will need also to replace
+    //   ALDecompressHttpResponseBody(LHTTPResponse.ContentEncoding, LResponseContent);
+    // with
+    //   ALDecompressHttpResponseBody(LHTTPResponse);
+  {$ENDIF}
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALNetHttpClientPoolCanStartRefFunc = reference to function (var AContext: Tobject): boolean;
   TALNetHttpClientPoolCanStartObjFunc = function (var AContext: Tobject): boolean of object;
   TALNetHttpClientPoolOnSuccessRefProc = reference to procedure (const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject);
   TALNetHttpClientPoolOnSuccessObjProc = procedure (const AResponse: IHTTPResponse; var AContentStream: TMemoryStream; var AContext: TObject) of object;
-  TALNetHttpClientPoolOnErrorRefProc = reference to procedure (const AErrMessage: string; var AContext: Tobject);
-  TALNetHttpClientPoolOnErrorObjProc = procedure (const AErrMessage: string; var AContext: Tobject) of object;
-  TALNetHttpClientPoolCacheDataProc = procedure(const aUrl: String; const AHTTPResponse: IHTTPResponse; const aData: TMemoryStream) of object;
-  TALNetHttpClientPoolRetrieveCachedDataProc = function(const aUrl: String; out AHTTPResponse: IHTTPResponse; const aData: TMemoryStream): boolean of object;
+  TALNetHttpClientPoolOnErrorRefProc = reference to procedure (const AResponse: IHTTPResponse; const AErrMessage: string; var AContext: Tobject);
+  TALNetHttpClientPoolOnErrorObjProc = procedure (const AResponse: IHTTPResponse; const AErrMessage: string; var AContext: Tobject) of object;
+  TALNetHttpClientPoolCacheDataProc = procedure(const AUrl: String; const AHeaders: TNetHeaders; const AResponse: IHTTPResponse) of object;
+  TALNetHttpClientPoolRetrieveCachedDataProc = function(const AUrl: String; const AHeaders: TNetHeaders; out AResponse: IHTTPResponse): boolean of object;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   TALNetHttpClientPoolRequest = Class(Tobject)
   private
     FUrl: String;
-    FCanStartCallBackRefFunc: TALNetHttpClientPoolCanStartRefFunc;
-    FCanStartCallBackObjFunc: TALNetHttpClientPoolCanStartObjFunc;
-    FOnSuccessCallBackRefProc: TALNetHttpClientPoolOnSuccessRefProc;
-    FOnSuccessCallBackObjProc: TALNetHttpClientPoolOnSuccessObjProc;
-    FOnErrorCallBackRefProc: TALNetHttpClientPoolOnErrorRefProc;
-    FOnErrorCallBackObjProc: TALNetHttpClientPoolOnErrorObjProc;
+    FCanStartRefFunc: TALNetHttpClientPoolCanStartRefFunc;
+    FCanStartObjFunc: TALNetHttpClientPoolCanStartObjFunc;
+    FOnSuccessRefProc: TALNetHttpClientPoolOnSuccessRefProc;
+    FOnSuccessObjProc: TALNetHttpClientPoolOnSuccessObjProc;
+    FOnErrorRefProc: TALNetHttpClientPoolOnErrorRefProc;
+    FOnErrorObjProc: TALNetHttpClientPoolOnErrorObjProc;
+    FGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
     FContext: Tobject;
     FUseCache: Boolean;
+    FHeaders: TNetHeaders;
   public
     constructor Create(
                   const AUrl: String;
                   const ACanStartCallBack: TALNetHttpClientPoolCanStartRefFunc;
                   const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
                   const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
+                  const AGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
                   const AContext: Tobject;
-                  const AUseCache: Boolean); overload;
+                  const AUseCache: Boolean;
+                  const AHeaders: TNetHeaders); overload;
     constructor Create(
                   const AUrl: String;
                   const ACanStartCallBack: TALNetHttpClientPoolCanStartObjFunc;
                   const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
                   const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
+                  const AGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
                   const AContext: Tobject;
-                  const AUseCache: Boolean); overload;
+                  const AUseCache: Boolean;
+                  const AHeaders: TNetHeaders); overload;
     destructor Destroy; override;
     Property Url: String read FUrl;
-    Property CanStartCallBackRefFunc: TALNetHttpClientPoolCanStartRefFunc read FCanStartCallBackRefFunc;
-    Property CanStartCallBackObjFunc: TALNetHttpClientPoolCanStartObjFunc read FCanStartCallBackObjFunc;
-    Property OnSuccessCallBackRefProc: TALNetHttpClientPoolOnSuccessRefProc read FOnSuccessCallBackRefProc;
-    Property OnSuccessCallBackObjProc: TALNetHttpClientPoolOnSuccessObjProc read FOnSuccessCallBackObjProc;
-    Property OnErrorCallBackRefProc: TALNetHttpClientPoolOnErrorRefProc read FOnErrorCallBackRefProc;
-    Property OnErrorCallBackObjProc: TALNetHttpClientPoolOnErrorObjProc read FOnErrorCallBackObjProc;
+    Property CanStartRefFunc: TALNetHttpClientPoolCanStartRefFunc read FCanStartRefFunc;
+    Property CanStartObjFunc: TALNetHttpClientPoolCanStartObjFunc read FCanStartObjFunc;
+    Property OnSuccessRefProc: TALNetHttpClientPoolOnSuccessRefProc read FOnSuccessRefProc;
+    Property OnSuccessObjProc: TALNetHttpClientPoolOnSuccessObjProc read FOnSuccessObjProc;
+    Property OnErrorRefProc: TALNetHttpClientPoolOnErrorRefProc read FOnErrorRefProc;
+    Property OnErrorObjProc: TALNetHttpClientPoolOnErrorObjProc read FOnErrorObjProc;
+    Property GetPriorityFunc: TALWorkerThreadGetPriorityFunc read FGetPriorityFunc;
     Property Context: Tobject read FContext;
     Property UseCache: Boolean read FUseCache;
+    Property Headers: TNetHeaders read FHeaders;
   end;
 
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
@@ -77,6 +100,7 @@ type
   private
     FCacheData: TALNetHttpClientPoolCacheDataProc;
     FRetrieveCachedData: TALNetHttpClientPoolRetrieveCachedDataProc;
+    function DoGetPriority(const AContext: Tobject): Int64;
     procedure DoGet(var AContext: Tobject);
   protected
   public
@@ -89,6 +113,7 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: Int64;
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -98,6 +123,7 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: TALWorkerThreadGetPriorityFunc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -105,12 +131,14 @@ type
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc; // [MultiThread]
                 const AContext: Tobject; // Context will be free by the worker thread
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
                 const ACanStartCallBack: TALNetHttpClientPoolCanStartRefFunc; // [MultiThread]
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -119,6 +147,7 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: Int64;
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -127,17 +156,20 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: TALWorkerThreadGetPriorityFunc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc; // [MultiThread]
                 const AContext: Tobject; // Context will be free by the worker thread
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     // ObjFunc / ObjProc
     procedure Get(
@@ -148,6 +180,7 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: Int64;
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -157,6 +190,7 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: TALWorkerThreadGetPriorityFunc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -164,12 +198,14 @@ type
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc; // [MultiThread]
                 const AContext: Tobject; // Context will be free by the worker thread
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
                 const ACanStartCallBack: TALNetHttpClientPoolCanStartObjFunc; // [MultiThread]
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -178,6 +214,7 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: Int64;
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
@@ -186,17 +223,20 @@ type
                 const AContext: Tobject; // Context will be free by the worker thread
                 const AUseCache: Boolean;
                 const APriority: TALWorkerThreadGetPriorityFunc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc; // [MultiThread]
                 const AContext: Tobject; // Context will be free by the worker thread
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     procedure Get(
                 const AUrl: String;
                 const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc; // [MultiThread]
                 const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc; // [MultiThread]
+                const AHeaders: TNetHeaders = nil;
                 const AAsync: Boolean = True); overload;
     // CacheData
     Property CacheData: TALNetHttpClientPoolCacheDataProc read FCacheData write FCacheData;
@@ -206,10 +246,10 @@ type
 implementation
 
 uses
-  system.SysUtils,
+  System.SysUtils,
+  Alcinoe.url,
+  Alcinoe.HTTP,
   Alcinoe.HTTP.Client.Net,
-  Alcinoe.HTTP.Client,
-  Alcinoe.Cipher,
   Alcinoe.StringUtils;
 
 {*********************************************}
@@ -218,19 +258,23 @@ constructor TALNetHttpClientPoolRequest.Create(
               const ACanStartCallBack: TALNetHttpClientPoolCanStartRefFunc;
               const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
               const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
+              const AGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
               const AContext: Tobject;
-              const AUseCache: Boolean);
+              const AUseCache: Boolean;
+              const AHeaders: TNetHeaders);
 begin
   inherited create;
   FUrl := AUrl;
-  FCanStartCallBackRefFunc := ACanStartCallBack;
-  FCanStartCallBackObjFunc := nil;
-  FOnSuccessCallBackRefProc := AOnSuccessCallBack;
-  FOnSuccessCallBackObjProc := nil;
-  FOnErrorCallBackRefProc := AOnErrorCallBack;
-  FOnErrorCallBackObjProc := nil;
+  FCanStartRefFunc := ACanStartCallBack;
+  FCanStartObjFunc := nil;
+  FOnSuccessRefProc := AOnSuccessCallBack;
+  FOnSuccessObjProc := nil;
+  FOnErrorRefProc := AOnErrorCallBack;
+  FOnErrorObjProc := nil;
+  FGetPriorityFunc := AGetPriorityFunc;
   FContext := AContext;
   FUseCache := AUseCache;
+  FHeaders := AHeaders;
 end;
 
 {*********************************************}
@@ -239,19 +283,23 @@ constructor TALNetHttpClientPoolRequest.Create(
               const ACanStartCallBack: TALNetHttpClientPoolCanStartObjFunc;
               const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
               const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
+              const AGetPriorityFunc: TALWorkerThreadGetPriorityFunc;
               const AContext: Tobject;
-              const AUseCache: Boolean);
+              const AUseCache: Boolean;
+              const AHeaders: TNetHeaders);
 begin
   inherited create;
   FUrl := AUrl;
-  FCanStartCallBackRefFunc := nil;
-  FCanStartCallBackObjFunc := ACanStartCallBack;
-  FOnSuccessCallBackRefProc := nil;
-  FOnSuccessCallBackObjProc := AOnSuccessCallBack;
-  FOnErrorCallBackRefProc := nil;
-  FOnErrorCallBackObjProc := AOnErrorCallBack;
+  FCanStartRefFunc := nil;
+  FCanStartObjFunc := ACanStartCallBack;
+  FOnSuccessRefProc := nil;
+  FOnSuccessObjProc := AOnSuccessCallBack;
+  FOnErrorRefProc := nil;
+  FOnErrorObjProc := AOnErrorCallBack;
+  FGetPriorityFunc := AGetPriorityFunc;
   FContext := AContext;
   FUseCache := AUseCache;
+  FHeaders := AHeaders;
 end;
 
 {*********************************************}
@@ -285,74 +333,83 @@ begin
   result := FInstance <> nil;
 end;
 
-{**********************************************************}
+{*************}
+//[MultiThread]
+function TALNetHttpClientPool.DoGetPriority(const AContext: Tobject): Int64;
+begin
+  var LNetHttpClientPoolRequest := TALNetHttpClientPoolRequest(AContext);
+  if assigned(LNetHttpClientPoolRequest.GetPriorityFunc) then
+    Result := LNetHttpClientPoolRequest.GetPriorityFunc(LNetHttpClientPoolRequest.FContext)
+  else
+    Result := 0;
+end;
+
+{*************}
+//[MultiThread]
 procedure TALNetHttpClientPool.DoGet(var AContext: Tobject);
-
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  function _HttpGetUrl(const aUrl: String; const LResponseContent: TStream): IHTTPResponse;
-  begin
-    Var LUri := Turi.Create(aUrl);
-    var LNetHttpClient := ALAcquireKeepAliveNetHttpClient(LUri);
-    try
-      // In case we lose the connection, this might return success with
-      // partial content. What a mess!
-      result := LNetHttpClient.Get(aUrl, LResponseContent);
-    finally
-      ALReleaseKeepAliveNetHttpClient(LUri, LNetHttpClient);
-    end;
-  end;
-
 begin
 
   var LNetHttpClientPoolRequest := TALNetHttpClientPoolRequest(AContext);
-
-  //protect the following code from exception
   try
 
-    //init the http
-    if ((not assigned(LNetHttpClientPoolRequest.CanStartCallBackObjFunc)) and
-        (not assigned(LNetHttpClientPoolRequest.CanStartCallBackRefFunc))) or
-       (assigned(LNetHttpClientPoolRequest.CanStartCallBackObjFunc) and
-        LNetHttpClientPoolRequest.CanStartCallBackObjFunc(LNetHttpClientPoolRequest.FContext)) or
-       (assigned(LNetHttpClientPoolRequest.CanStartCallBackRefFunc) and
-        LNetHttpClientPoolRequest.CanStartCallBackRefFunc(LNetHttpClientPoolRequest.FContext)) then begin
+    // Check whether this request is allowed to start
+    if ((not assigned(LNetHttpClientPoolRequest.CanStartObjFunc)) and
+        (not assigned(LNetHttpClientPoolRequest.CanStartRefFunc))) or
+       (assigned(LNetHttpClientPoolRequest.CanStartObjFunc) and
+        LNetHttpClientPoolRequest.CanStartObjFunc(LNetHttpClientPoolRequest.FContext)) or
+       (assigned(LNetHttpClientPoolRequest.CanStartRefFunc) and
+        LNetHttpClientPoolRequest.CanStartRefFunc(LNetHttpClientPoolRequest.FContext)) then begin
 
       //create the http
       var LHTTPResponse: IHTTPResponse := nil;
       var LResponseContent := TMemoryStream.Create;
       try
 
-        //get from the url
+        // Prepare HTTP call
         if LNetHttpClientPoolRequest.Url <> '' then begin
           if AlIsHttpOrHttpsUrl(LNetHttpClientPoolRequest.Url) then begin
-            if LNetHttpClientPoolRequest.UseCache then begin
-              if (not assigned(RetrieveCachedData)) or
-                 (not RetrieveCachedData(LNetHttpClientPoolRequest.Url, LHTTPResponse, LResponseContent)) then begin
-                LHTTPResponse := _HttpGetUrl(LNetHttpClientPoolRequest.Url, LResponseContent);
-                // Client error responses (400 – 499)
-                // Server error responses (500 – 599)
-                if (LHTTPResponse = nil) or
-                   ((LHTTPResponse.StatusCode >= 400) and (LHTTPResponse.StatusCode <= 599)) then begin
-                  if assigned(LNetHttpClientPoolRequest.OnErrorCallBackObjProc) then
-                    LNetHttpClientPoolRequest.OnErrorCallBackObjProc(ALFormatW('HTTP request failed (%d)', [LHTTPResponse.StatusCode], ALDefaultFormatSettingsW), LNetHttpClientPoolRequest.FContext)
-                  else if assigned(LNetHttpClientPoolRequest.OnErrorCallBackRefProc) then
-                    LNetHttpClientPoolRequest.OnErrorCallBackRefProc(ALFormatW('HTTP request failed (%d)', [LHTTPResponse.StatusCode], ALDefaultFormatSettingsW), LNetHttpClientPoolRequest.FContext);
-                  exit;
-                end;
-                ALDecompressHttpResponseContent(LHTTPResponse.ContentEncoding, LResponseContent);
-                if (assigned(CacheData)) then CacheData(LNetHttpClientPoolRequest.Url, LHTTPResponse, LResponseContent);
+            if (not LNetHttpClientPoolRequest.UseCache) or
+               (not assigned(RetrieveCachedData)) or
+               (not RetrieveCachedData(LNetHttpClientPoolRequest.Url, LNetHttpClientPoolRequest.Headers, LHTTPResponse)) then begin
+
+              Var LUri := Turi.Create(LNetHttpClientPoolRequest.Url);
+              var LNetHttpClient := ALAcquireKeepAliveNetHttpClient(LUri);
+              try
+                // Note: if the connection drops, the server may close the socket
+                // and the client can still return "success" with partial content.
+                LHTTPResponse := LNetHttpClient.Get(LNetHttpClientPoolRequest.Url, LResponseContent, LNetHttpClientPoolRequest.Headers);
+              finally
+                ALReleaseKeepAliveNetHttpClient(LUri, LNetHttpClient);
               end;
-            end
-            else LHTTPResponse := _HttpGetUrl(LNetHttpClientPoolRequest.Url, LResponseContent);
+
+              // Handle Content-Encoding (gzip, deflate, br, ...)
+              ALDecompressHttpResponseBody(LHTTPResponse.ContentEncoding, LResponseContent);
+
+              // Treat 4xx (client error) and 5xx (server error) as failures
+              if (LHTTPResponse.StatusCode >= 400) and (LHTTPResponse.StatusCode <= 599) then begin
+                if assigned(LNetHttpClientPoolRequest.OnErrorObjProc) then
+                  LNetHttpClientPoolRequest.OnErrorObjProc(LHTTPResponse, ALFormatW('HTTP request failed (%d)', [LHTTPResponse.StatusCode]), LNetHttpClientPoolRequest.FContext)
+                else if assigned(LNetHttpClientPoolRequest.OnErrorRefProc) then
+                  LNetHttpClientPoolRequest.OnErrorRefProc(LHTTPResponse, ALFormatW('HTTP request failed (%d)', [LHTTPResponse.StatusCode]), LNetHttpClientPoolRequest.FContext);
+                exit;
+              end;
+
+              // Store successful HTTP responses in the cache (if enabled)
+              if (LNetHttpClientPoolRequest.UseCache) and
+                 (assigned(CacheData)) then CacheData(LNetHttpClientPoolRequest.Url, LNetHttpClientPoolRequest.Headers, LHTTPResponse);
+
+            end;
           end
-          else LResponseContent.LoadFromFile(LNetHttpClientPoolRequest.Url);
+          else
+            // Non-HTTP(S) URL: treat it as a local file path
+            LResponseContent.LoadFromFile(LNetHttpClientPoolRequest.Url);
         end;
 
-        //fire the OnSuccess
-        if assigned(LNetHttpClientPoolRequest.OnSuccessCallBackObjProc) then
-          LNetHttpClientPoolRequest.OnSuccessCallBackObjProc(LHTTPResponse, LResponseContent, LNetHttpClientPoolRequest.FContext)
-        else if assigned(LNetHttpClientPoolRequest.OnSuccessCallBackRefProc) then
-          LNetHttpClientPoolRequest.OnSuccessCallBackRefProc(LHTTPResponse, LResponseContent, LNetHttpClientPoolRequest.FContext);
+        // Notify the caller that the request completed successfully
+        if assigned(LNetHttpClientPoolRequest.OnSuccessObjProc) then
+          LNetHttpClientPoolRequest.OnSuccessObjProc(LHTTPResponse, LResponseContent, LNetHttpClientPoolRequest.FContext)
+        else if assigned(LNetHttpClientPoolRequest.OnSuccessRefProc) then
+          LNetHttpClientPoolRequest.OnSuccessRefProc(LHTTPResponse, LResponseContent, LNetHttpClientPoolRequest.FContext);
 
       finally
         LHTTPResponse := nil;
@@ -363,10 +420,10 @@ begin
 
   except
     on E: exception do begin
-      if assigned(LNetHttpClientPoolRequest.OnErrorCallBackObjProc) then
-        LNetHttpClientPoolRequest.OnErrorCallBackObjProc(E.Message, LNetHttpClientPoolRequest.FContext)
-      else if assigned(LNetHttpClientPoolRequest.OnErrorCallBackRefProc) then
-        LNetHttpClientPoolRequest.OnErrorCallBackRefProc(E.Message, LNetHttpClientPoolRequest.FContext);
+      if assigned(LNetHttpClientPoolRequest.OnErrorObjProc) then
+        LNetHttpClientPoolRequest.OnErrorObjProc(nil{AResponse}, E.Message, LNetHttpClientPoolRequest.FContext)
+      else if assigned(LNetHttpClientPoolRequest.OnErrorRefProc) then
+        LNetHttpClientPoolRequest.OnErrorRefProc(nil{AResponse}, E.Message, LNetHttpClientPoolRequest.FContext);
     end;
   end;
 
@@ -381,6 +438,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: Int64;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -390,8 +448,10 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      nil{AGetPriorityFunc},
       AContext,
-      AUseCache), // const AContext: Tobject;
+      AUseCache,
+      AHeaders), // const AContext: Tobject;
     APriority, // const APriority: Int64;
     AAsync); // const AAsync: Boolean = True
 end;
@@ -405,6 +465,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: TALWorkerThreadGetPriorityFunc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -414,9 +475,11 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      APriority,
       AContext,
-      AUseCache), // const AContext: Tobject;
-    APriority, // const APriority: TALWorkerThreadGetPriorityFunc;
+      AUseCache,
+      AHeaders), // const AContext: Tobject;
+    DoGetPriority, // const APriority: TALWorkerThreadGetPriorityFunc;
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -427,6 +490,7 @@ procedure TALNetHttpClientPool.Get(
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
             const AContext: Tobject; // Context will be free by the worker thread
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -436,8 +500,10 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      nil{AGetPriorityFunc},
       AContext,
-      true{AUseCache}), // const AContext: Tobject;
+      true{AUseCache},
+      AHeaders), // const AContext: Tobject;
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -447,6 +513,7 @@ procedure TALNetHttpClientPool.Get(
             const ACanStartCallBack: TALNetHttpClientPoolCanStartRefFunc;
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -456,8 +523,10 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      nil{AGetPriorityFunc},
       nil{AContext},
-      true{AUseCache}), // const AContext: Tobject;
+      true{AUseCache},
+      AHeaders), // const AContext: Tobject;
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -469,6 +538,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: Int64;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -479,6 +549,7 @@ begin
     AContext, // const AContext: Tobject; // Context will be free by the worker thread
     AUseCache, // const AUseCache: Boolean;
     APriority, // const APriority: Int64;
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -490,6 +561,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: TALWorkerThreadGetPriorityFunc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -500,6 +572,7 @@ begin
     AContext, // const AContext: Tobject; // Context will be free by the worker thread
     AUseCache, // const AUseCache: Boolean;
     APriority, // const APriority: TALWorkerThreadGetPriorityFunc;
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -509,6 +582,7 @@ procedure TALNetHttpClientPool.Get(
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
             const AContext: Tobject; // Context will be free by the worker thread
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -517,6 +591,7 @@ begin
     AOnSuccessCallBack, // const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
     AOnErrorCallBack, // const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
     AContext, // const AContext: Tobject; // Context will be free by the worker thread
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -525,6 +600,7 @@ procedure TALNetHttpClientPool.Get(
             const AUrl: String;
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -532,6 +608,7 @@ begin
     nil, // const ACanStartCallBack: TALNetHttpClientPoolCanStartRefFunc;
     AOnSuccessCallBack, // const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessRefProc;
     AOnErrorCallBack, // const AOnErrorCallBack: TALNetHttpClientPoolOnErrorRefProc;
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -544,6 +621,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: Int64;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -553,8 +631,10 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      nil{AGetPriorityFunc},
       AContext,
-      AUseCache), // const AContext: Tobject;
+      AUseCache,
+      AHeaders), // const AContext: Tobject;
     APriority, // const APriority: Int64;
     AAsync); // const AAsync: Boolean = True
 end;
@@ -568,6 +648,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: TALWorkerThreadGetPriorityFunc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -577,9 +658,11 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      APriority,
       AContext,
-      AUseCache), // const AContext: Tobject;
-    APriority, // const APriority: TALWorkerThreadGetPriorityFunc;
+      AUseCache,
+      AHeaders), // const AContext: Tobject;
+    DoGetPriority, // const APriority: TALWorkerThreadGetPriorityFunc;
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -590,6 +673,7 @@ procedure TALNetHttpClientPool.Get(
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
             const AContext: Tobject; // Context will be free by the worker thread
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -599,8 +683,10 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      nil{AGetPriorityFunc},
       AContext,
-      true{AUseCache}), // const AContext: Tobject;
+      true{AUseCache},
+      AHeaders), // const AContext: Tobject;
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -610,6 +696,7 @@ procedure TALNetHttpClientPool.Get(
             const ACanStartCallBack: TALNetHttpClientPoolCanStartObjFunc;
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   ExecuteProc(
@@ -619,8 +706,10 @@ begin
       ACanStartCallBack,
       AOnSuccessCallBack,
       AOnErrorCallBack,
+      nil{AGetPriorityFunc},
       nil{AContext},
-      true{AUseCache}), // const AContext: Tobject;
+      true{AUseCache},
+      AHeaders), // const AContext: Tobject;
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -632,6 +721,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: Int64;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -642,6 +732,7 @@ begin
     AContext, // const AContext: Tobject; // Context will be free by the worker thread
     AUseCache, // const AUseCache: Boolean;
     APriority, // const APriority: Int64;
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -653,6 +744,7 @@ procedure TALNetHttpClientPool.Get(
             const AContext: Tobject; // Context will be free by the worker thread
             const AUseCache: Boolean;
             const APriority: TALWorkerThreadGetPriorityFunc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -663,6 +755,7 @@ begin
     AContext, // const AContext: Tobject; // Context will be free by the worker thread
     AUseCache, // const AUseCache: Boolean;
     APriority, // const APriority: TALWorkerThreadGetPriorityFunc;
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -672,6 +765,7 @@ procedure TALNetHttpClientPool.Get(
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
             const AContext: Tobject; // Context will be free by the worker thread
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -680,6 +774,7 @@ begin
     AOnSuccessCallBack, // const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
     AOnErrorCallBack, // const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
     AContext, // const AContext: Tobject; // Context will be free by the worker thread
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
@@ -688,6 +783,7 @@ procedure TALNetHttpClientPool.Get(
             const AUrl: String;
             const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
             const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
+            const AHeaders: TNetHeaders = nil;
             const AAsync: Boolean = True);
 begin
   Get(
@@ -695,14 +791,21 @@ begin
     nil, // const ACanStartCallBack: TALNetHttpClientPoolCanStartObjFunc;
     AOnSuccessCallBack, // const AOnSuccessCallBack: TALNetHttpClientPoolOnSuccessObjProc;
     AOnErrorCallBack, // const AOnErrorCallBack: TALNetHttpClientPoolOnErrorObjProc;
+    AHeaders, // const AHeaders: TNetHeaders = nil
     AAsync); // const AAsync: Boolean = True
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.HTTP.Client.Net.Pool','initialization');
+  {$ENDIF}
   TALNetHttpClientPool.FInstance := nil;
   TALNetHttpClientPool.CreateInstanceFunc := @TALNetHttpClientPool.CreateInstance;
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.HTTP.Client.Net.Pool','finalization');
+  {$ENDIF}
   ALFreeAndNil(TALNetHttpClientPool.FInstance);
 
 end.

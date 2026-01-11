@@ -117,10 +117,12 @@ uses
   FMX.Types3D,
   FMX.DialogService,
   FMX.Platform,
+  Alcinoe.FMX.Styles,
   Alcinoe.Cipher,
   Alcinoe.FMX.ErrorReporting,
   Alcinoe.Common,
   Alcinoe.FMX.Common,
+  Alcinoe.Localization,
   Alcinoe.StringUtils;
 
 {$R *.fmx}
@@ -228,8 +230,8 @@ begin
   LText1.parent := LLayout2;
   LText1.Align := TALALignLayout.Top;
   Ltext1.Margins.Bottom := 8;
-  LText1.AutoSize := True;
-  LText1.TextSettings.Font.Family := ALConvertFontFamily('sans-serif');
+  LText1.AutoSize := TALAutoSizeMode.Both;
+  LText1.TextSettings.Font.Family := 'sans-serif';
   LText1.TextSettings.IsHtml := true;
   LText1.TextSettings.Font.Size := 1;
   LText1.TextSettings.Font.Weight := TfontWeight.Bold;
@@ -311,11 +313,11 @@ begin
       inc(fDebugAverageFpsCount);
       ALLog(
         'FramePaint.fps',
-        ALFormatFloatW('0.##', (fDebugFpsCount / fDebugFpsStopWatch.Elapsed.totalMilliseconds) * 1000, ALDefaultFormatSettingsW) + ' fps' + ' | ' +
-        'average: ' + ALFormatFloatW('0.##', fDebugAverageFps, ALDefaultFormatSettingsW) + ' fps',
+        ALFormatFloatW('0.##', (fDebugFpsCount / fDebugFpsStopWatch.Elapsed.totalMilliseconds) * 1000) + ' fps' + ' | ' +
+        'average: ' + ALFormatFloatW('0.##', fDebugAverageFps) + ' fps',
         TalLogType.verbose);
-      StatusLabel1.Text := ALFormatFloatW('0.##', (fDebugFpsCount / fDebugFpsStopWatch.Elapsed.totalMilliseconds) * 1000, ALDefaultFormatSettingsW) + ' fps' +
-                           ' (average: ' + ALFormatFloatW('0.##', fDebugAverageFps, ALDefaultFormatSettingsW) + ' fps)';
+      StatusLabel1.Text := ALFormatFloatW('0.##', (fDebugFpsCount / fDebugFpsStopWatch.Elapsed.totalMilliseconds) * 1000) + ' fps' +
+                           ' (average: ' + ALFormatFloatW('0.##', fDebugAverageFps) + ' fps)';
       StatusLabel1.Visible := True;
       OrderStatusLabels;
       fDebugFpsCount := 0;
@@ -356,33 +358,33 @@ begin
     var W := 150 * ALGetScreenScale;
     var H := 150 * ALGetScreenScale;
     case i of
-      00: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TpointF.create(-50, -50), 0, 0, 0);
-      01: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TpointF.create(-50, -50), 0, 0, 0);
-      02: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 0, 0);
-      03: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 0, 0);
-      04: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
-      05: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
-      06: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, min(W,h)/2, min(W,h)/2);
-      07: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, min(W,h)/2, min(W,h)/2);
-      08: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-      09: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-      10: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
-      11: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
-      12: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 0, 0, 0);
-      13: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 0, 0, 0);
-      14: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-      15: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-      16: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 0, 0, 0);
-      17: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 0, 0, 0);
-      18: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 5*ALGetScreenScale, 0, 0);
-      19: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 5*ALGetScreenScale, 0, 0);
-      20: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Stretch, TpointF.create(-50, -50), 0, 0, 0);
-      21: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Stretch, TpointF.create(-50, -50), 0, 0, 0);
+      00: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Fit, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+      01: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Fit, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+      02: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+      03: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+      04: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
+      05: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
+      06: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, min(W,h)/2, min(W,h)/2);
+      07: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, min(W,h)/2, min(W,h)/2);
+      08: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+      09: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+      10: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
+      11: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
+      12: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+      13: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+      14: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+      15: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+      16: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+      17: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+      18: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+      19: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+      20: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Stretch, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+      21: FScrollBoxDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Stretch, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
       else FScrollBoxDrawables[i] := ALNullDrawable;
     end;
   end;
   LStopWatch.Stop;
-  StatusLabel1.Text := 'All images created in: ' + ALFormatFloatW('0.00', LStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms';
+  StatusLabel1.Text := 'All images created in: ' + ALFormatFloatW('0.00', LStopWatch.Elapsed.TotalMilliseconds) + ' ms';
   StatusLabel1.Visible := True;
   OrderStatusLabels;
 end;
@@ -410,28 +412,28 @@ begin
       var W := 10 + random(150) * ALGetScreenScale;
       var H := 10 + random(150) * ALGetScreenScale;
       case i mod 22 of
-        00: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TpointF.create(-50, -50), 0, 0, 0);
-        01: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TpointF.create(-50, -50), 0, 0, 0);
-        02: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 0, 0);
-        03: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 0, 0);
-        04: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
-        05: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
-        06: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, min(W,h)/2, min(W,h)/2);
-        07: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 0, min(W,h)/2, min(W,h)/2);
-        08: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-        09: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-        10: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
-        11: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.FitAndCrop, TPointF.create(-65, -48), 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
-        12: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 0, 0, 0);
-        13: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 0, 0, 0);
-        14: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-        15: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', ALNullBitmap, 1, W, H, TALImageWrapMode.Fit, TPointF.create(-65, -48), 5*ALGetScreenScale, 0, 0);
-        16: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 0, 0, 0);
-        17: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 0, 0, 0);
-        18: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 5*ALGetScreenScale, 0, 0);
-        19: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Place, TpointF.create(-50, -50), 5*ALGetScreenScale, 0, 0);
-        20: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Stretch, TpointF.create(-50, -50), 0, 0, 0);
-        21: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', ALNullBitmap, 1, W, H, TALImageWrapMode.Stretch, TpointF.create(-50, -50), 0, 0, 0);
+        00: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Fit, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+        01: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Fit, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+        02: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+        03: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+        04: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
+        05: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 25*ALGetScreenScale, 25*ALGetScreenScale);
+        06: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, min(W,h)/2, min(W,h)/2);
+        07: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 0, min(W,h)/2, min(W,h)/2);
+        08: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+        09: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+        10: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
+        11: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.FitAndCrop, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, min(W,h)/2, min(W,h)/2);
+        12: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+        13: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 0, 0, 0);
+        14: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+        15: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, 'mask', 1, W, H, False, TALImageWrapMode.Fit, TPointF.create(0.65, 0.48), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+        16: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+        17: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+        18: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+        19: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Place, TpointF.create(0.5,0.5), TalphaColors.null, 5*ALGetScreenScale, 0, 0);
+        20: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscape', nil, '', 1, W, H, False, TALImageWrapMode.Stretch, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
+        21: FTestFPSDrawables[i] := ALCreateDrawableFromResource('landscapelittle', nil, '', 1, W, H, False, TALImageWrapMode.Stretch, TpointF.create(0.5,0.5), TalphaColors.null, 0, 0, 0);
         else FTestFPSDrawables[i] := ALNullDrawable;
       end;
     {$IF defined(ios)}
@@ -540,7 +542,7 @@ begin
                 Try
                   LOptions.Scale := 1;
                   //--
-                  LOptions.FontFamily := ALConvertFontFamily('sans-serif');
+                  LOptions.FontFamily := 'sans-serif';
                   LOptions.FontSize := 10 + Random(30);
                   LOptions.FontWeight := TfontWeight(Random(11)); // Thin, UltraLight, Light, SemiLight, Regular, Medium, Semibold, Bold, UltraBold, Black, UltraBlack
                   LOptions.FontSlant := TFontSlant(Random(2)); // Regular, Italic
@@ -558,7 +560,7 @@ begin
                   if Random(5) = 0 then LOptions.EllipsisText := '… more[+]'
                   else LOptions.EllipsisText := '…';
                   If random(5) = 0 then begin
-                    LOptions.EllipsisFontFamily := ALConvertFontFamily('sans-serif');
+                    LOptions.EllipsisFontFamily := 'sans-serif';
                     LOptions.EllipsisFontSize := 10 + Random(30);
                     LOptions.EllipsisFontWeight := TfontWeight(Random(11)); // Thin, UltraLight, Light, SemiLight, Regular, Medium, Semibold, Bold, UltraBold, Black, UltraBlack
                     LOptions.EllipsisFontSlant := TFontSlant(Random(2)); // Regular, Italic
@@ -575,26 +577,11 @@ begin
                   end;
                   //--
                   case random(5) of
-                    0: begin
-                      LOptions.AutoSize := True;
-                      LOptions.AutoSizeX := True;
-                      LOptions.AutoSizeY := True;
-                    end;
-                    1: begin
-                      LOptions.AutoSize := False;
-                      LOptions.AutoSizeX := True;
-                      LOptions.AutoSizeY := False;
-                    end;
-                    2: begin
-                      LOptions.AutoSize := False;
-                      LOptions.AutoSizeX := False;
-                      LOptions.AutoSizeY := True;
-                    end
-                    else begin
-                      LOptions.AutoSize := False;
-                      LOptions.AutoSizeX := False;
-                      LOptions.AutoSizeY := False;
-                    end;
+                    0: LOptions.AutoSize := TALAutoSizeMode.Both;
+                    1: LOptions.AutoSize := TALAutoSizeMode.Width;
+                    2: LOptions.AutoSize := TALAutoSizeMode.Height;
+                    else
+                      LOptions.AutoSize := TALAutoSizeMode.None;
                   end;
                   //--
                   LOptions.MaxLines := random(200);
@@ -650,7 +637,7 @@ begin
                     TThread.Synchronize(nil,
                     procedure
                     begin
-                      StatusLabel3.Text := ALInttostrW(i) + ' images created in: ' + ALFormatFloatW('0.00', LRawTextStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms';
+                      StatusLabel3.Text := ALInttostrW(i) + ' images created in: ' + ALFormatFloatW('0.00', LRawTextStopWatch.Elapsed.TotalMilliseconds) + ' ms';
                       StatusLabel3.Visible := True;
                       OrderStatusLabels;
                       Invalidate;
@@ -682,7 +669,7 @@ begin
 
                   LOptions.Scale := 1;
                   //--
-                  LOptions.FontFamily := ALConvertFontFamily('sans-serif');
+                  LOptions.FontFamily := 'sans-serif';
                   LOptions.FontSize := 10 + Random(30);
                   LOptions.FontWeight := TfontWeight(Random(11)); // Thin, UltraLight, Light, SemiLight, Regular, Medium, Semibold, Bold, UltraBold, Black, UltraBlack
                   LOptions.FontSlant := TFontSlant(Random(2)); // Regular, Italic
@@ -700,7 +687,7 @@ begin
                   if Random(5) = 0 then LOptions.EllipsisText := '… more[+]'
                   else LOptions.EllipsisText := '…';
                   If random(5) = 0 then begin
-                    LOptions.EllipsisFontFamily := ALConvertFontFamily('sans-serif');
+                    LOptions.EllipsisFontFamily := 'sans-serif';
                     LOptions.EllipsisFontSize := 10 + Random(30);
                     LOptions.EllipsisFontWeight := TfontWeight(Random(11)); // Thin, UltraLight, Light, SemiLight, Regular, Medium, Semibold, Bold, UltraBold, Black, UltraBlack
                     LOptions.EllipsisFontSlant := TFontSlant(Random(2)); // Regular, Italic
@@ -717,26 +704,11 @@ begin
                   end;
                   //--
                   case random(5) of
-                    0: begin
-                      LOptions.AutoSize := True;
-                      LOptions.AutoSizeX := True;
-                      LOptions.AutoSizeY := True;
-                    end;
-                    1: begin
-                      LOptions.AutoSize := False;
-                      LOptions.AutoSizeX := True;
-                      LOptions.AutoSizeY := False;
-                    end;
-                    2: begin
-                      LOptions.AutoSize := False;
-                      LOptions.AutoSizeX := False;
-                      LOptions.AutoSizeY := True;
-                    end
-                    else begin
-                      LOptions.AutoSize := False;
-                      LOptions.AutoSizeX := False;
-                      LOptions.AutoSizeY := False;
-                    end;
+                    0: LOptions.AutoSize := TALAutoSizeMode.Both;
+                    1: LOptions.AutoSize := TALAutoSizeMode.Width;
+                    2: LOptions.AutoSize := TALAutoSizeMode.Height;
+                    else
+                      LOptions.AutoSize := TALAutoSizeMode.None;
                   end;
                   //--
                   LOptions.MaxLines := random(200);
@@ -822,7 +794,7 @@ begin
                     TThread.Synchronize(nil,
                     procedure
                     begin
-                      StatusLabel3.Text := ALInttostrW(i) + ' images created in: ' + ALFormatFloatW('0.00', LRawTextStopWatch.Elapsed.TotalMilliseconds + LHtmlTextStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms';
+                      StatusLabel3.Text := ALInttostrW(i) + ' images created in: ' + ALFormatFloatW('0.00', LRawTextStopWatch.Elapsed.TotalMilliseconds + LHtmlTextStopWatch.Elapsed.TotalMilliseconds) + ' ms';
                       StatusLabel3.Visible := True;
                       OrderStatusLabels;
                       Invalidate;
@@ -842,9 +814,9 @@ begin
             TThread.Synchronize(nil,
             procedure
             begin
-              StatusLabel1.Text := '500 text images created in: ' + ALFormatFloatW('0', LRawTextStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms ('+ALFormatFloatW('0', LRawTextStopWatch.Elapsed.TotalMilliseconds / 500, ALDefaultFormatSettingsW) +' ms/image)';
+              StatusLabel1.Text := '500 text images created in: ' + ALFormatFloatW('0', LRawTextStopWatch.Elapsed.TotalMilliseconds) + ' ms ('+ALFormatFloatW('0', LRawTextStopWatch.Elapsed.TotalMilliseconds / 500) +' ms/image)';
               StatusLabel1.Visible := True;
-              StatusLabel2.Text := '500 Html images created in: ' + ALFormatFloatW('0', LHtmlTextStopWatch.Elapsed.TotalMilliseconds, ALDefaultFormatSettingsW) + ' ms ('+ALFormatFloatW('0', LHtmlTextStopWatch.Elapsed.TotalMilliseconds / 500, ALDefaultFormatSettingsW) +' ms/image)';
+              StatusLabel2.Text := '500 Html images created in: ' + ALFormatFloatW('0', LHtmlTextStopWatch.Elapsed.TotalMilliseconds) + ' ms ('+ALFormatFloatW('0', LHtmlTextStopWatch.Elapsed.TotalMilliseconds / 500) +' ms/image)';
               StatusLabel2.Visible := True;
               OrderStatusLabels;
               ButtonTestMultilineText.Tag := 0;
@@ -896,7 +868,7 @@ begin
             begin
               MainScrollBox.Visible := False;
               ButtonStop.Visible := True;
-              StatusLabel2.Text := ALIntToStrW(Lcount)+' images created in: ' + ALFormatFloatW('0.00', LTotalMilliseconds, ALDefaultFormatSettingsW) + ' ms';
+              StatusLabel2.Text := ALIntToStrW(Lcount)+' images created in: ' + ALFormatFloatW('0.00', LTotalMilliseconds) + ' ms';
               StatusLabel2.Visible := True;
               OrderStatusLabels;
               ButtonTestFPS.Tag := 2;

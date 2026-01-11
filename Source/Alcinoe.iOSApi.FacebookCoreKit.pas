@@ -1,5 +1,5 @@
 //
-// Made from Facebook SDK version 15.1.0
+// Made from Facebook SDK version 18.0.0
 //
 unit Alcinoe.iOSApi.FacebookCoreKit;
 
@@ -7,7 +7,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   //Pleast update <Alcinoe>\Libraries\ios\facebook\ to the last one and then run
   //<Alcinoe>\Tools\NativeBridgeFileGenerator\NativeBridgeFileGeneratorIOS.bat
   //and gave the path to <Alcinoe>\Source\Alcinoe.iOSApi.FacebookCoreKit.pas to build
@@ -104,41 +104,40 @@ procedure libcLoader; cdecl; external '/usr/lib/libc++.dylib';
 procedure libvDSPLoader; cdecl; external '/System/Library/Frameworks/Accelerate.framework/Frameworks/vecLib.framework/libvDSP.dylib';
 procedure libvMiscLoader; cdecl; external '/System/Library/Frameworks/Accelerate.framework/Frameworks/vecLib.framework/libvMisc.dylib';
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-38700 is corrected and if yes check if all declarations below are still mandatories.'}
 {$ENDIF}
 {$IF Defined(IOSSIMULATOR)}
 procedure libswiftCompatibility50Loader; cdecl; external '/usr/lib/swift/iphonesimulator/libswiftCompatibility50.a';
 procedure libswiftCompatibility51Loader; cdecl; external '/usr/lib/swift/iphonesimulator/libswiftCompatibility51.a';
+procedure libswiftCompatibility56Loader; cdecl; external '/usr/lib/swift/iphonesimulator/libswiftCompatibility56.a';
 procedure libswiftCompatibilityConcurrencyLoader; cdecl; external '/usr/lib/swift/iphonesimulator/libswiftCompatibilityConcurrency.a';
 procedure libswiftCompatibilityDynamicReplacementsLoader; cdecl; external '/usr/lib/swift/iphonesimulator/libswiftCompatibilityDynamicReplacements.a';
 {$ELSE}
 procedure libswiftCompatibility50Loader; cdecl; external '/usr/lib/swift/iphoneos/libswiftCompatibility50.a';
 procedure libswiftCompatibility51Loader; cdecl; external '/usr/lib/swift/iphoneos/libswiftCompatibility51.a';
+procedure libswiftCompatibility56Loader; cdecl; external '/usr/lib/swift/iphoneos/libswiftCompatibility56.a';
 procedure libswiftCompatibilityConcurrencyLoader; cdecl; external '/usr/lib/swift/iphoneos/libswiftCompatibilityConcurrency.a';
 procedure libswiftCompatibilityDynamicReplacementsLoader; cdecl; external '/usr/lib/swift/iphoneos/libswiftCompatibilityDynamicReplacements.a';
 {$ENDIF}
+procedure libswiftConcurrencyLoader; cdecl; external '/usr/lib/swift/libswift_Concurrency.dylib';
+procedure libswiftXPCLoader; cdecl; external '/usr/lib/swift/libswiftXPC.dylib';
 procedure libswiftCoreFoundationLoader; cdecl; external '/usr/lib/swift/libswiftCoreFoundation.dylib';
 procedure libswiftCoreImageLoader; cdecl; external '/usr/lib/swift/libswiftCoreImage.dylib';
 procedure libswiftCoreLoader; cdecl; external '/usr/lib/swift/libswiftCore.dylib';
 procedure libswiftDarwinLoader; cdecl; external '/usr/lib/swift/libswiftDarwin.dylib';
 procedure libswiftDataDetectionLoader; cdecl; external '/usr/lib/swift/libswiftDataDetection.dylib';
 procedure libswiftDispatchLoader; cdecl; external '/usr/lib/swift/libswiftDispatch.dylib';
-procedure libswiftFileProviderLoader; cdecl; external '/usr/lib/swift/libswiftFileProvider.dylib';
 procedure libswiftMetalLoader; cdecl; external '/usr/lib/swift/libswiftMetal.dylib';
 procedure libswiftObjectiveCLoader; cdecl; external '/usr/lib/swift/libswiftObjectiveC.dylib';
 procedure libswiftQuartzCoreLoader; cdecl; external '/usr/lib/swift/libswiftQuartzCore.dylib';
-procedure libswiftUIKitLoader; cdecl; external '/usr/lib/swift/libswiftUIKit.dylib';
-procedure libswiftCoreAudioLoader; cdecl; external '/usr/lib/swift/libswiftCoreAudio.dylib';
 procedure libswiftosLoader; cdecl; external '/usr/lib/swift/libswiftos.dylib';
-procedure libswiftWebKitLoader; cdecl; external '/usr/lib/swift/libswiftWebKit.dylib';
+procedure libswiftUniformTypeIdentifiersLoader; cdecl; external '/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib';
+procedure libswiftCoreAudioLoader; cdecl; external '/usr/lib/swift/libswiftCoreAudio.dylib';
 procedure libswiftCoreMIDILoader; cdecl; external '/usr/lib/swift/libswiftCoreMIDI.dylib';
-procedure libswiftPhotosLoader; cdecl; external '/usr/lib/swift/libswiftPhotos.dylib';
 procedure libswiftAVFoundationLoader; cdecl; external '/usr/lib/swift/libswiftAVFoundation.dylib';
 procedure libswiftCoreMediaLoader; cdecl; external '/usr/lib/swift/libswiftCoreMedia.dylib';
 procedure libswiftsimdLoader; cdecl; external '/usr/lib/swift/libswiftsimd.dylib';
-procedure libswiftUniformTypeIdentifiersLoader; cdecl; external '/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib';
 procedure libswiftCoreLocationLoader; cdecl; external '/usr/lib/swift/libswiftCoreLocation.dylib';
-procedure libswiftCoreGraphicsLoader; cdecl; external '/usr/lib/swift/libswiftCoreGraphics.dylib';
 
 end.

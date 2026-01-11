@@ -2,6 +2,8 @@ unit Alcinoe.FMX.Firebase.Core;
 
 interface
 
+{$I Alcinoe.inc}
+
 implementation
 
 uses
@@ -48,9 +50,15 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Firebase.Core','initialization');
+  {$ENDIF}
   TMessageManager.DefaultManager.SubscribeToMessage(TApplicationEventMessage, ALFmxFirebaseCoreApplicationEventHandler);
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Firebase.Core','finalization');
+  {$ENDIF}
   TMessageManager.DefaultManager.Unsubscribe(TApplicationEventMessage, ALFmxFirebaseCoreApplicationEventHandler);
 
 end.

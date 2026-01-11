@@ -4,7 +4,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Presentation.Win.pas was not updated and adjust the IFDEF'}
 {$ENDIF}
 
@@ -18,7 +18,9 @@ uses
   FMX.Forms,
   FMX.Controls,
   FMX.Controls.Win,
-  FMX.Zorder.Win;
+  FMX.Zorder.Win,
+  Alcinoe.FMX.Controls,
+  Alcinoe.FMX.Graphics;
 
 type
 
@@ -53,9 +55,10 @@ type
     function HandleAllocated: Boolean; inline;
     property Handle: HWND read GetHandle;
   private
-    FControl: TControl;
+    FControl: TALControl;
     FForm: TCommonCustomForm;
     FVisible: Boolean;
+    function GetAbsoluteRect: TRectF;
     procedure BeforeDestroyMessageListener(const Sender: TObject; const AMessage: System.Messaging.TMessage);
     procedure AfterCreateMessageListener(const Sender: TObject; const AMessage: System.Messaging.TMessage);
   protected
@@ -64,7 +67,7 @@ type
     procedure SetEnabled(const value: Boolean); virtual; //procedure PMSetAbsoluteEnabled(var AMessage: TDispatchMessageWithValue<Boolean>); message PM_SET_ABSOLUTE_ENABLED;
     procedure SetVisible(const Value: Boolean); virtual; //procedure PMSetVisible(var AMessage: TDispatchMessageWithValue<Boolean>); message PM_SET_VISIBLE;
     procedure SetAlpha(const Value: Single); virtual;
-    procedure AncestorVisibleChanged; virtual; //procedure PMAncesstorVisibleChanged(var AMessage: TDispatchMessageWithValue<Boolean>); message PM_ANCESSTOR_VISIBLE_CHANGED;
+    procedure AncestorVisibleChanged; virtual; //procedure PMAncestorVisibleChanged(var AMessage: TDispatchMessageWithValue<Boolean>); message PM_ANCESSTOR_VISIBLE_CHANGED;
     procedure RootChanged(const aRoot: IRoot); virtual; //procedure PMRootChanged(var AMessage: TDispatchMessageWithValue<IRoot>); message PM_ROOT_CHANGED;
     procedure ChangeOrder; virtual; //procedure PMChangeOrder(var AMessage: TDispatchMessage); message PM_CHANGE_ORDER;
   protected
@@ -83,14 +86,15 @@ type
     procedure WMMButtonDblClick(var Message: TWMMButtonDblClk); message WM_MBUTTONDBLCLK;
   public
     constructor Create; overload; virtual;
-    constructor Create(const AControl: TControl); overload; virtual;
+    constructor Create(const AControl: TALControl); overload; virtual;
     destructor Destroy; override;
     procedure SetFocus; virtual;
     procedure ResetFocus; virtual;
-    procedure UpdateFrame;
+    procedure UpdateFrame; virtual;
+    function CaptureScreenshot: TALDrawable; virtual;
     procedure Invalidate;
     property Form: TCommonCustomForm read FForm;
-    property Control: TControl read FControl;
+    property Control: TALControl read FControl;
     property Visible: Boolean read FVisible;
   end;
   TALWinNativeViewClass = class of TALWinNativeView;
@@ -101,7 +105,9 @@ uses
   System.SysUtils,
   System.UITypes,
   FMX.Platform.Win,
-  FMX.Helpers.Win;
+  FMX.Helpers.Win,
+  Alcinoe.Common,
+  Alcinoe.FMX.NativeControl;
 
 {***********************************************************************************************}
 function InitWndProc(HWindow: HWND; Msg: UINT; WParam: WParam; LParam: LParam): LRESULT; stdcall;
@@ -193,8 +199,8 @@ begin
   TMessageManager.DefaultManager.SubscribeToMessage(TAfterCreateFormHandle, AfterCreateMessageListener);
 end;
 
-{************************************************************}
-constructor TALWinNativeView.Create(const AControl: TControl);
+{**************************************************************}
+constructor TALWinNativeView.Create(const AControl: TALControl);
 begin
   FControl := AControl;
   Create;
@@ -211,19 +217,21 @@ begin
   inherited Destroy;
 end;
 
+{************************************************************************************************************************}
+procedure TALWinNativeView.BeforeDestroyMessageListener(const Sender: TObject; const AMessage: System.Messaging.TMessage);
+begin
+  if (AMessage is TBeforeDestroyFormHandle) and (TBeforeDestroyFormHandle(AMessage).Value = Form) then begin
+    if TFmxFormState.Recreating in Form.FormState then SetParent(Handle, 0)
+    else DestroyHandle;
+  end;
+end;
+
 {**********************************************************************************************************************}
 procedure TALWinNativeView.AfterCreateMessageListener(const Sender: TObject; const AMessage: System.Messaging.TMessage);
 begin
   // This event is called only when the window's handle is recreated.
   if (AMessage is TAfterCreateFormHandle) and (TAfterCreateFormHandle(AMessage).Value = Form) then
     RootChanged(Form);
-end;
-
-{************************************************************************************************************************}
-procedure TALWinNativeView.BeforeDestroyMessageListener(const Sender: TObject; const AMessage: System.Messaging.TMessage);
-begin
-  if (AMessage is TBeforeDestroyFormHandle) and (TBeforeDestroyFormHandle(AMessage).Value = Form) then
-    SetParent(Handle, 0);
 end;
 
 {**************************************}
@@ -395,6 +403,12 @@ begin
   end;
 end;
 
+{************************************************}
+function TALWinNativeView.GetAbsoluteRect: TRectF;
+begin
+  Result := TALNativeControl(Control).GetNativeViewAbsoluteRect;
+end;
+
 {*************************************}
 procedure TALWinNativeView.UpdateFrame;
 begin
@@ -402,14 +416,20 @@ begin
   // only the bounds but also the visibility! Code below is taken from
   // TWinZOrderManager.UpdateBounds
   if FForm = nil then exit;
-  var LBounds := Control.AbsoluteRect;
+  var LAbsoluteRect := GetAbsoluteRect;
   var LScreenScale: Single := FForm.Handle.Scale;
   var LWinBounds := TRectF.Create(
-                      LBounds.Left * LScreenScale,
-                      LBounds.Top * LScreenScale,
-                      LBounds.Right * LScreenScale,
-                      LBounds.Bottom * LScreenScale).Round;
+                      LAbsoluteRect.Left * LScreenScale,
+                      LAbsoluteRect.Top * LScreenScale,
+                      LAbsoluteRect.Right * LScreenScale,
+                      LAbsoluteRect.Bottom * LScreenScale).Round;
   SetWindowPos(Handle, 0, LWinBounds.Left, LWinBounds.Top, LWinBounds.Width, LWinBounds.Height, SWP_NOZORDER or SWP_NOACTIVATE);
+end;
+
+{*******************************************************}
+function TALWinNativeView.CaptureScreenshot: TALDrawable;
+begin
+  Result := AlNullDrawable;
 end;
 
 {*************************************}
@@ -696,8 +716,11 @@ begin
 end;
 
 initialization
-{$IFDEF WIN64}
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.NativeView.Win','initialization');
+  {$ENDIF}
+  {$IFDEF WIN64}
   UserLibrary := 0;
-{$ENDIF}
+  {$ENDIF}
 
 end.

@@ -4305,7 +4305,7 @@ end;
 // http://mormot.net
 //
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if https://github.com/synopse/mORMot.git SynCommons.pas was not updated from References\mORMot\SynCommons.pas and adjust the IFDEF'}
 {$ENDIF}
 
@@ -5283,7 +5283,7 @@ function ALGenerateGoogleOAuth2AccessToken(
 begin
 
   //lock the access
-  TMonitor.Enter(_GoogleOAuth2AccessTokens);
+  ALMonitorEnter(_GoogleOAuth2AccessTokens{$IF defined(DEBUG)}, 'ALGenerateGoogleOAuth2AccessToken'{$ENDIF});
   Try
 
     var LTokensListKey := aServiceAccountEmail + #30{record separator} + aScope;
@@ -5318,46 +5318,49 @@ begin
 
     //Making the access token request
     var LWinHttpClient := TAlWinHTTPClient.Create;
-    var LRequestFields := TALStringListA.Create;
+    var LRequestFields := TALNVStringListA.Create;
     var LJsonDoc := TALJSONDocumentA.Create;
     try
 
       //init the aWinHttpClient
-      with LWinHttpClient do begin
-        AccessType := wHttpAt_NO_PROXY;
-        InternetOptions := [TAlWinHttpClientInternetOption(wHttpIo_Keep_connection), TAlWinHttpClientInternetOption(wHttpIo_SECURE)];
-        ConnectTimeout := 60000;
-        SendTimeout := 60000;
-        ReceiveTimeout := 60000;
-      end;
+      LWinHttpClient.ConnectTimeout := 60000;
+      LWinHttpClient.SendTimeout := 60000;
+      LWinHttpClient.ReceiveTimeout := 60000;
 
       //init LRequestFields
       LRequestFields.AddNameValue('grant_type', 'urn:ietf:params:oauth:grant-type:jwt-bearer');
       LRequestFields.AddNameValue('assertion', LJWT);
 
       //Renew the token
-      var S1 := LWinHttpClient.PostUrlEncoded('https://oauth2.googleapis.com/token', LRequestFields);
+      var LHTTPClientResponse := LWinHttpClient.PostFormUrlEncoded('https://oauth2.googleapis.com/token', LRequestFields);
+      Try
 
-      //Handling the response
-      //{
-      //  "access_token": "1/8xbJqaOZXSUZbHLl5EOtu1pxz3fmmetKx9W8CV4t79M",
-      //  "scope": "https://www.googleapis.com/auth/prediction"
-      //  "token_type": "Bearer",
-      //  "expires_in": 3600
-      //}
-      LJsonDoc.LoadFromJSONString(S1);
-      Result := LJsonDoc.GetChildNodeValueText('access_token', '');
-      if result = '' then
-        raise Exception.Create('Error 8CBF4FB7-7878-4225-A26D-14369A49081A');
+        if LHTTPClientResponse.StatusCode <> 200 then
+          raise Exception.CreateFmt('Google OAuth2 token request failed: %d', [LHTTPClientResponse.StatusCode]);
 
-      //update _GoogleOAuth2AccessTokens
-      _GoogleOAuth2AccessTokens.AddNameValueObject(
-        LTokensListKey,
-        result,
-        pointer(
-          {$IF defined(WIN64)}int64{$ELSE}integer{$ENDIF}(
-            DateTimeToUnix(
-              IncSecond(ALUtcNow, LJsonDoc.GetChildNodeValueInt32('expires_in', 0) div 2)))));
+        //Handling the response
+        //{
+        //  "access_token": "1/8xbJqaOZXSUZbHLl5EOtu1pxz3fmmetKx9W8CV4t79M",
+        //  "scope": "https://www.googleapis.com/auth/prediction"
+        //  "token_type": "Bearer",
+        //  "expires_in": 3600
+        //}
+        LJsonDoc.LoadFromJSONString(LHTTPClientResponse.BodyString);
+        Result := LJsonDoc.GetChildNodeValueText('access_token', '');
+        if result = '' then raise Exception.Create('Error 8CBF4FB7-7878-4225-A26D-14369A49081A');
+
+        //update _GoogleOAuth2AccessTokens
+        _GoogleOAuth2AccessTokens.AddNameValueObject(
+          LTokensListKey,
+          result,
+          pointer(
+            {$IF defined(WIN64)}int64{$ELSE}integer{$ENDIF}(
+              DateTimeToUnix(
+                IncSecond(ALUtcNow, LJsonDoc.GetChildNodeValueInt32('expires_in', 0) div 2)))));
+
+      finally
+        ALFreeAndNil(LHTTPClientResponse);
+      end;
 
     finally
       alfreeAndNil(LJsonDoc);
@@ -5366,7 +5369,7 @@ begin
     end;
 
   finally
-    TMonitor.Exit(_GoogleOAuth2AccessTokens);
+    ALMonitorExit(_GoogleOAuth2AccessTokens{$IF defined(DEBUG)}, 'ALGenerateGoogleOAuth2AccessToken'{$ENDIF});
   end;
 
 end;
@@ -5453,7 +5456,7 @@ begin
   // http://mormot.net
   //
 
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if https://github.com/synopse/mORMot.git SynCommons.pas was not updated from References\mORMot\SynCommons.pas and adjust the IFDEF'}
   {$ENDIF}
 
@@ -5510,9 +5513,15 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.Cipher','initialization');
+  {$ENDIF}
   _InitCipher;
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.Cipher','finalization');
+  {$ENDIF}
   {$IF defined(MSWINDOWS)}
   AlFreeAndNil(_GoogleOAuth2AccessTokens);
   {$ENDIF}

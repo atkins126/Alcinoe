@@ -11,9 +11,9 @@ https://developers.facebook.com/docs/facebook-login/android/
 1) follow the step described in Alcinoe.FMX.Facebook.Core
 
 2) On android you just need to include the library
-     * com.facebook.android:facebook-login:15.2.0
+     * com.facebook.android:facebook-login:18.0.3
    in the project. You can do this with the help of AndroidMerger. You can see
-   an exemple in <Alcinoe>\Demos\ALFacebookLogin\_source\android\MergeLibraries.bat
+   an exemple in <Alcinoe>\Demos\ALFmxFacebookLogin\_source\android\MergeLibraries.bat
 
 3) https://developers.facebook.com/docs/facebook-login/android/
    Add an activity for Facebook, and an activity and intent filter for Chrome
@@ -196,7 +196,7 @@ begin
   {$IF defined(IOS)}
 
   // https://stackoverflow.com/questions/42222508/why-we-need-to-do-retain-for-objective-c-object-field
-  // In general, if you create such a class with Create, alloc, copy, mutableCopy, new... then retain
+  // In general, if you create such a class with create, alloc, copy, mutableCopy, new... then retain
   // is called for you. Then you need to call release or autorelease.
   FLoginManager := TFBSDKLoginManager.Create;
 
@@ -245,7 +245,7 @@ begin
   {$IF defined(android)}
 
   var LArrayList := ALStringsToJArrayList(APermissions);
-  var LCollection := TJCollection.Wrap((LArrayList as ILocalObject).GetObjectID);
+  var LCollection := TJCollection.Wrap(TAndroidHelper.JObjectToID(LArrayList));
   TJloginManager.JavaClass.getInstance.logInWithReadPermissions(TAndroidHelper.Activity, LCollection);
 
   {$ENDIF}
@@ -469,7 +469,7 @@ var LLoginResult: JLoginResult;
     LDeniedPermissions: TArray<String>;
 begin
 
-  LLoginResult := TJLoginResult.Wrap((result as ILocalObject).GetObjectID);
+  LLoginResult := TJLoginResult.Wrap(TAndroidHelper.JObjectToID(result));
   LToken := LLoginResult.getAccessToken;
   if LToken <> nil then begin
     LUserIDStr := JStringToString(LToken.getUserId);

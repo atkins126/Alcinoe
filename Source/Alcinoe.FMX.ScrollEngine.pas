@@ -89,7 +89,7 @@ type
   {********************************************************}
   // Calculates the velocity of pointer movements over time.
   // Based on Android's VelocityTracker
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if android VelocityTracker was not updated and adjust the IFDEF'}
     //Compare <Alcinoe>\References\Android\VelocityTracker.h with https://android.googlesource.com/platform/frameworks/native/+/refs/heads/main/include/input/VelocityTracker.h
     //Compare <Alcinoe>\References\Android\VelocityTracker.cpp with https://android.googlesource.com/platform/frameworks/native/+/refs/heads/main/libs/input/VelocityTracker.cpp
@@ -440,7 +440,7 @@ type
   // ability to overshoot the bounds of a scrolling operation.
   // Based on the Android OverScroller class
   // https://www.sobyte.net/post/2022-02/android-over-scroller/
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if android OverScroller was not updated and adjust the IFDEF'}
     //Compare <Alcinoe>\References\Android\OverScroller.java with <SDKs>\android\sources\android-XX\android\widget\OverScroller.java
   {$ENDIF}
@@ -551,7 +551,8 @@ type
     FVelocityTracker: TALVelocityTracker;
     FTouchSlop: Single;
     FOverflingDistance: Single;
-    FDragResistanceFactor: Single;
+    FMinEdgeDragResistanceFactor: Single;
+    FMaxEdgeDragResistanceFactor: Single;
     FMinEdgeSpringbackEnabled: Boolean;
     FMaxEdgeSpringbackEnabled: Boolean;
     FTouchMode: TTouchMode;
@@ -571,7 +572,7 @@ type
     FMoved: Boolean;
     FTag: NativeInt;
     procedure StartTimer;
-    procedure StopTimer(const AAbruptly: Boolean = False);
+    procedure StopTimer(const AAbruptly: Boolean = False; const ATriggerOnStopEventWhenAbrupt: Boolean = False);
     {$IF (not defined(IOS)) and (not defined(ANDROID))}
     procedure TimerProc;
     {$ENDIF}
@@ -579,7 +580,8 @@ type
     procedure SetDown(const Value: Boolean);
     function IsTouchSlopStored: Boolean;
     function IsOverflingDistanceStored: Boolean;
-    function IsDragResistanceFactorStored: Boolean;
+    function IsMinEdgeDragResistanceFactorStored: Boolean;
+    function IsMaxEdgeDragResistanceFactorStored: Boolean;
     function IsFrictionStored: Boolean;
     function GetFriction: Single;
     procedure SetFriction(const Value: Single);
@@ -602,7 +604,7 @@ type
     procedure DoMouseUp; virtual;
   public
     const
-      // taken from android ViewConfiguration TOUCH_SLOP = 8;
+      // Taken from android ViewConfiguration TOUCH_SLOP = 8;
       DefaultTouchSlop = 8;
       // Instead of the android ViewConfiguration OVERFLING_DISTANCE = 6;
       DefaultOverflingDistance = 65;
@@ -611,6 +613,10 @@ type
       DefaultTimerInterval = 10; // 100 fps
       // The default multiplier that dampens a drag movement at boundaries.
       DefaultDragResistanceFactor = 0.4;
+      // The velocity threshold (in virtual pixels per second) considered as "low".
+      DefaultLowVelocityThreshold = 10;
+      // The default amount of friction applied to flings (Taken from ViewConfiguration.getScrollFriction)
+      DefaultFriction = 0.015;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -635,7 +641,7 @@ type
     ///   Halts the ongoing animation, freezing the scroller at its current position
     ///   without completing the remaining motion.
     /// </summary>
-    procedure Stop(const AAbruptly: Boolean = False);
+    procedure Stop(const AAbruptly: Boolean = False; const ATriggerOnStopEventWhenAbrupt: Boolean = False);
     property TouchTracking: TTouchTracking read FTouchTracking write FTouchTracking;
     property TouchEnabled: Boolean read GetTouchEnabled;
     /// <summary>
@@ -670,12 +676,36 @@ type
     /// </summary>
     property OverflingDistance: Single read FOverflingDistance write FOverflingDistance stored IsOverflingDistanceStored nodefault;
     /// <summary>
-    ///   A multiplier applied during drag operations to simulate resistance. A value
-    ///   of 1 implies normal drag behavior, while values below 1 introduce increased
-    ///   resistance, making the drag feel heavier.
+    ///   A multiplier applied during drag operations when the content is pulled
+    ///   against the minimum edge (top/left). A value of 1 implies normal drag
+    ///   behavior, while values below 1 introduce increased resistance, making
+    ///   the drag feel heavier as you approach the min edge.
     /// </summary>
-    property DragResistanceFactor: Single read FDragResistanceFactor write FDragResistanceFactor stored IsDragResistanceFactorStored nodefault;
+    property MinEdgeDragResistanceFactor: Single read FMinEdgeDragResistanceFactor write FMinEdgeDragResistanceFactor stored IsMinEdgeDragResistanceFactorStored nodefault;
+    /// <summary>
+    ///   A multiplier applied during drag operations when the content is pulled
+    ///   against the maximum edge (bottom/right). A value of 1 implies normal drag
+    ///   behavior, while values below 1 introduce increased resistance, making
+    ///   the drag feel heavier as you approach the max edge.
+    /// </summary>
+    property MaxEdgeDragResistanceFactor: Single read FMaxEdgeDragResistanceFactor write FMaxEdgeDragResistanceFactor stored IsMaxEdgeDragResistanceFactorStored nodefault;
+    /// <summary>
+    ///   Enables the elastic “spring-back” effect when the content reaches the
+    ///   minimum edge (top/left). This differs from <see cref="MinEdgeDragResistanceFactor"/>,
+    ///   as it is not applied during a drag operation but only when the scroll
+    ///   position exceeds the edge due to a scrolling animation. When <c>true</c>,
+    ///   overscrolling past the min edge animates back with a bounce. When <c>false</c>,
+    ///   the bounce is suppressed and the content simply clamps to the edge.
+    /// </summary>
     property MinEdgeSpringbackEnabled: Boolean read FMinEdgeSpringbackEnabled write FMinEdgeSpringbackEnabled default true;
+    /// <summary>
+    ///   Enables the elastic “spring-back” effect when the content reaches the
+    ///   maximum edge (bottom/right). This differs from <see cref="MaxEdgeDragResistanceFactor"/>,
+    ///   as it is not applied during a drag operation but only when the scroll
+    ///   position exceeds the edge due to a scrolling animation. When <c>true</c>,
+    ///   overscrolling past the max edge animates back with a bounce. When <c>false</c>,
+    ///   the bounce is suppressed and the content simply clamps to the edge.
+    /// </summary>
     property MaxEdgeSpringbackEnabled: Boolean read FMaxEdgeSpringbackEnabled write FMaxEdgeSpringbackEnabled default true;
     /// <summary>
     ///   The amount of friction applied to flings.
@@ -693,18 +723,17 @@ uses
   Androidapi.Input,
   FMX.Platform.Android,
   FMX.Platform.UI.Android,
-  Alcinoe.Androidapi.JNI.GraphicsContentViewText,
+  Alcinoe.Androidapi.GraphicsContentViewText,
   {$ENDIF}
   {$IFDEF IOS}
   iOSapi.UIKit,
   Macapi.Helpers,
   Macapi.ObjCRuntime,
   FMX.Platform.iOS,
-  Alcinoe.iOSapi.UIKit,
-  Alcinoe.iOSapi.QuartzCore,
   {$ENDIF}
   FMX.Platform,
   Alcinoe.FMX.Common,
+  Alcinoe.Localization,
   Alcinoe.StringUtils,
   Alcinoe.FMX.Ani;
 
@@ -775,7 +804,7 @@ begin
   for var i{: size_t} := 0 to length(a) - 1 do begin
     if i > 0 then
       str := str + ',';
-    str := str + ' ' + ALFloatToStrW(a[i], ALDefaultFormatSettingsW);
+    str := str + ' ' + ALFloatToStrW(a[i]);
   end;
   str := str + ' ]';
   Result := str;
@@ -795,7 +824,7 @@ begin
         for var j{: size_t} := 0 to length(a[i]) - 1 do begin
           if j > 0 then
             str := str + ',';
-          str := str + ALFloatToStrW(a[i][j], ALDefaultFormatSettingsW)
+          str := str + ALFloatToStrW(a[i][j])
         end;
         str := str + ' ]';
       end;
@@ -808,7 +837,7 @@ begin
         for var j{: size_t} := 0 to length(a) - 1 do begin
           if j > 0 then
             str := str + ',';
-          str := str + ALFloatToStrW(a[j][i], ALDefaultFormatSettingsW)
+          str := str + ALFloatToStrW(a[j][i])
         end;
         str := str + ' ]';
       end;
@@ -1739,7 +1768,7 @@ end;
 constructor TALSplineOverScroller.Create;
 begin
   inherited Create;
-  FFlingFriction := 0.015; {ViewConfiguration.getScrollFriction}
+  FFlingFriction := TALScrollEngine.DefaultFriction;
   FState := SPLINE;
   FFinished := true;
   // const ppi: Single = context.getResources().getDisplayMetrics().density * 160.0;
@@ -1752,8 +1781,8 @@ begin
   {$IFDEF DEBUG}
   ALLog(
     'Alcinoe.FMX.ScrollEngine.TALSplineOverScroller.Create',
-    'PixelsPerInch:' + ALFormatFloatW('0.##', PixelsPerInch, ALDefaultFormatSettingsW) + ' | ' +
-    'PhysicalCoeff:' + ALFormatFloatW('0.##', FPhysicalCoeff, ALDefaultFormatSettingsW));
+    'PixelsPerInch:' + ALFormatFloatW('0.##', PixelsPerInch) + ' | ' +
+    'PhysicalCoeff:' + ALFormatFloatW('0.##', FPhysicalCoeff));
   {$ENDIF}
 end;
 
@@ -2598,7 +2627,8 @@ begin
   FVelocityTracker := TALVelocityTracker.Create;
   FTouchSlop := DefaultTouchSlop;
   FOverflingDistance := DefaultOverflingDistance;
-  FDragResistanceFactor := DefaultDragResistanceFactor;
+  FMinEdgeDragResistanceFactor := DefaultDragResistanceFactor;
+  FMaxEdgeDragResistanceFactor := DefaultDragResistanceFactor;
   FMinEdgeSpringbackEnabled := True;
   FMaxEdgeSpringbackEnabled := True;
   FTouchMode := TTouchMode.Auto;
@@ -2661,7 +2691,8 @@ begin
     TouchMode := TALScrollEngine(Source).TouchMode;
     TouchSlop := TALScrollEngine(Source).TouchSlop;
     OverflingDistance := TALScrollEngine(Source).OverflingDistance;
-    DragResistanceFactor := TALScrollEngine(Source).DragResistanceFactor;
+    MinEdgeDragResistanceFactor := TALScrollEngine(Source).MinEdgeDragResistanceFactor;
+    MaxEdgeDragResistanceFactor := TALScrollEngine(Source).MaxEdgeDragResistanceFactor;
     MinEdgeSpringbackEnabled := TALScrollEngine(Source).MinEdgeSpringbackEnabled;
     MaxEdgeSpringbackEnabled := TALScrollEngine(Source).MaxEdgeSpringbackEnabled;
     Friction := TALScrollEngine(Source).Friction;
@@ -2679,17 +2710,27 @@ end;
 // @param duration Duration of the scroll in milliseconds.
 procedure TALScrollEngine.startScroll(startX: Double; startY: Double; dx: Double; dy: Double; const duration: integer = TALOverScroller.DEFAULT_DURATION);
 begin
-  if not FOverScroller.isFinished then
-    FoverScroller.abortAnimation;
+  if duration = 0 then begin
+    SetViewportPosition(
+      TALPointD.Create(
+        startX + dx,
+        startY + dy));
+  end
+  else begin
+    if not FOverScroller.isFinished then
+      FoverScroller.abortAnimation;
 
-  FOverScroller.startScroll(
-    trunc(startX * ALScreenScale), // startX: integer;
-    trunc(startY * ALScreenScale), // startY: integer;
-    trunc(dx * ALScreenScale), // dx: integer;
-    trunc(dy * ALScreenScale), // dy: integer;
-    duration); // const duration: integer = DEFAULT_DURATION);
+    var LstartX: Integer := round(startX * ALScreenScale);
+    var LstartY: Integer := round(startY * ALScreenScale);
+    FOverScroller.startScroll(
+      LstartX, // startX: integer;
+      LstartY, // startY: integer;
+      round((startX + dx) * ALScreenScale) - LstartX, // dx: integer;
+      round((startY + dy) * ALScreenScale) - LstartY, // dy: integer;
+      duration); // const duration: integer = DEFAULT_DURATION);
 
-  StartTimer;
+    StartTimer;
+  end;
 end;
 
 {***********************************************************************************************************************************}
@@ -2743,7 +2784,8 @@ end;
 {***************************************************}
 function TALScrollEngine.GetCurrentVelocity: TPointF;
 begin
-  result := Foverscroller.getCurrVelocity / ALScreenScale;
+  If not FTimerActive then result := TpointF.Zero
+  else result := Foverscroller.getCurrVelocity / ALScreenScale;
 end;
 
 {*************************************************}
@@ -2751,8 +2793,8 @@ function TALScrollEngine.GetIsVelocityLow: Boolean;
 begin
   var LCurrentVelocity := GetCurrentVelocity;
   // virtual pixels per second
-  result := (abs(LCurrentVelocity.X) < 10) and
-            (abs(LCurrentVelocity.Y) < 10);
+  result := (abs(LCurrentVelocity.X) < DefaultLowVelocityThreshold) and
+            (abs(LCurrentVelocity.Y) < DefaultLowVelocityThreshold);
 end;
 
 {************************************************}
@@ -2781,7 +2823,7 @@ begin
   if fDisplayLinkListener = nil then
     fDisplayLinkListener := TDisplayLinkListener.Create(self);
   if fDisplayLink = nil then begin
-    fDisplayLink := TCADisplayLink.Wrap(TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated')));
+    fDisplayLink := TCADisplayLink.OCClass.displayLinkWithTarget(fDisplayLinkListener.GetObjectID, sel_getUid('displayLinkUpdated'));
     fDisplayLink.retain;
     if GlobalUseMetal then begin
       // In OpenGL, the animation appears more jerky when using
@@ -2791,12 +2833,13 @@ begin
         LFrameRateRange.minimum := ALMinimumFramesPerSecond;
         LFrameRateRange.maximum := ALMaximumFramesPerSecond;
         LFrameRateRange.preferred := ALPreferredFramesPerSecond;
-        TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFrameRateRange(LFrameRateRange);
+        fDisplayLink.setPreferredFrameRateRange(LFrameRateRange);
       end
       else
-        TALCADisplayLink.Wrap(NSObjectToID(fDisplayLink)).setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
+        fDisplayLink.setPreferredFramesPerSecond(ALPreferredFramesPerSecond);
     end;
-    fDisplayLink.addToRunLoop(TNSRunLoop.Wrap(TNSRunLoop.OCClass.mainRunLoop), NSRunLoopCommonModes); // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+    // I don't really know with is the best, NSDefaultRunLoopMode or NSRunLoopCommonModes
+    fDisplayLink.addToRunLoop(TNSRunLoop.OCClass.mainRunLoop, NSRunLoopCommonModes);
   end;
   fDisplayLink.setPaused(False);
   {$ELSEIF defined(ANDROID)}
@@ -2814,14 +2857,14 @@ begin
 
 end;
 
-{********************************************************************}
-procedure TALScrollEngine.StopTimer(const AAbruptly: Boolean = False);
+{**************************************************************************************************************************}
+procedure TALScrollEngine.StopTimer(const AAbruptly: Boolean = False; const ATriggerOnStopEventWhenAbrupt: Boolean = False);
 begin
 
   if not FTimerActive then exit;
   FTimerActive := False;
 
-  if not AAbruptly then
+  if (not AAbruptly) or ATriggerOnStopEventWhenAbrupt then
     DoStop;
 
   {$IFDEF IOS}
@@ -2859,7 +2902,7 @@ begin
   {$IFDEF DEBUG}
   //ALLog(
   //  'Alcinoe.FMX.ScrollEngine.TALScrollEngine.DoChanged',
-  //  'ViewPortPosition:' + ALFormatFloatW('0.##', ViewPortPosition.x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', ViewPortPosition.y, ALDefaultFormatSettingsW));
+  //  'ViewPortPosition:' + ALFormatFloatW('0.##', ViewPortPosition.x) + ',' + ALFormatFloatW('0.##', ViewPortPosition.y));
   {$ENDIF}
   if Assigned(FOnChanged) then
     FOnChanged(self);
@@ -2878,14 +2921,14 @@ end;
 {***************************************************************************}
 // Halts the ongoing animation, freezing the scroller at its current position
 // without completing the remaining motion.
-procedure TALScrollEngine.Stop(const AAbruptly: Boolean = False);
+procedure TALScrollEngine.Stop(const AAbruptly: Boolean = False; const ATriggerOnStopEventWhenAbrupt: Boolean = False);
 begin
   if AAbruptly then
     FDown := False;
   //--
   if FOverScroller.isFinished then begin
     if AAbruptly then
-      StopTimer(true{AAbruptly});
+      StopTimer(AAbruptly, ATriggerOnStopEventWhenAbrupt);
     exit;
   end;
   //--
@@ -2895,7 +2938,7 @@ begin
   end
   else begin
     FOverScroller.forceFinished(true{finished});
-    StopTimer(true{AAbruptly});
+    StopTimer(AAbruptly, ATriggerOnStopEventWhenAbrupt);
   end;
 end;
 
@@ -2911,16 +2954,22 @@ begin
   Result := Not sameValue(FOverflingDistance, DefaultOverflingDistance, TEpsilon.Position);
 end;
 
-{*************************************************************}
-function TALScrollEngine.IsDragResistanceFactorStored: Boolean;
+{********************************************************************}
+function TALScrollEngine.IsMinEdgeDragResistanceFactorStored: Boolean;
 begin
-  Result := Not sameValue(FDragResistanceFactor, DefaultDragResistanceFactor, TEpsilon.Scale);
+  Result := Not sameValue(FMinEdgeDragResistanceFactor, DefaultDragResistanceFactor, TEpsilon.Scale);
+end;
+
+{********************************************************************}
+function TALScrollEngine.IsMaxEdgeDragResistanceFactorStored: Boolean;
+begin
+  Result := Not sameValue(FMaxEdgeDragResistanceFactor, DefaultDragResistanceFactor, TEpsilon.Scale);
 end;
 
 {*************************************************}
 function TALScrollEngine.IsFrictionStored: Boolean;
 begin
-  Result := Not sameValue(GetFriction, 0.015{ViewConfiguration.getScrollFriction}, TEpsilon.Scale);
+  Result := Not sameValue(GetFriction, DefaultFriction, TEpsilon.Scale);
 end;
 
 {*******************************************}
@@ -3146,14 +3195,13 @@ begin
   if (AHandle = nil) or (not TouchEnabled) then exit;
 
   {$IF defined(ANDROID)}
-  var LTmpCurrentMotionEvent := WindowHandleToPlatform(AHandle).CurrentMotionEvent;
-  if LTmpCurrentMotionEvent = nil then begin
+  var LCurrentMotionEvent := WindowHandleToPlatform(AHandle).CurrentMotionEvent;
+  if LCurrentMotionEvent = nil then begin
     {$IF defined(DEBUG)}
     ALLog('Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseDown', 'CurrentMotionEvent is nil', TALLogType.ERROR);
     {$ENDIF}
     exit;
   end;
-  var LCurrentMotionEvent := TJALMotionEvent.wrap(LTmpCurrentMotionEvent);
   if (LCurrentMotionEvent.getPointerCount = 0) or
      (LCurrentMotionEvent.getActionMasked <> AMOTION_EVENT_ACTION_DOWN) then exit;
   //--
@@ -3170,14 +3218,13 @@ begin
   {$ENDIF}
 
   {$IF defined(IOS)}
-  var LTmpCurrentTouchEvent := WindowHandleToPlatform(AHandle).CurrentTouchEvent;
-  if LTmpCurrentTouchEvent = nil then begin
+  var LCurrentTouchEvent := WindowHandleToPlatform(AHandle).CurrentTouchEvent;
+  if LCurrentTouchEvent = nil then begin
     {$IF defined(DEBUG)}
     ALLog('Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseDown', 'CurrentTouchEvent is nil', TALLogType.ERROR);
     {$ENDIF}
     exit;
   end;
-  var LCurrentTouchEvent := TALUIEvent.Wrap(NSObjectToID(LTmpCurrentTouchEvent));
   if (LCurrentTouchEvent.AllTouches = nil) or
      (LCurrentTouchEvent.AllTouches.count = 0) then exit;
   var LTouch := TUITouch.Wrap(LCurrentTouchEvent.alltouches.anyObject);
@@ -3239,16 +3286,19 @@ begin
 
   FMoved := True;
 
-  if (FViewportPosition.x < FMinScrollLimit.x) or
-     (FViewportPosition.x > FMaxScrollLimit.x) then xDiff := xDiff * FDragResistanceFactor;
-  if (FViewportPosition.y < FMinScrollLimit.y) or
-     (FViewportPosition.y > FMaxScrollLimit.y) then yDiff := yDiff * FDragResistanceFactor;
+       if (FViewportPosition.x < FMinScrollLimit.x - TEpsilon.Position) then xDiff := xDiff * FMinEdgeDragResistanceFactor
+  else if (FViewportPosition.x > FMaxScrollLimit.x + TEpsilon.Position) then xDiff := xDiff * FMaxEdgeDragResistanceFactor;
+       if (FViewportPosition.y < FMinScrollLimit.y - TEpsilon.Position) then yDiff := yDiff * FMinEdgeDragResistanceFactor
+  else if (FViewportPosition.y > FMaxScrollLimit.y + TEpsilon.Position) then yDiff := yDiff * FMaxEdgeDragResistanceFactor;
 
-  if FDragResistanceFactor = 0 then begin
-         if FViewportPosition.x + xDiff < FMinScrollLimit.x then xDiff := FMinScrollLimit.x - FViewportPosition.x
-    else if FViewportPosition.x + xDiff > FMaxScrollLimit.x then xDiff := FMaxScrollLimit.x - FViewportPosition.x;
-         if FViewportPosition.y + YDiff < FMinScrollLimit.y then yDiff := FMinScrollLimit.y - FViewportPosition.y
-    else if FViewportPosition.y + YDiff > FMaxScrollLimit.y then yDiff := FMaxScrollLimit.y - FViewportPosition.y;
+  if FMinEdgeDragResistanceFactor = 0 then begin
+    if FViewportPosition.x + xDiff < FMinScrollLimit.x - TEpsilon.Position then xDiff := FMinScrollLimit.x - FViewportPosition.x;
+    if FViewportPosition.y + YDiff < FMinScrollLimit.y - TEpsilon.Position then yDiff := FMinScrollLimit.y - FViewportPosition.y;
+  end;
+
+  if FMaxEdgeDragResistanceFactor = 0 then begin
+    if FViewportPosition.x + xDiff > FMaxScrollLimit.x + TEpsilon.Position then xDiff := FMaxScrollLimit.x - FViewportPosition.x;
+    if FViewportPosition.y + YDiff > FMaxScrollLimit.y + TEpsilon.Position then yDiff := FMaxScrollLimit.y - FViewportPosition.y;
   end;
 
   if sameValue(xDiff, 0, Tepsilon.Position) and
@@ -3290,14 +3340,13 @@ begin
   if (AHandle = nil) or (not fDown) then exit;
 
   {$IF defined(ANDROID)}
-  var LTmpCurrentMotionEvent := WindowHandleToPlatform(AHandle).CurrentMotionEvent;
-  if LTmpCurrentMotionEvent = nil then begin
+  var LCurrentMotionEvent := WindowHandleToPlatform(AHandle).CurrentMotionEvent;
+  if LCurrentMotionEvent = nil then begin
     {$IF defined(DEBUG)}
     ALLog('Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseMove', 'CurrentMotionEvent is nil', TALLogType.ERROR);
     {$ENDIF}
     exit;
   end;
-  var LCurrentMotionEvent := TJALMotionEvent.wrap(LTmpCurrentMotionEvent);
   if (LCurrentMotionEvent.getPointerCount = 0) or
      (LCurrentMotionEvent.getActionMasked <> AMOTION_EVENT_ACTION_MOVE) then exit;
   //--
@@ -3327,14 +3376,13 @@ begin
   {$ENDIF}
 
   {$IF defined(IOS)}
-  var LTmpCurrentTouchEvent := WindowHandleToPlatform(AHandle).CurrentTouchEvent;
-  if LTmpCurrentTouchEvent = nil then begin
+  var LCurrentTouchEvent := WindowHandleToPlatform(AHandle).CurrentTouchEvent;
+  if LCurrentTouchEvent = nil then begin
     {$IF defined(DEBUG)}
     ALLog('Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseMove', 'CurrentTouchEvent is nil', TALLogType.ERROR);
     {$ENDIF}
     exit;
   end;
-  var LCurrentTouchEvent := TALUIEvent.Wrap(NSObjectToID(LTmpCurrentTouchEvent));
   if (LCurrentTouchEvent.AllTouches = nil) or
      (LCurrentTouchEvent.AllTouches.count = 0) then exit;
   var LTouch := TUITouch.Wrap(LCurrentTouchEvent.alltouches.anyObject);
@@ -3468,14 +3516,13 @@ begin
   if (AHandle = nil) or (not Fdown) then exit;
 
   {$IF defined(ANDROID)}
-  var LTmpCurrentMotionEvent := WindowHandleToPlatform(AHandle).CurrentMotionEvent;
-  if LTmpCurrentMotionEvent = nil then begin
+  var LCurrentMotionEvent := WindowHandleToPlatform(AHandle).CurrentMotionEvent;
+  if LCurrentMotionEvent = nil then begin
     {$IF defined(DEBUG)}
     ALLog('Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseUp', 'CurrentMotionEvent is nil', TALLogType.ERROR);
     {$ENDIF}
     exit;
   end;
-  var LCurrentMotionEvent := TJALMotionEvent.wrap(LTmpCurrentMotionEvent);
   if (LCurrentMotionEvent.getPointerCount = 0) or
      (LCurrentMotionEvent.getActionMasked <> AMOTION_EVENT_ACTION_UP) then exit;
   //--
@@ -3491,14 +3538,13 @@ begin
   FMovements.Add(LMovement);
   {$ENDIF}
   {$IF defined(IOS)}
-  var LTmpCurrentTouchEvent := WindowHandleToPlatform(AHandle).CurrentTouchEvent;
-  if LTmpCurrentTouchEvent = nil then begin
+  var LCurrentTouchEvent := WindowHandleToPlatform(AHandle).CurrentTouchEvent;
+  if LCurrentTouchEvent = nil then begin
     {$IF defined(DEBUG)}
     ALLog('Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseUp', 'CurrentTouchEvent is nil', TALLogType.ERROR);
     {$ENDIF}
     exit;
   end;
-  var LCurrentTouchEvent := TALUIEvent.Wrap(NSObjectToID(LTmpCurrentTouchEvent));
   if (LCurrentTouchEvent.AllTouches = nil) or
      (LCurrentTouchEvent.AllTouches.count = 0) then exit;
   var LTouch := TUITouch.Wrap(LCurrentTouchEvent.alltouches.anyObject);
@@ -3526,7 +3572,7 @@ begin
   {$IFDEF DEBUG}
   //ALLog(
   //  'Alcinoe.FMX.ScrollEngine.TALScrollEngine.MouseWheel',
-  //  'Position:' + ALFormatFloatW('0.##', x, ALDefaultFormatSettingsW) + ',' + ALFormatFloatW('0.##', y, ALDefaultFormatSettingsW));
+  //  'Position:' + ALFormatFloatW('0.##', x) + ',' + ALFormatFloatW('0.##', y));
   {$ENDIF}
 
   if not FOverScroller.isFinished then begin
@@ -3549,6 +3595,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.ScrollEngine','initialization');
+  {$ENDIF}
   TALSplineOverScroller.PixelsPerInch := 0;
   TALSplineOverScroller.DECELERATION_RATE := {(Single)} (ln(0.78) / ln(0.9));
   TALSplineOverScroller.InitSpline;

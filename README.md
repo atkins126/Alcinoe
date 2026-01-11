@@ -12,13 +12,27 @@ built with the philosophy that every developer deserves the
 platforms—all while maintaining **independence** from the 
 dominance of GAFA (Google, Apple, Facebook, Amazon). 
 
-**Alcinoe** is fully compatible with **Delphi Athens 12.3**. 
+**Alcinoe** is fully compatible with **Delphi Florence 13.0**. 
 If you find this library helpful, please consider giving it a 
 star on GitHub. It’s free and greatly supports the project’s 
 visibility and growth.
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/star.jpg?raw=true" />
 
+
+Fuel the Magic, Inspire Innovation
+----------------------------------
+
+By joining MagicFoundation as an Associate, you'll enter a 
+community that's actively shaping the future of Alcinoe—while 
+unlocking a suite of exclusive perks. Associates receive priority 
+support for bugs they submit via the issue tracker or by email, 
+including faster triage, dedicated investigation, and ongoing 
+updates until resolved.
+
+<a href="https://github.com/sponsors/MagicFoundation">
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/becomeasponsor.webp?raw=true" width="800" />
+</a>
 
 Example of an App Built with Alcinoe
 ------------------------------------
@@ -37,6 +51,25 @@ features and custom styling capabilities.
   <a href="https://play.google.com/store/apps/details?id=io.magicfoundation.alcinoe.alfmxcontrolsdemo"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxcontrolsdemogoogleplay.png?raw=true" alt="Alcinoe Firemonkey Controls Demo" /></a>
   <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" width="25" />
   <a href="https://apps.apple.com/app/alcinoe-firemonkey-controls/id6738398604"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxcontrolsdemoappstore.png?raw=true" alt="Alcinoe Firemonkey Controls Demo" /></a>
+</p>
+
+#### Alcinoe Dynamic ListBox Demo ####
+
+This demo showcases the Alcinoe Dynamic ListBox — a 
+high-performance, customizable list control for Delphi 
+FireMonkey apps. Optimized for modern UIs, it supports 
+animated, scrollable content using an on-demand data 
+model that creates and frees items dynamically, ensuring 
+smooth performance and low memory usage. Ideal for 
+building rich, content-driven interfaces like social 
+feeds, chats, or news streams.
+
+<p align="left">
+  <a href="https://play.google.com/store/apps/details?id=io.magicfoundation.alcinoe.alfmxdynamiclistboxdemo"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxdynamiclistboxdemo.png?raw=true" alt="Alcinoe Dynamic ListBox Demo" /></a>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" width="25" />
+  <a href="https://play.google.com/store/apps/details?id=io.magicfoundation.alcinoe.alfmxdynamiclistboxdemo"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxdynamiclistboxdemogoogleplay.png?raw=true" alt="Alcinoe Dynamic ListBox Demo" /></a>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" width="25" />
+  <a href="https://testflight.apple.com/join/VQnj4KsU"><img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/alfmxdynamiclistboxdemoappstore.png?raw=true" alt="Alcinoe Dynamic ListBox Demo" /></a>
 </p>
   
 #### KisKis ####
@@ -59,57 +92,57 @@ Please request the resolution of these quality reports. Due
 to the unresolved issues from Embarcadero, we have been 
 forced to apply patches to the original Delphi source files:
 
+* [iOS: Missing application:handleEventsForBackgroundURLSession:completionHandler: delegate in FMX](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4669)
+* [FMX Android: Zoom gesture (TInteractiveGesture.Zoom) only fires on very fast pinches](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4509)
 * [Enhance MouseEvent Handling by Providing Access to MotionEvent (Android) and UIEvent (iOS)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3002)
-* [Project option to define where to look/create the LaunchScreen.TemplateiOS directory](https://quality.embarcadero.com/browse/RSP-33503)
-* [Support for the new Android Splash Screen standard](https://quality.embarcadero.com/browse/RSP-39331)
-* [Their is no propagation of mouse event under Firemonkey](https://quality.embarcadero.com/browse/RSP-24397)
-* [Performance Issue - Comparing Equality Between Two Strings](https://quality.embarcadero.com/browse/RSP-42011)
-* [Introduce IsVisibleObject function for improved optimization on TScrollBox](https://quality.embarcadero.com/browse/RSP-42357)
-* [The width and height of a TContext3D object must be defined as single-precision, not as integers](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1723)
-* [TTextLayout.PositionAtPoint / TTextLayoutD2D.DoPositionAtPoint totally broken in Alexandria](https://quality.embarcadero.com/browse/RSP-39734)
-* [Regression in Alexandria: FMX.StrokeBuilder.pas Revamp Leads to TARC Drawing Issues](https://quality.embarcadero.com/browse/RSP-41618)
-* [Multi-Threading for TBitmap, TCanvas, and TContext3D is not working !](https://quality.embarcadero.com/browse/RSP-19673)
-* [Allow linking of Swift compatibility frameworks](https://quality.embarcadero.com/browse/RSP-38700)
-* [Allow TTexture to Define a GL_TEXTURE_EXTERNAL_OES Target](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1550)
-* [Make CanvasHelper of TCanvasGpu public](https://quality.embarcadero.com/browse/RSP-18797)
-* [Allow TTexture to Define a Material (GLSL Shader) to Use](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1549)
-* [On iOS we need to pass options: PNSDictionary with the message TApplicationEvent.FinishedLaunching](https://quality.embarcadero.com/browse/RSP-40351)
-* [AVPlayerItem miss the function addOutput](https://quality.embarcadero.com/browse/RSP-16853)
-* [CLVisit is missing from the implementation of CLLocationManager](https://quality.embarcadero.com/browse/RSP-18621)
-* [Miss kCIInputImageKey in iOSapi.CoreImage.pas](https://quality.embarcadero.com/browse/RSP-19878)
-* [Effect ProcessTexture is not working and function TFilter.InputTexture: TTexture do unecessary work](https://quality.embarcadero.com/browse/RSP-20825)
-* [TVirtualKeyboardAndroid.GetVirtualKeyboardState not accurate](https://quality.embarcadero.com/browse/RSP-24737)
-* [Add NSPersonNameComponents in iOSapi.Foundation.pas](https://quality.embarcadero.com/browse/RSP-28096)
-* [Comparison of 2 interfaces result in bad behavior in TCommonCustomForm.SetHovered and similar](https://quality.embarcadero.com/browse/RSP-36612)
 * [Improve Rendering Timing by Using Choreographer Instead of Runnable](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2865)
-* [Need JNotificationClass.AUDIO_ATTRIBUTES_DEFAULT and JNotificationChannel.setSound](https://quality.embarcadero.com/browse/RSP-39511)
-* [iOS/OSX: Declaration for CLRegion.initCircularRegionWithCenter is incorrect](https://quality.embarcadero.com/browse/RSP-15717)
-* [Missing Declaration of maximumFramesPerSecond Function in UIScreen Interface](https://quality.embarcadero.com/browse/RSP-43458)
-* [Resolve Circular Reference in JBitmapClass by Refactoring JHardwareBuffer Declaration](https://quality.embarcadero.com/browse/RSP-44100)    
-* [Add Missing drawBitmap functions to JRecordingCanvas Interface](https://quality.embarcadero.com/browse/RSP-44102)
-* [Miss kCIFormatRGBA8 and kCIFormatBGRA8 in iOSapi.CoreImage.pas](https://quality.embarcadero.com/browse/RSP-44130)
-* [Miss UITraitCollection.displayGamut in iOSapi.UIKit.pas](https://quality.embarcadero.com/browse/RSP-44208)
-* [Update Pressed Property Setter in TControl to Enhance State Change Tracking](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1323)
-* [Architectural Issues in FMX.Skia.Canvas.GL](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1541)
-* [Missing Declaration of CTFontManagerRegisterGraphicsFont in Macapi.CoreText.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1929)
-* [Request to Add Interfaces and Methods in Macapi.AppKit.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1933)
-* [Missing Functions in Macapi.CoreText.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1934)
-* [Missing &string Method in NSAttributedString Interface in Macapi.Foundation.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1935)
-* [Modify libImageIO Constant in Macapi.ImageIO.pas to Include iOS Support](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1936)
-* [Missing Functions in Macapi.QuartzCore.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1937)
-* [Missing CoreText Constant Functions in iOSapi.CoreText.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1938)
-* [Missing CVMetalTexture and CVMetalTextureCache Declarations in iOSapi.CoreVideo.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1939)
-* [Missing Method Declarations in UITextView and UITextField Interfaces in iOSapi.UIKit.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1941)
-* [Add Additional Notification Icon Sizes for iOS 16+](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2171)
-* [Update TAlignLayout to Include New Alignment Options for Centering Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2342)
-* [Enhance TCustomForm.DoAddObject to Properly Handle FUpdating State for Controls](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2388)
-* [Add the CAFrameRateRange record and preferredFramesPerSecond/preferredFrameRateRange to CADisplayLink](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2424)
-* [Add getEventTimeNanos and getHistoricalEventTimeNanos to JMotionEvent](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2992)
-* [Incorrect indentation of end; in TScreen.IndexFormOfObject](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2902)
-* [ForceQueue with Delay Does Not Work on Android](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3206)
-* [FullScreenManager.showSystemUI Resets SystemUiVisibility](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3207)
-* [Component Type Name Cannot Contain a "."](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3213)
+* [Allow TTexture to Define a Material (GLSL Shader) to Use](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1549)
+* [TControl.DoRemoveObject should only realign when the removed control is visible](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4001)
 * [TControl.SetBounds: Missing ParentContentChanged Call on Size-Only Updates](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3264)
+* [Missing ResetUpdatingState call in TCustomForm.DoRemoveObject](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4302)
+* [Effect ProcessTexture is not working and function TFilter.InputTexture: TTexture do unecessary work](https://quality.embarcadero.com/browse/RSP-20825)
+* [TAndroidMotionManager does not handle AMOTION_EVENT_ACTION_CANCEL](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3762)
+* [Add ExtractContentStream to TURLResponse / IURLResponse to allow taking ownership without copying.](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4664)
+* [Architectural Issues in FMX.Skia.Canvas.GL](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1541)
+* [FMX.VirtualKeyboard.Android: Unused variable and unnecessary logic in Delphi 13 update](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4311)
+* [Project option to define where to look/create the LaunchScreen.TemplateiOS directory](https://quality.embarcadero.com/browse/RSP-33503)
+* [Replace Pointer-based signatures in iOS/macOS bridges with strongly typed wrappers](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4433)
+* [Performance Issue - Comparing Equality Between Two Strings](https://quality.embarcadero.com/browse/RSP-42011)
+* [Allow linking of Swift compatibility frameworks](https://quality.embarcadero.com/browse/RSP-38700)
+* [need to uncomment _GetAUDIO_ATTRIBUTES_DEFAULT from JNotificationClass](https://quality.embarcadero.com/browse/RSP-21296)
+* [Resolve Circular Reference in JBitmapClass by Refactoring JHardwareBuffer Declaration](https://quality.embarcadero.com/browse/RSP-44100)    
+* [Update Pressed Property Setter in TControl to Enhance State Change Tracking](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1323)
+* [Add Additional Notification Icon Sizes for iOS 16+](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-2171)
+* [ForceQueue with Delay Does Not Work on Android](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3206)
+* [AndroidManifest merge in Delphi does not respect tools:node="remove" directive for uses-permission](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3867)
+* [Uncomment missing init overloads in JCipher to enable standard Android Crypto API usage](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-3921)
+* [FMX: TAlignLayout.TopLeft ignores Margins on child control](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4335)
+* [iOS: UNNotificationPresentationOptionNone removed from iOSapi.UserNotifications in Delphi 13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4325)
+* [CVOpenGLESTextureCacheCreate expects raw Obj-C pointer for eaglContext](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4333)
+* [macOS: Align NSTextField.setDelegate signature with other AppKit setters](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4352)
+* [UIViewAutoresizing changed from NSUInteger to NSInteger in Delphi 13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4410)
+* [iOS API regression: UNNotificationAttachment.attachmentWithIdentifier returns Pointer](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4411)
+* [iOS API regression: UNNotificationRequest.requestWithIdentifier returns Pointer](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4412)
+* [iOS: UNNotificationPresentationOptionNone removed from iOSapi.UserNotifications in Delphi 13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4325)
+* [Security.framework: kSec* constants return type inconsistent between macOS (NSString) and iOS (CFStringRef)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4404)
+* [Inconsistent NSUserDefaultsClass.standardUserDefaults return type (macOS = Pointer, iOS = NSUserDefaults)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4389)
+* [Foundation/NSURL: fileURLWithPath: return type inconsistent between macOS and iOS headers](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4402)
+* [NSURL factory methods return types are inconsistent in D13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4401)
+* [Foundation: NSURLCredentialPersistence changed from NSUInteger to NSInteger in Delphi 13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4399)
+* [Foundation: NSKeyValueObservingOptions changed from NSUInteger to NSInteger in Delphi 13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4398)
+* [CoreText: CTParagraphStyleCreate parameter type changed to NativeUInt in D13 — should be NativeInt ](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4397)
+* [CoreText: CTParagraphStyleSpecifier widened from 32-bit to 64-bit in Delphi 13](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4396)
+* [CGImageAlphaInfo mapped to NSInteger in Delphi 13 (was UInt32 in Delphi 12)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4393)
+* [CGBlendMode mapped to NSInteger in Delphi 13 (was UInt32 in Delphi 12)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4392)
+* [CGBitmapInfo mapped to NSInteger in Delphi 13 (was UInt32 in Delphi 12)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4391)
+* [UNUserNotificationCenter.setDelegate changed from UNUserNotificationCenterDelegate to Pointer](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4344)
+* [macOS/iOS: Inconsistent CIFilterClass.filterWithName return type (macOS = Pointer, iOS = CIFilter)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4348)
+* [macOS/iOS: Inconsistent NSNumberClass.numberWithFloat return type (macOS = Pointer, iOS = NSNumber)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4349)
+* [macOS/iOS: Inconsistent CIContextClass.contextWithOptions return type (macOS = Pointer, iOS = CIContext)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4350)
+* [macOS/iOS: Inconsistent CIImageClass.imageWithCGImage return type (macOS = Pointer, iOS = CIImage)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4347)
+* [Missing Functions in Macapi.QuartzCore.pas](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4346)
+* [macOS: Add missing NSTextField APIs (delegate getter/setter + placeholder getters/setter)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4353)
+* [iOS vs macOS mismatch in CGImageDestinationFinalize declaration (Boolean vs Integer return type)](https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4714)
 
 
 Install Alcinoe
@@ -137,7 +170,7 @@ will need to install the BPL. Open Delphi, go to
 Component > Install Packages..., and select the BPL 
 from [Libraries\bpl\Alcinoe](https://github.com/MagicFoundation/Alcinoe/tree/master/Libraries/bpl/Alcinoe). 
 Additionally, include both [Source](https://github.com/MagicFoundation/Alcinoe/tree/master/Source) 
-and all subdirectories from [Embarcadero\Athens](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/Athens/) 
+and all subdirectories from [Embarcadero\Florence](https://github.com/MagicFoundation/Alcinoe/tree/master/Embarcadero/Florence/) 
 in your search path.
 
 
@@ -286,7 +319,16 @@ rich text.
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3button.png?raw=true" />
 
-### 2. **TALCheckBox and TALRadioButton**
+### 2. **TALToggleButton**
+**TALToggleButton** is a customizable toggle control with distinct styles 
+for On and Off across all states — **Enabled**, **Pressed**, **Focused**, **Hovered**, 
+and **Disabled**. It supports **fill, border, shadow**, and **font** customization, 
+as well as HTML content for icons or rich text, making it ideal for 
+interactive Material 3 components.
+
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3tooglebutton.gif?raw=true" />
+
+### 3. **TALCheckBox and TALRadioButton**
 Both controls follow Material 3’s minimalistic and responsive 
 design. They include customizable properties for **checkmark, 
 border**, and **shadow** and utilize smooth transitions between states. 
@@ -308,7 +350,7 @@ Delphi applications.
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3switch.gif?raw=true" />
 
-### 3. **TALTrackBar and TALRangeTrackBar**
+### 5. **TALTrackBar and TALRangeTrackBar**
 **TALTrackBar** allows for extensive customization of its appearance 
 and behavior, making it an ideal choice for implementing Material 3’s 
 clean and modern slider design. You can easily customize the track and 
@@ -321,7 +363,7 @@ and **Pressed** contribute to a polished, fluid user experience.
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3trackbar.gif?raw=true" />
 
-### 4. **TALEdit and TALMemo**
+### 6. **TALEdit and TALMemo**
 Alcinoe’s native **TALEdit** and **TALMemo** controls are designed to 
 match Material 3’s input fields, offering customizable **border, 
 shadow**, and **font** properties. These controls adapt across platforms 
@@ -330,23 +372,27 @@ with features like autosizing and prompt text.
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3edit.webp?raw=true" />
 
-## Why Alcinoe for Material 3?
-While Material 3 focuses on responsive and adaptive design, 
-performance is equally important. Alcinoe’s double-buffered 
-rendering ensures that your controls are fast and fluid, 
-even during complex UI interactions like scrolling. This 
-performance boost aligns perfectly with Material 3’s goal 
-of seamless, responsive user interfaces.
-
-Incorporating Alcinoe in your Delphi projects allows you to 
-create modern, high-performance apps with a polished 
-Material 3 appearance, without compromising on speed or 
-cross-platform compatibility.
-
-Learn more at [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls)
-<br/>
-<br/>
   
+Effortless Theming with TALStyleManager
+=======================================
+
+All Alcinoe controls can be easily styled using **TALStyleManager**. To achieve 
+this, you simply define a custom style for each control by modifying
+**Alcinoe.FMX.CustomStyles.pas**.
+
+In addition, the **TALStyleManager** makes it straightforward to implement light 
+and dark theme variants—or any other custom theme.
+
+The core of this flexibility lies in the fact that each Alcinoe control associates 
+a **ColorKey** with every **Color** property. You can assign a symbolic value to 
+this key, such as **Material3.Color.Primary**. Then, within **TALStyleManager**,
+you define the actual color value mapped to **Material3.Color.Primary**.
+
+This design allows you to switch effortlessly between light, dark, or custom 
+themes—ensuring both consistency and maintainability.
+
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/lightdarkmode.jpg?raw=true" />
+
 
 High-Performance Text Control with HTML Formatting and Interactive Capabilities
 ===============================================================================
@@ -370,6 +416,7 @@ responsive text behavior. Learn more at
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/htmltext.png?raw=true" />
 <br/>
   
+  
 TALPageController – The Page Transition Maestro
 ===============================================
 
@@ -381,8 +428,9 @@ and customize the behavior of scrolling animations and
 transitions. Learn more at 
 [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls)
 
-<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pagecontroller.gif?raw=true" />
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pagecontroller.gif?raw=true" width="380" style="width:380px;" />
 <br/>
+  
   
 TALPageIndicator – Animated Multi-Page Navigator
 ================================================
@@ -408,8 +456,93 @@ design preferences.
 | LinearSwap         |              ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_linearswap.gif?raw=true)     | 
 | SpinSwap           |         ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_spinswap.gif?raw=true)            |
 | Color              |        ![](https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/pageindicator_color.gif?raw=true)                | 
-
+<br/>
   
+  
+Design Flexible, Modern Dialogs with TALDialog
+==============================================
+
+**TALDialog** is a dialog component built for mobile 
+applications. It provides the flexibility to display 
+highly customizable dialogs with a modern, 
+Material 3 design.
+
+It uses the <b>Builder Pattern</b> with <b>fluent method 
+chaining</b>, making the dialog creation process 
+simple and intuitive:
+
+```
+  TALDialog.Builder
+    .SetHeadlineText('Delete item')
+    .SetMessageText('Are you sure?')
+    .AddButton('Cancel', 1)
+    .AddButton('Delete', 2)
+    .SetCloseProc(...)
+    .Show;
+```
+  
+<p>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/dialog.gif?raw=true" alt="dialog" />
+</p>
+
+Learn more at [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls) 
+<br/>
+<br/>
+
+
+Material-Inspired Loading Indicator
+===================================
+
+A modern loading indicator inspired by Material 3 design. 
+Ideal for signaling that an operation is in progress, it 
+uses subtle motion and minimal design to reassure users 
+that the app is working, even when results aren't immediate.
+
+<p>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3loadingindicator.gif?raw=true" alt="Loading Indicator" width="480" style="width:480px;" />
+</p>
+
+Learn more at [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls) 
+<br/>
+<br/>
+
+
+Create Versatile Sheets with TALSheet
+=====================================
+
+**TALSheet** is a flexible sheet component designed for 
+mobile applications. It can appear from the top, bottom, 
+left, or right edge of the screen. Following modern 
+Material 3 design guidelines, TALSheet is perfect for 
+presenting contextual content, navigation panels, or 
+action menus with smooth, customizable animations.
+
+<p>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3bottomsheet.png?raw=true" alt="bottom sheet" width="580" style="width:580px;" />
+</p>
+
+Learn more at [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls) 
+<br/>
+<br/>
+  
+
+Create Clear, Timed Messages with TALSnackbar
+=============================================
+
+**TALSnackbar** is a lightweight, transient message bar 
+that follows Material 3. It’s ideal for brief status updates 
+or confirmations and can include an optional action 
+(e.g., “UNDO”).
+
+<p>
+  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/material3snackbar.gif?raw=true" alt="Snackbar" width="800" style="width:800px;" />
+</p>
+
+Learn more at [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxControls) 
+<br/>
+<br/>
+    
+
 Video Player for FireMonkey
 ===========================
 
@@ -439,26 +572,47 @@ Learn more at [Demos/ALFmxControls](https://github.com/MagicFoundation/Alcinoe/t
 <br/>
 
 
-WebRTC Delphi Wrapper
-=====================
+TALMediaPicker — Unified Media Picker
+=====================================
 
-WebRTC (Web Real-Time Communications) is a technology that 
-allows web applications and sites to capture and stream 
-audio and/or video media, as well as exchange arbitrary 
-data between browsers and mobile applications without an 
-intermediary. The set of standards behind WebRTC enables 
-peer-to-peer data sharing and teleconferencing without 
-the need for plug-ins or third-party software.
+**TALMediaPicker** provides a unified, high-level API to select 
+images and videos from the device library or capture new media 
+with the camera across iOS and Android. It abstracts 
+platform specifics (iOS PHPickerViewController/UIImagePickerController, 
+Android ACTION_PICK_IMAGES/GET_CONTENT and camera intents), 
+handles permission flows, and normalizes 
+results into TMediaItem objects with URIs and media types. 
+The component supports multiple selection, returns streams on 
+demand (ExtractStream), and exposes clear callbacks for success, 
+cancel, and error states—letting you integrate media workflows 
+quickly without dealing with per-platform quirks like 
+FileProvider URIs, picker filters, or temporary file management.
+Learn more at [Demos/ALFmxMediaPicker](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxMediaPicker)
 
-<p align="center">
-  <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/webrtc.jpg?raw=true" alt="Delphi WebRTC wrapper" />
-</p>
-
-With the **TALWebRTC** component, you can easily integrate 
-video and audio chat into your applications, providing users 
-with a more interactive and immersive experience! 
-Learn more at [Demos/ALLiveVideoChat](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALLiveVideoChat)
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/mediapicker.png?raw=true" alt="mediapicker" />
 <br/>
+
+  
+ALHttpWorker - Upload and download data reliably in the background — even when the app is killed
+================================================================================================
+
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/backgroundhttptransfer.png?raw=true"/>
+  
+Imagine you're building a chat app: when the user taps **Send**, 
+you could send the message on the **main thread**, but this freezes 
+the UI and is forbidden by mobile operating systems. Another option 
+is a **background thread**, however this fails when the user switches 
+apps (incoming phone call, home button, etc.), since iOS and Android 
+suspend or kill HTTP networking in background mode. You also have to 
+deal with unreliable mobile connectivity (temporary loss of Wi-Fi / 
+4G / 5G) and manually manage retries and server unavailability.
+
+**TALHttpWorker** solves all these problems. Simply enqueue the 
+upload using **`TALHttpWorker.enqueue`**, and you no longer need 
+to worry about network reliability, app switching, app termination, 
+or temporary server errors (`HTTP 5xx`, unreachable host, etc.). 
+**TALHttpWorker** handles everything automatically and posts a 
+**`TWorkResultMessage`** when the job is completed.
 <br/>
   
   
@@ -474,7 +628,7 @@ color, ensuring seamless integration into any project.
 Whether it's for celebrations, notifications, or 
 dynamic visual effects, **ALConfetti** delivers a 
 smooth, high-performance animation experience. 
-Learn more at [Demos/ALConfetti](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALConfetti)
+Learn more at [Demos/ALFmxConfetti](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxConfetti)
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/confetti.gif?raw=true" alt="confetti" width="564" style="width:564px;" />
 <br/>
@@ -592,7 +746,7 @@ far beyond the traditional ease-in or ease-out sequences.
 </p>
 
 Learn more at 
-[Demos/ALAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALAnimation)
+[Demos/ALFmxAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxAnimation)
 <br/>
 <br/>
 
@@ -600,8 +754,8 @@ Learn more at
 SpringForce Animation
 =====================
 
-<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/springforce.gif?raw=true" alt="SpringForce Animation" align="left" width="320" height="711" />
-<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" align="left" width="1" height="711" />
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/springforce.gif?raw=true" alt="SpringForce Animation" align="left" width="320" height="711" style="width:320px; height:711px;" />
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" align="left" width="1" height="711" style="height:711px;" />
   
 Inspired by Android's **SpringForce**, the **TALSpringForceAnimation** 
 component brings the dynamics of physics-based animations to the 
@@ -618,7 +772,7 @@ This version improves the flow and clarity of the description
 while keeping the markdown formatting
 
 Learn more at 
-[Demos/ALAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALAnimation)
+[Demos/ALFmxAnimation](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxAnimation)
 
 <br clear="left"/>
 <br/>
@@ -627,8 +781,8 @@ Learn more at
 Scrolling Engine
 ================
 
-<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/scrollingengine.gif?raw=true" alt="Scrolling Engine" align="right" width="222" height="480" />
-<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" align="right" width="32" height="480" />
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/scrollingengine.gif?raw=true" alt="Scrolling Engine" align="right" width="222" height="480" style="width:222px; height:480px;" />
+<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/empty.png?raw=true" align="right" width="32" height="480" style="width:32px; height:480px;" />
   
 **TALOverScroller** and **TALVelocityTracker** are key components 
 of the **TALScrollEngine**, enhancing user interface interactions. 
@@ -665,24 +819,24 @@ to mobile users, improving engagement and communication within
 their apps.
 
 Learn more at 
-[Demos\ALNotificationService](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALNotificationService)
+[Demos\ALFmxNotificationService](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxNotificationService)
 <br/>
 <br/>
 
 
-GeoPositioning for Android/iOS
-==============================
+Geolocation for Android & iOS 
+=============================
 
 <img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/geopositioning.webp?raw=true" width="540" style="width:540px;"/>
 
-The **TALGeoPositionSensor** component is a Delphi component that 
+The **TALGeoLocationSensor** component is a Delphi component that 
 provides access to location services on iOS and Android devices. 
 It allows developers to retrieve the device's current location 
 and receive updates as the location changes. The component supports 
 various location providers, including GPS, cellular network 
 triangulation, and Wi-Fi positioning.
 
-In addition to accessing location services, **TALGeoPositionSensor** 
+In addition to accessing location services, **TALGeoLocationSensor** 
 automates the process of requesting user permission to use location 
 data on both iOS and Android. It also handles scenarios where users 
 have previously denied location access. By using this component, 
@@ -690,7 +844,7 @@ developers can seamlessly integrate location-based functionality
 into their apps without needing to manage the underlying 
 implementation details.
 
-Learn more at [Demos\ALGeoPositionSensor](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALGeoPositionSensor)
+Learn more at [Demos\ALFmxGeoLocationSensor](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxGeoLocationSensor)
 <br/>
 <br/>
   
@@ -720,7 +874,7 @@ Once logged in, users can grant permissions to your app, enabling you
 to retrieve information or perform actions on VKontakte/Facebook 
 on their behalf.
 
-Learn more at [Demos\ALFacebookLogin](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFacebookLogin)
+Learn more at [Demos\ALFmxFacebookLogin](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALFmxFacebookLogin)
 <br/>
 <br/>
 
@@ -742,6 +896,42 @@ Learn more at [Demos\ALFmxFilterEffects](https://github.com/MagicFoundation/Alci
 <br/>
   
   
+High-Performance HTTP Server (http.sys)
+=======================================
+
+TALHttpSysServer is a high-performance HTTP server component for 
+Delphi that runs directly on top of http.sys, the kernel-mode HTTP 
+stack built into Windows. By leveraging the same foundation that 
+powers IIS, it delivers production-grade performance, scalability, 
+and security without requiring an external web server. With 
+TALHttpSysServer, you can build lightweight yet powerful REST APIs, 
+RPC services, or custom HTTP applications while letting the Windows 
+kernel handle the heavy lifting.
+
+Advantages of using http.sys:
+
+- Kernel-mode HTTP stack → runs directly inside Windows networking core, giving you
+  IIS-level performance, stability, and security without needing a heavyweight web server.
+- Port sharing → multiple apps can listen on the same port with different URL prefixes.
+- I/O Completion Ports → your thread only spends time building the response.
+  Receiving requests and sending responses (even to very slow clients) is
+  handled in the kernel, so your thread never blocks. Concretely, this means
+  a single thread can handle thousands of simultaneous connections.
+- TLS/SSL handled in kernel → you don’t manage OpenSSL/Schannel yourself
+- Modern protocols → supports HTTP/1.1, HTTP/2, and HTTP/3 (QUIC) out of the box.
+- Automatic timeout handling → idle, header, and entity-body timeouts enforced by kernel.
+- Kernel-mode response caching → frequently requested responses can be cached directly
+  in kernel space, bypassing user-mode, which reduces latency and CPU usage.
+- Kernel-managed W3C logging → http.sys writes W3C logs for you and handles
+  file rotation and I/O off the request path, so your app avoids blocking.
+- Quality of Service (QoS) → bandwidth throttling and connection limits built in.
+- Widely tested → same engine IIS uses under the hood
+
+Learn more at [Demos\ALHttpServer](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALHttpServer)
+<br/>
+<br/>
+
+
 Json Parser
 ===========
 
@@ -813,30 +1003,30 @@ Example :
 
 ```
     //Create the ImageMagick Library
-    ALCreateImageMagickLibrary({alcinoe} + '\Libraries\dll\imagemagick\win32\imagemagick', min(2, System.CPUCount){aThreadLimit});
+    ALCreateImageMagickLibrary({alcinoe} + '\Libraries\dll\imagemagick\win32\imagemagick');
     try
     
       //create the wand pointer
-      var LWand := ALImageMagickLib.NewMagickWand;
+      var LWand := NewMagickWand;
       try
     
         //load the image
-        if ALImageMagickLib.MagickReadImage(LWand, pansiChar(aInputFilename)) <> MagickTrue then RaiseLastMagickWandError(LWand);
+        if MagickReadImage(LWand, pansiChar(aInputFilename)) <> MagickTrue then RaiseLastMagickWandError(LWand);
         
         //Set the compression quality
-        if ALImageMagickLib.MagickSetImageCompressionQuality(LWand,80) <> MagickTrue then RaiseLastMagickWandError(LWand);
+        if MagickSetImageCompressionQuality(LWand,80) <> MagickTrue then RaiseLastMagickWandError(LWand);
     
         //autorate the image
-        if ALImageMagickLib.MagickAutoOrientImage(LWand) <> MagickTrue then RaiseLastMagickWandError(LWand);
+        if MagickAutoOrientImage(LWand) <> MagickTrue then RaiseLastMagickWandError(LWand);
     
         //Resize the image using the Lanczos filter
-        if ALImageMagickLib.MagickResizeImage(LWand, 640, 480, LanczosFilter) <> MagickTrue then RaiseLastMagickWandError(LWand);
+        if MagickResizeImage(LWand, 640, 480, LanczosFilter) <> MagickTrue then RaiseLastMagickWandError(LWand);
            
         //save the image
-        ALImageMagickLib.MagickWriteImage(LWand, pansiChar(aOutputFilename));
+        MagickWriteImage(LWand, pansiChar(aOutputFilename));
     
       finally
-        ALImageMagickLib.DestroyMagickWand(LWand);
+        DestroyMagickWand(LWand);
       end;
   
     finally
@@ -845,90 +1035,7 @@ Example :
 
 ```
 
-Learn more at [Source/Alcinoe.ImageMagick.pas](https://github.com/MagicFoundation/Alcinoe/tree/master/Source/Alcinoe.ImageMagick.pas)
-<br/>
-<br/>
-  
-
-Streamlining Object Initialization with TALInit
-===============================================
-
-In the constant evolution of software development, we often find ourselves
-seeking ways to reduce boilerplate code and enhance the maintainability of our
-projects. One such instance where boilerplate can become cumbersome is in the
-initialization of class fields. The traditional method involves explicitly
-setting each field's value in the constructor, which can be tedious, especially
-for classes with numerous fields. Enter TALInit—a feature that allows
-automatic initialization of object fields based on their attributes.
-
-#### The Traditional Way ####
-
-In the typical approach, developers manually initialize object fields in the
-constructor. Take the following class as an example:
-
-```
-    TAutoInitObject = class(TObject)
-    public
-      CharValue: Char;
-      ChildObject: TChildObject;
-    public
-      constructor Create; virtual;
-      destructor Destroy; override;
-    End;
-```
-
-Here, each field is initialized in the Create constructor:
-
-```
-  constructor TAutoInitObject.create(const aOwner: Tform1; const AAutoInit: Boolean);
-  begin
-    CharValue := 'A';
-    ChildObject := TChildObject.create;
-    ChildObject.Name := 'AnObject';
-    ChildObject.Value := 12.2;
-  end;
-
-  destructor TAutoInitObject.Destroy;
-  begin
-    ALFreeandNil(ChildObject);
-    inherited;
-  end;
-```
-
-While this method offers precise control, it can become tedious for large
-classes with numerous fields.
-
-#### The TALInit Way ####
-
-Imagine having a mechanism that not only automates this but is also as fast as
-the traditional way - yes, you read that right. TALInit achieves this
-remarkable feat.
-
-```
-  TAutoInitObject = class(TObject)
-  public
-    [TALInit('A')]
-    CharValue: Char;
-    [TALInit('Name:AnObject;Value:12.2')]
-    ChildObject: TChildObject;
-  End;
-```
-
-By using custom attributes, every field within the object can be automatically
-initialized based on its corresponding attribute. This eliminates the need for
-manually setting each field within the constructor. The above snippet showcases
-just how concise and readable object field initialization can become with
-TALInit.
-
-#### Performance - A Game Changer: ####
-
-One of the strongest advantages of using TALInit is its performance. When
-introducing automation, a natural concern is the overhead that might come with
-it. However, TALInit is designed to be as efficient as the traditional way
-of initializing fields. This means developers can enjoy the convenience
-without having to worry about any hidden costs in execution time.
-
-Learn more at [Alcinoe/tree/master/Demos/ALRTTI](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALRTTI)
+Learn more at [Demos\ALImageMagick](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALImageMagick)
 <br/>
 <br/>
 
@@ -954,26 +1061,6 @@ Learn more at [Source/Alcinoe.MongoDB.Client.pas](https://github.com/MagicFounda
 <br/>
   
 
-WebSocket client
-================
-
-<img src="https://github.com/MagicFoundation/Alcinoe/blob/master/References/DocImages/websocket.png?raw=true"  width="540" style="width:540px;"/>
-
-The **WebSocket client** for Delphi is built on top of **WinHTTP** and 
-provides a communication protocol for two-way, interactive communication 
-sessions between a user's browser and a server. This enables sending 
-messages to a server and receiving event-driven responses without the 
-need for constant polling. 
-
-With WebSocket, real-time communication is streamlined, making it ideal 
-for applications that require low-latency, continuous data exchange 
-between the client and server. 
-
-Learn more at [Demos\ALWinHTTPWebSocketClient](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALWinHTTPWebSocketClient)
-<br/>
-<br/>
-  
-
 Fast TStringList
 ================
 
@@ -994,24 +1081,6 @@ You can start exploring this feature with the demo located at
 [Demos\ALSortedListBenchmark](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALSortedListBenchmark)
 <br/>
 <br/>
-
-
-PHP runner
-==========
-
-**ALPHPRunnerEngine** is a simple yet powerful component that allows 
-you to seamlessly use **PHP** (any version) as a scripting language 
-within Delphi applications. With **ALPHPRunnerEngine**, you can 
-execute PHP scripts directly in your Delphi program without the 
-need for a web server. 
-
-This component leverages the **CGI/FastCGI** interface (using **php-cgi.exe**) 
-to communicate with the PHP engine, making it easy to integrate PHP 
-functionality into Delphi-based projects.
-
-Learn more at [Demos\ALPhpRunner](https://github.com/MagicFoundation/Alcinoe/tree/master/Demos/ALPhpRunner)
-<br/>
-<br/>
   
 
 Memcached Client
@@ -1025,20 +1094,6 @@ caching frequently accessed data in memory, Memcached helps
 improve the performance and scalability of applications.
 
 Learn more at [Source/Alcinoe.MemCached.Client.pas](https://github.com/MagicFoundation/Alcinoe/tree/master/Source/Alcinoe.MemCached.Client.pas)
-<br/>
-<br/>
-  
-
-GSM Component
-=============
-
-The **TAlGSMComm** component enables SMS text messaging 
-using the text-mode interface defined in the **GSM Technical 
-Specification 07.05**. This component allows for easy 
-integration of SMS functionality into your applications, 
-adhering to the standard protocols used in GSM networks.
-
-Learn more at [Source/Alcinoe.GSMComm.pas](https://github.com/MagicFoundation/Alcinoe/tree/master/Source/Alcinoe.GSMComm.pas)
 <br/>
 <br/>
   
@@ -1061,10 +1116,7 @@ Learn more at [Source/Alcinoe.Sqlite3.Client.pas](https://github.com/MagicFounda
 And Much More
 =============
 
-* CGI Runner 
-* Http Client (WinInet/WinHTTP)
-* MySQL Client 
-* NNTP Client
+* HTTP Client (WinHTTP)
 * POP3 Client
 * SMTP Client
 * Xml Parser 
@@ -1113,6 +1165,344 @@ undesired conversions.
 
 History
 =======
+
+## 24/12/2025 – Versioning Alignment, API Additions & Behavior Updates
+
+- Align **Alcinoe** versioning with the Delphi compiler version (e.g. Alcinoe built 
+  with Delphi 13.0 now uses version `13.0.x`).
+- Added `HttpWorker.Cancel` method.
+- Added `ToString` helpers for `TRectF`, `TSizeF`, `TPointF`, `TALRectD`, `TALSizeD`, 
+  and `TALPointD`.
+- Added unified path helper functions:
+  - `ALGetAppDataPathW`
+  - `ALGetTempPathW`
+  - `ALGetTempFilenameW`
+  - `ALGetCachePathW`
+- Added `ResourceStream` property to `TALAnimatedImage`.
+- Added `PrependItem`, `AppendItem`, and `DeleteItem` methods to `TALDynamicListBox`.
+- Removed `AddItem` from `TALDynamicListBox` (use `PrependItem` or `AppendItem` instead).
+- `TALEdit` controls are now automatically frozen (using a screenshot for rendering) 
+  when partially visible, improving Z-order simulation.
+- `TALMemo` and `TALEdit` now use `ALResolveLineHeightMultiplier`, ensuring the same 
+  line-height algorithm as `TALText`.
+- Updated `TALNotificationService` to use `TMessage`-based notifications:
+  - `TNotificationReceivedMessage`
+  - `TGetTokenMessage`
+  - `TDeleteTokenMessage`
+  - `TTokenRefreshMessage`
+  - `TNotificationPermissionResultMessage`
+  This replaces event-based callbacks (`OnNotificationReceived`, `OnGetToken`, etc.) and 
+  better aligns with the singleton design.
+- Added an internal `ScrollBox` to `TALBottomSheet` to support content larger than the 
+  maximum visible area.
+- Added `IsAncestorOf` method to `TControl`.
+
+### 25/11/2025 – TALHttpWorker Added
+
+- Added `TALHttpWorker` component to support background upload/download operations
+- Refactoring of HTTP-related types to explicitly separate ANSI (A) 
+  and Unicode (W) variants:
+  - `TALHttpServerRequest` → `TALHttpServerRequestA`
+  - `TALHttpServerResponse` → `TALHttpServerResponseA`
+  - `TALHttpServer` → `TALHttpServerA`
+  - `TALHTTPCookie` → `TALHTTPCookieA` and `TALHTTPCookieW`
+  - `TALHTTPRequestHeaders` → `TALHTTPRequestHeadersA` and `TALHTTPRequestHeadersW`
+  - `TALHTTPResponseHeaders` → `TALHTTPResponseHeadersA` and `TALHTTPResponseHeadersW`
+  - `TALHTTPRequest` → `TALHTTPRequestA` and `TALHTTPRequestW`
+  - `TALHTTPResponse` → `TALHTTPResponseA` and `TALHTTPResponseW`
+  - `AlRfc822DayOfWeekNames` → `AlRfc822DayOfWeekNamesA` and `AlRfc822DayOfWeekNamesW`
+  - `ALRfc822MonthOfTheYearNames` → `ALRfc822MonthOfTheYearNamesA` and `ALRfc822MonthOfTheYearNamesW`
+- `TALUserPreferences` now saves its settings in the file `{PackageName}.user_preferences`
+
+### 16/11/2025 – Framework Improvements
+
+- Renamed TALImage.ApplyExifOrientation to TALImage.ApplyMetadataOrientation
+  for consistency with TALVideoPlayer.ApplyMetadataOrientation.
+
+### 14/11/2025 – Full ImageMagick Wrapper Integration
+
+- Added the complete ImageMagick wrapper, including all functions 
+  and types from MagickCore and MagickWand. This wrapper was 
+  generated automagically using the ImageMagickWrapperGenerator 
+  project.
+
+### 09/11/2025 – Framework Improvements
+
+- Renamed `RotateAccordingToMetadataOrientation` → `ApplyMetadataOrientation`
+- Renamed `RotateAccordingToExifOrientation` → `ApplyExifOrientation`
+- Added `GetSingle`, `GetDouble`, and `GetDateTime` to `TALUserPreferences`
+- `TALBrush` now includes:
+  - `ResourceStream`
+  - `OwnsResourceStream`
+  - `ApplyExifOrientation`
+- `TALImage`:
+  - Now supports `HTTPHeaders` when downloading from a URL
+  - Added `OwnsResourceStream`
+- Renamed `TalExifOrientationInfo` → `TalExifOrientation`
+- Renamed `AlGetExifOrientationInfo` → `AlGetExifOrientation`
+- Added `AApplyExifOrientation` parameter to:
+  - `ALCreateSkSurfaceFromResource`
+  - `ALCreateSkImageFromResource`
+  - `ALCreateJBitmapFromResource`
+  - `ALCreateCGContextRefFromResource`
+  - `ALCreateCGImageRefFromResource`
+  - `ALCreateTBitmapFromResource`
+  - `ALCreateBitmapFromResource`
+  - `ALCreateDrawableFromResource`
+- Updated `TALDialog`, `TALLoadingOverlay`, and `TALSheet` to emulate overlays over system bars (via system bar color adjustments)
+- Added `ALGetSystemBarsColor` and `ALSetSystemBarsColor`
+
+### 24/10/2025 – New Components & Enhancements  
+
+- **TALMediaPicker**: New cross-platform component to select
+  images/videos or capture media from the camera.  
+- **TALVideoPlayer**: Added `RotateAccordingToMetadataOrientation` 
+  property to automatically adjust playback orientation.  
+- **TALImage**: Added `ResourceStream` property to load 
+  images directly from a stream.
+  
+
+### 02/10/2025 – Framework Updates
+
+- Archived
+  - `Alcinoe.CGI.pas`
+  - `Alcinoe.ExprEval.pas`
+  - `Alcinoe.FTP.Client.WinINet.pas`
+  - `Alcinoe.FTP.Client.pas`
+  - `Alcinoe.GSMComm.pas`
+  - `Alcinoe.HTTP.Client.WinINet.pas`
+  - `Alcinoe.IsapiHTTP.pas`
+  - `Alcinoe.LibPhoneNumber.pas`
+  - `Alcinoe.MySql.Client.pas`
+  - `Alcinoe.MySql.Wrapper.pas`
+  - `Alcinoe.NNTP.Client.pas`
+  - `Alcinoe.PhpRunner.pas`
+  - `Alcinoe.SphinxQL.Client.pas`
+  - `Alcinoe.WebSocket.Client.WinHTTP.pas`
+  - `Alcinoe.WebSocket.Client.pas`
+  - `Alcinoe.ZLibEx.pas`
+  - `Alcinoe.ZLibExGZ.pas`
+  - `ZLibEx.inc`
+  - `ZLibEx.pas`
+  - `ZLibExApi.pas`
+  - `ZLibExGZ.pas`
+  - `Alcinoe.iOSApi.WebRTC.pas`
+  - `Alcinoe.FMX.WebRTC.pas`
+  - `Alcinoe.AndroidApi.WebRTC.pas`
+  - `Alcinoe.QuickSortList.pas`
+- Renamed
+  - `Alcinoe.Mime.pas` → `Alcinoe.Mime.ContentTypes.pas`  
+  - `Alcinoe.MultiPartParser.pas` → `Alcinoe.Mime.Multipart.pas`  
+  - `Alcinoe.WinApi.Common.pas` → `Alcinoe.WinApi.Windows.pas`  
+  - `ALHTTPEncode` → `ALUrlEncode` and `ALPercentEncode`  
+  - `ALHTTPDecode` → `ALUrlDecode` and `ALPercentDecode`  
+  - `OnChange` → `OnChanged` in `TALStringsA` and `TALStringsW`
+- Added
+  - `TALStringBuilderA` (same as `TStringBuilder` but for `AnsiString`)  
+  - `IncludeTrailingLineBreakInText` property to `TALStringsA` and `TALStringsW`  
+  - `TALHttpSysServer` (an HTTP server built on top of Windows **http.sys**)  
+- Removed
+  - `ALExtractExpressionA`  
+  - `ALExtractHeaderFieldsWithQuoteEscaped` (use `ALExtractHeaderFields` instead)  
+  - `StripParamQuotes` from `ALExtractTagParamsA`  
+  - `TALNewsArticleHeader`   
+
+### 21/08/2025 – Framework Updates
+
+- **ALRectFitInto** and **ALRectPlaceInto**  
+  `CenterAt` is now expressed in normalized coordinates `[0..1]`.
+- **ALDrawMultiLineText**  
+  Now decodes all HTML entities, not only `&gt;` and `&lt;`.
+- **Mouse Events**  
+  `ChildrenMouseDown`, `ChildrenMouseMove`, `ChildrenMouseUp`, `ChildrenMouseEnter`, and `ChildrenMouseLeave`  
+  are now part of Alcinoe and no longer require patching the Embarcadero source file.
+
+### 21/08/2025 – Enhancements & Cleanup
+
+- Removed `AlInt2BaseN` and `AlBaseN2Int`
+- Added `TALJSONNodeA.Clone` and `TALJSONNodeW.Clone`
+- Introduced `ALDefaultEstimateLineHeightMultiplier`: When the 
+  `LineHeightMultiplier` of a text is `0`, the function assigned to 
+  `ALDefaultEstimateLineHeightMultiplier` (e.g. `ALEstimateLineHeightMultiplier`) 
+  will be used to determine the multiplier
+
+### 15/08/2025 – TALText and TALButton Improvements
+
+- Set `TALText.AutoSize` to default to `TALAutoSizeMode.Both`.  
+- If `TALText.MaxWidth = 0`, no explicit maximum width is enforced; 
+  the control expands to the largest width that still fits fully 
+  inside its parent container.  
+- If `TALText.MaxHeight = 0`, no explicit maximum height is enforced; 
+  the control expands to the largest height that still fits fully 
+  inside its parent container.  
+- Added `ShowLoadingIndicator` and `HideLoadingIndicator` methods 
+  to `TALButton` to morph it into a loading indicator.  
+- Renamed resource `alcinoe_loader` to `alcinoe_loading_indicator`.   
+
+### 10/08/2025 – Added TALSnackbar Component
+
+- Added **`TALSnackbar`** component for displaying brief, 
+  informative messages to users with optional actions.
+- Renamed **`TALDownloadContext`** to **`TALWorkerContext`** 
+  to better reflect its broader purpose in managing background tasks.
+- Added **Secure** option to **`TALUserPreferences`** to 
+  enable encrypted storage of sensitive user data.
+
+### 03/08/2025 – Add Loading Indicator
+
+- Added **`TALLoadingOverlay`** component — a full-screen overlay 
+  designed to block user interaction while displaying a Material-inspired 
+  loading indicator.
+
+### 27/07/2025 – New Components and Enhancements
+
+- Added **`TALLeftSheet`**, **`TALRightSheet`**, **`TALTopSheet`**, 
+  and **`TALBottomSheet`**.
+- Updated **`TALDialog`** to support right-to-left layouts (inherits 
+  the `BiDiMode` from the main application form).
+- Improved **`TALDialog`** with smooth upward animation when the 
+  virtual keyboard is displayed.
+- Renamed **`ALBrokenImageResourceName`** from `'broken_image'` to 
+  `'alcinoe_broken_image'`.
+
+#### 16/07/2025 – Z-Order Simulation for Native Controls
+
+- Added `TALWebBrowser`.
+- Introduced `FreezeNativeView` and `UnFreezeNativeView` methods 
+  to `TALNativeControl`-based controls such as `TALEdit`, `TALMemo`, 
+  and `TALWebBrowser`. These methods capture a screenshot of the 
+  underlying native view (`FNativeView`), hide the actual native 
+  control, and draw the captured bitmap in its place. This allows 
+  simulating z-order (e.g., displaying a popup dialog above the 
+  control) without altering the native view hierarchy.
+- Refactored `Alcinoe.FMX.Edit` and `Alcinoe.FMX.Memo` units.
+
+#### 06/07/2025 – Renamed Material Interpolation Types
+
+- **Renamed** the following `TALInterpolationType` entries to use 
+  the `Material3` prefix for improved clarity and alignment with 
+  Material Design 3:
+  - `MaterialExpressiveFastSpatial` → `Material3ExpressiveFastSpatial`
+  - `MaterialExpressiveDefaultSpatial` → `Material3ExpressiveDefaultSpatial`
+  - `MaterialExpressiveSlowSpatial` → `Material3ExpressiveSlowSpatial`
+  - `MaterialExpressiveFastEffects` → `Material3ExpressiveFastEffects`
+  - `MaterialExpressiveDefaultEffects` → `Material3ExpressiveDefaultEffects`
+  - `MaterialExpressiveSlowEffects` → `Material3ExpressiveSlowEffects`
+  - `MaterialStandardFastSpatial` → `Material3StandardFastSpatial`
+  - `MaterialStandardDefaultSpatial` → `Material3StandardDefaultSpatial`
+  - `MaterialStandardSlowSpatial` → `Material3StandardSlowSpatial`
+  - `MaterialStandardFastEffects` → `Material3StandardFastEffects`
+  - `MaterialStandardDefaultEffects` → `Material3StandardDefaultEffects`
+  - `MaterialStandardSlowEffects` → `Material3StandardSlowEffects`
+  - `MaterialEmphasized` → `Material3Emphasized`
+  - `MaterialEmphasizedDecelerate` → `Material3EmphasizedDecelerate`
+  - `MaterialEmphasizedAccelerate` → `Material3EmphasizedAccelerate`
+
+#### 04/07/2025 – Added TALToggleButton and Enhancements
+
+- **Added** `TALToggleButton` control.
+- **Added** Material 3 Expressive button styles.
+- **Extended** `TALInterpolatedAnimation` with `Bezier` support 
+  via `TALInterpolationType` and `TALInterpolationParams`.
+- **Improved** text layout to allow character-level breaking when 
+  word boundaries are not available.
+- **Added** `ClickSound: TALClickSoundMode (Default, Always, Never)` 
+  property to all `TALControl` components.
+- **Changed** `StateLayer.XRadius` and `YRadius` to default to `NaN`, 
+  allowing them to inherit radius values from their parent control.
+
+#### 18/06/2025 – Updates and Refactoring
+
+- Replaced `AutoSize: Boolean` with `AutoSize: TALAutoSizeMode` to provide more granular control over sizing behavior.
+  ```TALAutoSizeMode = (None, Width, Height, All);```
+
+#### 10/05/2025 – Updates and Refactoring
+
+- Removed `ReadyBeforeResourcesLoaded`.
+- Replaced `IsReadyToDisplay` with `IsReadyToDisplay(const AStrict: Boolean = False)`.
+- Renamed `TALAnimation.Interpolation` → `TALAnimation.InterpolationType`.
+- Renamed `TALAnimation.AnimationType` → `TALAnimation.InterpolationMode`.
+- Updated `TALStateTransition.Interpolation` to use `TALAnimation.InterpolationType`.
+- Updated `TALStateTransition.AnimationType` to use `TALAnimation.InterpolationMode`.
+- Refactored `TALAniIndicator`; added `MotionMode = (Frame, Rotate)`.
+- Removed `Trimming` property from `TALBaseTextSettings`.
+
+#### 04/05/2025
+
+- `Fill.ImageNoRadius` is now `True` by default.
+- Added `ALVibrateDevice`.
+- Reactivated `OnDblClick` event.
+- Split the unit `Alcinoe.FMX.DynamicListBox.pas` into several smaller units:
+  - `Alcinoe.FMX.Dynamic.Common.pas`
+  - `Alcinoe.FMX.Dynamic.Controls.pas`
+  - `Alcinoe.FMX.Dynamic.Layouts.pas`
+  - `Alcinoe.FMX.Dynamic.ListBox.pas`
+  - `Alcinoe.FMX.Dynamic.Objects.pas`
+  - `Alcinoe.FMX.Dynamic.PageController.pas`
+  - `Alcinoe.FMX.Dynamic.StdCtrls.pas`
+  - `Alcinoe.FMX.Dynamic.VideoPlayer.pas`
+- Added `IsPreciseGeoLocationAccessGranted` to `TALGeoLocationSensor`.
+
+#### 26/05/2025
+
+- Moved `TALFormatSettingsA` and `TALFormatSettingsW` to the 
+  `Alcinoe.Localization` unit for better organization of 
+  locale-specific utilities.
+- Added `ALIsAlphaString` and `ALIsAlphaNumeric` helper functions 
+  for string validation, and renamed `ALIsDecimal` to 
+  `ALIsNumeric` for improved clarity.
+- Introduced `TALPluralRules`, a new class for handling language-specific 
+  pluralization rules based on numeric values, enabling proper 
+  selection of plural forms in internationalized applications. 
+  This supports use cases such as correctly displaying localized 
+  strings for quantities (e.g., "1 item" vs "2 items") based on 
+  the user's language.
+- Added `TALDialog.GetButtons`, a method that returns the list of 
+  buttons currently attached to the dialog.
+
+#### 19/05/2025
+
+- Added the following easing types to TALInterpolationType, matching Material Design 3 motion system:
+  - MaterialExpressiveFastSpatial
+  - MaterialExpressiveDefaultSpatial
+  - MaterialExpressiveSlowSpatial
+  - MaterialExpressiveFastEffects
+  - MaterialExpressiveDefaultEffects
+  - MaterialExpressiveSlowEffects
+  - MaterialStandardFastSpatial
+  - MaterialStandardDefaultSpatial
+  - MaterialStandardSlowSpatial
+  - MaterialStandardFastEffects
+  - MaterialStandardDefaultEffects
+  - MaterialStandardSlowEffects
+  - MaterialEmphasized
+  - MaterialEmphasizedDecelerate
+  - MaterialEmphasizedAccelerate
+- Removed Overshoot from TALInterpolatedAnimation.
+- Added imageTintColor to TALBrush to allow tinting images with a defined color.
+- Added support for image tint in HTML via:
+  `<img src="{ResourceName}" color="#FFFFFF or {ColorKey} or inherit">`
+- Removed ALConvertFontFamily and replaced it with ALResolveFontFamily.
+- Set TextSettings.IsHtml to true by default.
+- HasTouchScreen is now disabled in debug mode on devices without a touchscreen.
+- Added TALAlignLayout.contents.
+- Introduced new TALDialog component.
+
+#### 08/05/2025
+
+- Added `ColorKey` to pair with each color property.
+- Introduced `TALStyleManager`.
+- In dark mode, resource loading now first checks for `xxx_dark` before loading `xxx`.
+- Renamed `TALIniFile` to `TALIniFileA`.
+- Added `TALUserPreferences`.
+
+#### 24/04/2025 ####
+
+- Rename **alcinoe-common.jar** to **alcinoe-broadcastreceiver.jar**
+
+#### 22/04/2025 ####
+
+- **TALGeoPositionSensor** has been replaced by **TALGeoLocationSensor**.
 
 #### 13/04/2025 ####
 

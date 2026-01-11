@@ -4,28 +4,32 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Presentation.Mac.pas EXIST and adjust the IFDEF'}
 {$ENDIF}
 
 uses
+  System.Types,
   system.Messaging,
   System.TypInfo,
   Macapi.ObjectiveC,
   MacApi.AppKit,
   FMX.Controls,
   FMX.Forms,
-  FMX.Types;
+  FMX.Types,
+  Alcinoe.FMX.Controls,
+  Alcinoe.FMX.Graphics;
 
 type
 
   {********************************}
   TALMacNativeView = class(TOCLocal)
   private
-    FControl: TControl;
+    FControl: TALControl;
     FForm: TCommonCustomForm;
     FVisible: Boolean;
     function GetView: NSView; overload;
+    function GetAbsoluteRect: TRectF;
     procedure BeforeDestroyHandleListener(const Sender: TObject; const AMessage: TMessage);
     procedure AfterCreateHandleListener(const Sender: TObject; const AMessage: TMessage);
     procedure FormSizeChanged(const Sender: TObject; const AMessage: TMessage);
@@ -40,17 +44,20 @@ type
     procedure AncestorVisibleChanged; virtual; //procedure PMAncesstorVisibleChanged(var AMessage: TDispatchMessageWithValue<Boolean>); message PM_ANCESSTOR_VISIBLE_CHANGED;
     procedure RootChanged(const aRoot: IRoot); virtual; //procedure PMRootChanged(var AMessage: TDispatchMessageWithValue<IRoot>); message PM_ROOT_CHANGED;
     procedure ChangeOrder; virtual; //procedure PMChangeOrder(var AMessage: TDispatchMessage); message PM_CHANGE_ORDER;
+    function acceptsFirstResponder: Boolean; virtual; cdecl;
+    function becomeFirstResponder: Boolean; virtual; cdecl;
   protected
     function GetView<T: NSView>: T; overload;
   public
     constructor Create; overload; virtual;
-    constructor Create(const AControl: TControl); overload; virtual;
+    constructor Create(const AControl: TALControl); overload; virtual;
     destructor Destroy; override;
     procedure SetFocus; virtual;
     procedure ResetFocus; virtual;
-    procedure UpdateFrame;
+    procedure UpdateFrame; virtual;
+    function CaptureScreenshot: TALDrawable; virtual;
     property Form: TCommonCustomForm read FForm;
-    property Control: TControl read FControl;
+    property Control: TALControl read FControl;
     property View: NSView read GetView;
     property Visible: Boolean read FVisible;
   end;
@@ -60,7 +67,9 @@ implementation
 
 uses
   FMX.Platform.Mac,
-  Alcinoe.FMX.Common;
+  Alcinoe.Common,
+  Alcinoe.FMX.Common,
+  Alcinoe.FMX.NativeControl;
 
 {**********************************}
 constructor TALMacNativeView.Create;
@@ -73,8 +82,8 @@ begin
   TMessageManager.DefaultManager.SubscribeToMessage(TSizeChangedMessage, FormSizeChanged);
 end;
 
-{************************************************************}
-constructor TALMacNativeView.Create(const AControl: TControl);
+{**************************************************************}
+constructor TALMacNativeView.Create(const AControl: TALControl);
 begin
   FControl := AControl;
   Create;
@@ -91,19 +100,19 @@ begin
   inherited;
 end;
 
+{******************************************************************************************************}
+procedure TALMacNativeView.BeforeDestroyHandleListener(const Sender: TObject; const AMessage: TMessage);
+begin
+  if (AMessage is TBeforeDestroyFormHandle) and (TBeforeDestroyFormHandle(AMessage).Value = Form) then
+    View.removeFromSuperview;
+end;
+
 {****************************************************************************************************}
 procedure TALMacNativeView.AfterCreateHandleListener(const Sender: TObject; const AMessage: TMessage);
 begin
   // This event is called only when the window's handle is recreated.
   if (AMessage is TAfterCreateFormHandle) and (TAfterCreateFormHandle(AMessage).Value = Form) then
     RootChanged(Form);
-end;
-
-{******************************************************************************************************}
-procedure TALMacNativeView.BeforeDestroyHandleListener(const Sender: TObject; const AMessage: TMessage);
-begin
-  if (AMessage is TBeforeDestroyFormHandle) and (TBeforeDestroyFormHandle(AMessage).Value = Form) then
-    View.removeFromSuperview;
 end;
 
 {******************************************************************************************}
@@ -118,7 +127,7 @@ end;
 {**********************************}
 procedure TALMacNativeView.InitView;
 begin
-  var LAbsoluteRect := Control.AbsoluteRect;
+  var LAbsoluteRect := GetAbsoluteRect;
   var LGridHeight: Single;
   if FForm <> nil then LGridHeight := GetFormView(FForm).frame.size.height
   else LGridHeight := 0;
@@ -157,17 +166,29 @@ begin
   Result := T(Super);
 end;
 
+{************************************************}
+function TALMacNativeView.GetAbsoluteRect: TRectF;
+begin
+  Result := TALNativeControl(Control).GetNativeViewAbsoluteRect;
+end;
+
 {*************************************}
 procedure TALMacNativeView.UpdateFrame;
 begin
   if FForm = nil then exit;
-  var LAbsoluteRect := Control.AbsoluteRect;
+  var LAbsoluteRect := GetAbsoluteRect;
   View.setFrame(
     ALLowerLeftCGRect(
       LAbsoluteRect.TopLeft,
       LAbsoluteRect.Width,
       LAbsoluteRect.Height,
       GetFormView(FForm).frame.size.height));
+end;
+
+{*******************************************************}
+function TALMacNativeView.CaptureScreenshot: TALDrawable;
+begin
+  Result := AlNullDrawable;
 end;
 
 {*************************************}
@@ -227,14 +248,41 @@ end;
 {**********************************}
 procedure TALMacNativeView.SetFocus;
 begin
-  if View.window.FirstResponder <> View then
-    View.becomeFirstResponder;
+  // See remarks in TALMacNativeView.ResetFocus;
+  //if View.window.FirstResponder <> View then
+  //  View.becomeFirstResponder;
+  if (View <> nil) and (View.window <> nil) and (View.window.FirstResponder <> View) then
+    View.window.makeFirstResponder(View);
 end;
 
 {************************************}
 procedure TALMacNativeView.ResetFocus;
 begin
-  View.resignFirstResponder;
+  // I have sometime this error with View.resignFirstResponder
+  // Project Project1 raised exception class 6.
+  //View.resignFirstResponder;
+  if (View <> nil) and (View.window <> nil) then
+    View.window.makeFirstResponder(nil);
+end;
+
+{*******************************************************}
+function TALMacNativeView.acceptsFirstResponder: Boolean;
+begin
+  {$IF defined(DEBUG)}
+  //ALLog(classname + '.acceptsFirstResponder', 'control.name: ' + Control.Name);
+  {$ENDIF}
+  Result := NSView(Super).acceptsFirstResponder and Control.canFocus;
+end;
+
+{******************************************************}
+function TALMacNativeView.becomeFirstResponder: Boolean;
+begin
+  {$IF defined(DEBUG)}
+  //ALLog(classname + '.becomeFirstResponder', 'control.name: ' + Control.Name);
+  {$ENDIF}
+  Result := NSView(Super).becomeFirstResponder;
+  if (not Control.IsFocused) then
+    Control.SetFocus;
 end;
 
 end.

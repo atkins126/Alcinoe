@@ -14,16 +14,19 @@ uses
   system.types,
   system.uitypes,
   System.Math.Vectors,
+  system.Generics.Collections,
   {$IF defined(ALSkiaAvailable)}
   System.Skia.API,
   {$ENDIF}
   {$IF defined(ios)}
+  Macapi.CoreFoundation,
   iOSapi.CoreGraphics,
   iOSapi.CocoaTypes,
   iOSapi.UIKit,
   fmx.surfaces,
   {$ENDIF}
   {$IF defined(ALMacOS)}
+  Macapi.CoreFoundation,
   Macapi.CoreGraphics,
   Macapi.CocoaTypes,
   Macapi.AppKit,
@@ -146,9 +149,24 @@ procedure ALUpdateTextureFromSkImage(Const AImage: sk_image_t; const ATexture: T
 function ALGetCubicMitchellNetravaliSkSamplingoptions: sk_samplingoptions_t;
 function ALGetLinearSkSamplingoptions: sk_samplingoptions_t;
 function ALGetNearestSkSamplingoptions: sk_samplingoptions_t;
+procedure ALReleaseMemPixelBufferProc(const pixels: Pointer; context: Pointer); cdecl;
+{$ENDIF}
+
+{$IF defined(ALSkiaAvailable)}
+function ALFileExtensionToSkEncodedImageFormat(const AExt: string): sk_encodedimageformat_t;
+{$ENDIF}
+{$IF defined(ANDROID)}
+function ALFileExtensionToJBitmapCompressFormat(const AExt: string): JBitmap_CompressFormat;
+{$ENDIF}
+{$IF defined(ALAppleOS)}
+function ALFileExtensionToUTTypeImage(const AExt: string): CFStringRef;
 {$ENDIF}
 
 {$IF defined(ANDROID)}
+{$IF defined(ALSkiaAvailable)}
+procedure ALReleaseJavaPixelBufferProc(const pixels: Pointer; context: Pointer); cdecl;
+function ALCreateSkImageFromJBitmap(const aBitmap: Jbitmap): sk_image_t;
+{$ENDIF}
 function ALCreateTextureFromJBitmap(const aBitmap: Jbitmap): TTexture;
 procedure ALUpdateTextureFromJBitmap(const aBitmap: Jbitmap; const ATexture: TTexture);
 {$ENDIF}
@@ -192,25 +210,26 @@ procedure ALGradientEvaluateCallback(info: Pointer; inData: PCGFloat; outData: P
 {$ENDIF}
 
 type
-  TalExifOrientationInfo = (
-    FLIP_HORIZONTAL,
-    FLIP_VERTICAL,
-    NORMAL,
-    ROTATE_180,
-    ROTATE_270,
-    ROTATE_90,
-    TRANSPOSE,
-    TRANSVERSE,
-    UNDEFINED);
+  TALExifOrientation = (
+    UNDEFINED = 0, // not part of EXIF 1..8, but useful
+    NORMAL = 1, // top-left
+    FLIP_HORIZONTAL = 2, // mirror horizontal
+    ROTATE_180 = 3, // rotate 180
+    FLIP_VERTICAL = 4, // mirror vertical
+    TRANSPOSE = 5, // rotate 90, then mirror horizontal
+    ROTATE_90 = 6, // 90 CW
+    TRANSVERSE = 7, // rotate -90, then mirror horizontal
+    ROTATE_270 = 8);  // 270 CW
 
 function ALIsDefaultContextOpenGL: Boolean;
-function ALGetImageDimensions(const aStream: TStream): TSize;
-function AlGetExifOrientationInfo(const aFilename: String): TalExifOrientationInfo; overload;
-function AlGetExifOrientationInfo(const aStream: TStream): TalExifOrientationInfo; overload;
-function AlGetImageSignature(const aStream: TStream; const aSignatureLength: integer = 12): Tbytes; overload;
-function AlGetImageSignature(const aFileName: string; const aSignatureLength: integer = 12): Tbytes; overload;
-function AlDetectImageExtension(const aStream: TStream): String; overload;
-function AlDetectImageExtension(const aFileName: string): String; overload;
+function ALGetImageDimensions(const AStream: TStream; const AApplyMetadataOrientation: boolean = false): TSize; overload;
+function ALGetImageDimensions(const AResourceName: String; const AApplyMetadataOrientation: boolean = false): TSize; overload;
+function AlGetExifOrientation(const AFilename: String): TALExifOrientation; overload;
+function AlGetExifOrientation(const AStream: TStream): TALExifOrientation; overload;
+function AlGetImageSignature(const AStream: TStream; const ASignatureLength: integer = 12): Tbytes; overload;
+function AlGetImageSignature(const AFilename: string; const ASignatureLength: integer = 12): Tbytes; overload;
+function AlDetectImageExtension(const AStream: TStream): String; overload;
+function AlDetectImageExtension(const AFilename: string): String; overload;
 function ALModulateColor(const SrcColor: TAlphaColor; const Opacity: Single): TAlphaColor;
 function ALBlendColor(const ABaseColor, AOverlayColor: TAlphaColor): TAlphaColor; overload;
 function ALBlendColor(const ABaseColor, AOverlayColor: TAlphaColor; const AOverlayOpacity: Single): TAlphaColor; overload;
@@ -223,6 +242,7 @@ function ALGetShadowWidth(const AShadowBlur: Single): Single;
 procedure ALGetLinearGradientCoordinates(const ASize: TSizeF; const AAngle: Single; out AStartPoint: TPointF; out AEndPoint: TPointF; const ACssAngleConvention: Boolean = True);
 function ALGetShapeSurfaceRect(
            const ARect: TRectF;
+           const AAlignToPixel: Boolean;
            const AFillColor: TAlphaColor;
            const AFillGradientColors: TArray<TAlphaColor>;
            const AFillResourceName: String;
@@ -239,8 +259,8 @@ function ALGetShapeSurfaceRect(
            const AShadowOffsetY: Single): TRectF; overload;
 function ALGetShapeSurfaceRect(
            const ARect: TrectF;
+           const AAlignToPixel: Boolean;
            const AFill: TALBrush;
-           const AFillResourceStream: TStream;
            const AStateLayer: TALStateLayer;
            const AShadow: TALShadow): TRectF; overload;
 function ALCreateEmptyDrawable1x1: TALDrawable;
@@ -264,6 +284,7 @@ procedure ALDrawSkImage(
             const AOpacity: Single;
             const AMaskImage: sk_image_t;
             const ACropCenter: TpointF; // Used only when AMaskImage is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -271,11 +292,12 @@ function ALCreateSkSurfaceFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: sk_image_t;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): sk_surface_t;
@@ -283,11 +305,12 @@ function ALCreateSkImageFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: sk_image_t;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): sk_image_t;
@@ -304,6 +327,7 @@ procedure ALDrawJBitmap(
             const AOpacity: Single;
             const AMaskBitmap: JBitmap;
             const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -311,11 +335,12 @@ function ALCreateJBitmapFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: JBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): JBitmap;
@@ -332,6 +357,7 @@ procedure ALDrawCGImageRef(
             const AOpacity: Single;
             const AMaskImage: CGImageRef;
             const ACropCenter: TpointF; // Used only when AMaskImage is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -339,11 +365,12 @@ function ALCreateCGContextRefFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: CGImageRef;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): CGContextRef;
@@ -351,11 +378,12 @@ function ALCreateCGImageRefFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: CGImageRef;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): CGImageRef;
@@ -372,6 +400,7 @@ procedure ALDrawTBitmap(
             const AOpacity: Single;
             const AMaskBitmap: TBitmap;
             const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -379,11 +408,12 @@ function ALCreateTBitmapFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: TBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): TBitmap;
@@ -399,6 +429,7 @@ procedure ALDrawBitmap(
             const AOpacity: Single;
             const AMaskBitmap: TALBitmap;
             const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single); inline;
@@ -406,14 +437,19 @@ function ALCreateBitmapFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: TALBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): TALBitmap; inline;
+procedure ALSaveBitmapToFile(
+            const AFilename: String;
+            const ABitmap: TALBitmap;
+            const AQuality: integer);
 
 {***********************}
 procedure ALDrawDrawable(
@@ -436,11 +472,12 @@ function ALCreateDrawableFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: TALBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): TALDrawable;
@@ -466,9 +503,10 @@ Type
     FFillResourceName: String;
     FFillResourceStream: TStream;
     FFillMaskResourceName: String;
-    FFillMaskBitmap: TALBitmap;
+    FFillApplyMetadataOrientation: Boolean;
     FFillBackgroundMarginsRect: TRectF;
     FFillImageMarginsRect: TRectF;
+    FFillImageTintColor: TAlphaColor;
     FFillImageNoRadius: Boolean;
     FFillWrapMode: TALImageWrapMode;
     FFillCropCenter: TpointF;
@@ -513,9 +551,10 @@ Type
     function SetFillResourceName(const AValue: String): PALDrawRectangleHelper;
     function SetFillResourceStream(const AValue: TStream): PALDrawRectangleHelper;
     function SetFillMaskResourceName(const AValue: String): PALDrawRectangleHelper;
-    function SetFillMaskBitmap(const AValue: TALBitmap): PALDrawRectangleHelper;
+    function SetFillApplyMetadataOrientation(const AValue: Boolean): PALDrawRectangleHelper;
     function SetFillBackgroundMarginsRect(const AValue: TRectF): PALDrawRectangleHelper;
     function SetFillImageMarginsRect(const AValue: TRectF): PALDrawRectangleHelper;
+    function SetFillImageTintColor(const AValue: TAlphaColor): PALDrawRectangleHelper;
     function SetFillImageNoRadius(const AValue: Boolean): PALDrawRectangleHelper;
     function SetFillWrapMode(const AValue: TALImageWrapMode): PALDrawRectangleHelper;
     function SetFillCropCenter(const AValue: TpointF): PALDrawRectangleHelper;
@@ -606,10 +645,75 @@ type
                 Const AAsync: Boolean = True); override;
   end;
 
+var
+  /// <summary>
+  ///   Maximum number of rendered bitmaps to cache. This cache is used to avoid
+  ///   recreating the bitmap on every frame during animations.
+  ///   It stores a limited number of pre-rendered bitmaps for reuse.
+  /// </summary>
+  ALMaxCachedBitmaps: integer;
+  {$IF defined(ALSkiaAvailable)}
+  ALCachedSkImages: TList<TALTriplet<TBytes, sk_image_t, Integer>>;
+  {$ENDIF}
+  {$IF defined(ANDROID)}
+  ALCachedJBitmaps: TList<TALTriplet<TBytes, JBitmap, Integer>>;
+  {$ENDIF}
+  {$IF defined(ALAppleOS)}
+  ALCachedCGImageRefs: TList<TALTriplet<TBytes, CGImageRef, Integer>>;
+  {$ENDIF}
+  ALCachedTBitmaps: TList<TALTriplet<TBytes, TBitmap, Integer>>;
+  /// <summary>
+  ///   Maximum number of mask bitmaps to cache. Mask bitmaps are often reused,
+  ///   especially in dynamic list controls, so caching them helps avoid repeated
+  ///   expensive recomputation.
+  /// </summary>
+  ALMaxCachedMaskBitmaps: integer;
+  {$IF defined(ALSkiaAvailable)}
+  ALCachedMaskSkImages: TList<TALTriplet<TBytes, sk_image_t, Integer>>;
+  {$ENDIF}
+  {$IF defined(ANDROID)}
+  ALCachedMaskJBitmaps: TList<TALTriplet<TBytes, JBitmap, Integer>>;
+  {$ENDIF}
+  {$IF defined(ALAppleOS)}
+  ALCachedMaskCGImageRefs: TList<TALTriplet<TBytes, CGImageRef, Integer>>;
+  {$ENDIF}
+  ALCachedMaskTBitmaps: TList<TALTriplet<TBytes, TBitmap, Integer>>;
+
+
+function ALGetCachedBitmap(
+           const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): TALBitmap;
+procedure ALCacheBitmap(
+            const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+            const AMaxCachedBitmaps: Integer;
+            const AKey: TBytes;
+            const AHash: Integer;
+            var ABitmap: TALBitmap);
+
+{$IF defined(DEBUG)}
+Threadvar
+  ALDisableResourceScaleMismatchLog: Boolean;
+{$ENDIF}
+
 implementation
 
 uses
   system.math,
+  system.Hash,
+  System.IOUtils,
   {$IF defined(ALSkiaAvailable)}
   System.Skia,
   FMX.Skia,
@@ -627,8 +731,8 @@ uses
   Androidapi.Bitmap,
   Androidapi.Gles2,
   FMX.Context.GLES,
-  Alcinoe.AndroidApi.Common,
-  Alcinoe.Androidapi.JNI.GraphicsContentViewText,
+  Alcinoe.AndroidApi.RenderScript,
+  Alcinoe.Androidapi.GraphicsContentViewText,
   {$ENDIF}
   {$IF defined(IOS)}
   Fmx.Utils,
@@ -637,11 +741,9 @@ uses
   iOSapi.Foundation,
   iOSapi.CoreImage,
   iOSapi.Helpers,
+  iOSapi.ImageIO,
   Macapi.ObjectiveC,
-  Macapi.CoreFoundation,
   Macapi.Helpers,
-  Alcinoe.iOSapi.ImageIO,
-  Alcinoe.iOSapi.CoreImage,
   Alcinoe.iOSapi.CoreFoundation,
   {$ENDIF}
   {$IF defined(ALMacOS)}
@@ -649,36 +751,919 @@ uses
   Macapi.Foundation,
   Macapi.QuartzCore,
   Macapi.ObjectiveC,
-  Macapi.CoreFoundation,
   Macapi.Helpers,
   Macapi.ImageIO,
   Alcinoe.Macapi.QuartzCore,
   {$ENDIF}
+  {$IF defined(DEBUG)}
+  System.TypInfo,
+  Alcinoe.Localization,
+  {$ENDIF}
   FMX.Effects,
   System.UIConsts,
-  Alcinoe.http.client,
+  Alcinoe.Url,
+  Alcinoe.StringUtils,
   Alcinoe.FMX.Types3D;
 
+{$IFNDEF ALCompilerVersionSupported130}
+  {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4392 was corrected, if yes delete the function below, and adjust the IFDEF'}
+{$ENDIF}
+{$IF defined(ALAppleOS)}
+procedure CGContextSetBlendMode(c: CGContextRef; mode: Int32); cdecl; external libCoreGraphics name _PU + 'CGContextSetBlendMode';
+{$ENDIF}
+
+{****************************}
+function ALGetCachedBitmapKey(
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): boolean;
+begin
+
+  {$IF defined(DEBUG)}
+  if sizeOF(AWrapMode) <> sizeof(Byte) then
+    Raise Exception.Create('Error 1576E4AF-679D-44F2-B515-90788A6F77D6');
+  {$ENDIF}
+
+  {$IF defined(ALDPK)}
+
+  setlength(AKey, 0);
+  AHash := 0;
+  exit(false);
+
+  {$ELSE}
+
+  Result := True;
+
+  var LLen1: Integer := Length(AResourceName) * SizeOf(Char);
+  var LLen2: Integer := Length(AMaskResourceName) * SizeOf(Char);
+  SetLength(
+    AKey,
+    SizeOf(Integer) + LLen1 + // AResourceName: Length + Text
+    SizeOf(Pointer) + SizeOf(Int64) + // AResourceStream: Address + Size
+    SizeOf(Integer) + LLen2 + // AMaskResourceName: Length + Text
+    SizeOf(Single) + // AScale
+    SizeOf(Single) + // W
+    SizeOf(Single) + // H
+    SizeOf(Boolean) + // AApplyMetadataOrientation
+    SizeOf(Byte) + // AWrapMode
+    SizeOf(Single) + // ACropCenter.X
+    SizeOf(Single) + // ACropCenter.Y
+    SizeOf(TalphaColor) + // ATintColor
+    SizeOf(Single) + // ABlurRadius
+    SizeOf(Single) + // AXRadius
+    SizeOf(Single)); // AYRadius
+
+  var LOffset: Integer := 0;
+
+  // Write AResourceName
+  PInteger(@AKey[LOffset])^ := Length(AResourceName);
+  Inc(LOffset, SizeOf(Integer));
+  if LLen1 > 0 then begin
+    Move(PChar(AResourceName)^, AKey[LOffset], LLen1);
+    Inc(LOffset, LLen1);
+  end;
+
+  // Write AResourceStream
+  PPointer(@AKey[LOffset])^ := AResourceStream;
+  Inc(LOffset, SizeOf(Pointer));
+  if AResourceStream <> nil then PInt64(@AKey[LOffset])^ := AResourceStream.size
+  else PInt64(@AKey[LOffset])^ := 0;
+  Inc(LOffset, SizeOf(Int64));
+
+  // Write AMaskResourceName
+  PInteger(@AKey[LOffset])^ := Length(AMaskResourceName);
+  Inc(LOffset, SizeOf(Integer));
+  if LLen2 > 0 then begin
+    Move(PChar(AMaskResourceName)^, AKey[LOffset], LLen2);
+    Inc(LOffset, LLen2);
+  end;
+
+  // Write all binary values
+  PSingle(@AKey[LOffset])^ := AScale;
+  Inc(LOffset, SizeOf(Single));
+
+  PSingle(@AKey[LOffset])^ := W;
+  Inc(LOffset, SizeOf(Single));
+
+  PSingle(@AKey[LOffset])^ := H;
+  Inc(LOffset, SizeOf(Single));
+
+  PBoolean(@AKey[LOffset])^ := AApplyMetadataOrientation;
+  Inc(LOffset, SizeOf(Boolean));
+
+  PByte(@AKey[LOffset])^ := Byte(AWrapMode);
+  Inc(LOffset, SizeOf(Byte));
+
+  PSingle(@AKey[LOffset])^ := ACropCenter.x;
+  Inc(LOffset, SizeOf(Single));
+
+  PSingle(@AKey[LOffset])^ := ACropCenter.Y;
+  Inc(LOffset, SizeOf(Single));
+
+  PAlphaColor(@AKey[LOffset])^ := ATintColor;
+  Inc(LOffset, SizeOf(ATintColor));
+
+  PSingle(@AKey[LOffset])^ := ABlurRadius;
+  Inc(LOffset, SizeOf(Single));
+
+  PSingle(@AKey[LOffset])^ := AXRadius;
+  Inc(LOffset, SizeOf(Single));
+
+  PSingle(@AKey[LOffset])^ := AYRadius;
+  {$IF defined(DEBUG)}
+  Inc(LOffset, SizeOf(Single));
+  if length(AKey) <> LOffset then
+   raise Exception.Create('Error C91D7557-4D88-4D07-8F68-023BFF0F65EA');
+  {$ENDIF}
+
+  AHash := THashFNV1a32.GetHashValue(Pointer(AKey)^, length(AKey));
+
+  {$ENDIF}
+end;
+
+{******************}
+{$IF defined(DEBUG)}
+function ALFormatCachedBitmapKeyLog(const AKey: TBytes): string;
+begin
+  if Length(AKey) = 0 then begin
+    Result := 'KeyLength=0';
+    Exit;
+  end;
+
+  var LOffset: Integer := 0;
+
+  // --- Read AResourceName ---
+  var LResNameLen: Integer := PInteger(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Integer));
+  var LResourceName: string := '';
+  if LResNameLen > 0 then begin
+    SetLength(LResourceName, LResNameLen);
+    Move(AKey[LOffset], PChar(LResourceName)^, LResNameLen * SizeOf(Char));
+    Inc(LOffset, LResNameLen * SizeOf(Char));
+  end;
+
+  // --- Read AResourceStream pointer + size ---
+  var LStreamPtr: Pointer := PPointer(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Pointer));
+  var LStreamSize: Int64 := PInt64(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Int64));
+
+  // --- Read AMaskResourceName ---
+  var LMaskNameLen: Integer := PInteger(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Integer));
+  var LMaskResourceName: string := '';
+  if LMaskNameLen > 0 then begin
+    SetLength(LMaskResourceName, LMaskNameLen);
+    Move(AKey[LOffset], PChar(LMaskResourceName)^, LMaskNameLen * SizeOf(Char));
+    Inc(LOffset, LMaskNameLen * SizeOf(Char));
+  end;
+
+  // --- Read all numeric fields in same order as written ---
+
+  var LScale: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LW: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LH: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LApplyMetadataOrientation: Boolean := PBoolean(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Boolean));
+
+  var LWrapModeByte: Byte := PByte(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Byte));
+
+  var LCropCenterX: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LCropCenterY: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LTintColor: TAlphaColor := PAlphaColor(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(TAlphaColor));
+
+  var LBlurRadius: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LXRadius: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  var LYRadius: Single := PSingle(@AKey[LOffset])^;
+  Inc(LOffset, SizeOf(Single));
+
+  {$IFDEF DEBUG}
+  if LOffset <> Length(AKey) then
+    raise Exception.Create('Error 3D9BCE6B-B7A1-4CCB-80D5-E7F6C894088C');
+  {$ENDIF}
+
+  // --- WrapMode name from enum ---
+  var LWrapModeName: string :=
+    GetEnumName(TypeInfo(TALImageWrapMode), LWrapModeByte);
+
+  // --- Build final human-readable string ---
+  Result :=
+    'ResourceName="' + LResourceName + '"; ' +
+    Format('ResourceStreamPtr=%p; ResourceStreamSize=%d; ', [LStreamPtr, LStreamSize]) +
+    'MaskResourceName="' + LMaskResourceName + '"; ' +
+    'Scale=' + ALFloatToStrW(LScale) + '; ' +
+    'W=' + ALFloatToStrW(LW) + '; ' +
+    'H=' + ALFloatToStrW(LH) + '; ' +
+    'ApplyMetadataOrientation=' + ALBoolToStrW(LApplyMetadataOrientation, 'True', 'False') + '; ' +
+    'WrapMode=' + LWrapModeName + '; ' +
+    'CropCenter=(' +
+      ALFloatToStrW(LCropCenterX) + ',' +
+      ALFloatToStrW(LCropCenterY) + '); ' +
+    'TintColor=$' + ALIntToHexW(Cardinal(LTintColor), 8) + '; ' +
+    'BlurRadius=' + ALFloatToStrW(LBlurRadius) + '; ' +
+    'XRadius=' + ALFloatToStrW(LXRadius) + '; ' +
+    'YRadius=' + ALFloatToStrW(LYRadius);
+end;
+{$ENDIF}
+
+{****************************}
+{$IF defined(ALSkiaAvailable)}
+function ALGetCachedSkImage(
+           const ACachedImages: TList<TALTriplet<TBytes, sk_image_t, Integer>>;
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): sk_image_t;
+begin
+
+  if not ALGetCachedBitmapKey(
+           AResourceName, // const AResourceName: String;
+           AResourceStream, // const AResourceStream: TStream;
+           AMaskResourceName, // const AMaskResourceName: String;
+           AScale, // const AScale: Single;
+           W, H, // const W, H: single;
+           AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+           AWrapMode, // const AWrapMode: TALImageWrapMode;
+           ACropCenter, // const ACropCenter: TpointF;
+           ATintColor, // const ATintColor: TalphaColor;
+           ABlurRadius, // const ABlurRadius: single;
+           AXRadius, // const AXRadius: Single;
+           AYRadius, // const AYRadius: Single;
+           AKey, // out AKey: TBytes;
+           AHash) then // out AHash: Integer) then
+    exit(0);
+
+  TMonitor.Enter(ACachedImages);
+  Try
+    var LList := ACachedImages.PList;
+    for var I := ACachedImages.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        Result := LList^[i].Value;
+        Exit;
+      end;
+    end;
+  Finally
+    TMonitor.Exit(ACachedImages);
+  End;
+
+  Result := 0;
+
+end;
+{$ENDIF}
+
+{****************************}
+{$IF defined(ALSkiaAvailable)}
+procedure ALCacheSkImage(
+            const ACachedImages: TList<TALTriplet<TBytes, sk_image_t, Integer>>;
+            const AMaxCachedImages: Integer;
+            const AKey: TBytes;
+            const AHash: Integer;
+            var AImage: sk_image_t);
+begin
+
+  {$IF defined(DEBUG)}
+  if Length(AKey) = 0 then
+    Raise Exception.Create('Error 0BE84913-2CE3-4A2B-B2F3-002A56C5BED5');
+  {$ENDIF}
+
+  TMonitor.Enter(ACachedImages);
+  Try
+
+    var LList := ACachedImages.PList;
+    for var I := ACachedImages.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        sk4d_refcnt_unref(AImage);
+        Exit;
+      end;
+    end;
+
+    while ACachedImages.Count >= AMaxCachedImages do begin
+      {$IF defined(DEBUG)}
+      //ALLog('ALCacheSkImage', 'Remove ' + ALFormatCachedBitmapKeyLog(ACachedImages.PList^[0].Key));
+      {$ENDIF}
+      var LImage := ACachedImages.PList^[0].Value;
+      sk4d_refcnt_unref(LImage);
+      ACachedImages.Delete(0);
+    end;
+
+    {$IF defined(DEBUG)}
+    //ALLog('ALCacheSkImage', 'Add ' + ALFormatCachedBitmapKeyLog(AKey));
+    {$ENDIF}
+    ACachedImages.Add(TALTriplet<TBytes, sk_image_t, Integer>.Create(AKey, AImage, AHash));
+
+  Finally
+    TMonitor.Exit(ACachedImages);
+  End;
+
+end;
+{$ENDIF}
+
 {********************}
+{$IF defined(ANDROID)}
+function ALGetCachedJBitmap(
+           const ACachedBitmaps: TList<TALTriplet<TBytes, JBitmap, Integer>>;
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): JBitmap;
+begin
+
+  if not ALGetCachedBitmapKey(
+           AResourceName, // const AResourceName: String;
+           AResourceStream, // const AResourceStream: TStream;
+           AMaskResourceName, // const AMaskResourceName: String;
+           AScale, // const AScale: Single;
+           W, H, // const W, H: single;
+           AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+           AWrapMode, // const AWrapMode: TALImageWrapMode;
+           ACropCenter, // const ACropCenter: TpointF;
+           ATintColor, // const ATintColor: TalphaColor;
+           ABlurRadius, // const ABlurRadius: single;
+           AXRadius, // const AXRadius: Single;
+           AYRadius, // const AYRadius: Single;
+           AKey, // out AKey: TBytes;
+           AHash) then // out AHash: Integer) then
+    exit(nil);
+
+  TMonitor.Enter(ACachedBitmaps);
+  Try
+    var LList := ACachedBitmaps.PList;
+    for var I := ACachedBitmaps.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        Result := LList^[i].Value;
+        Exit;
+      end;
+    end;
+  Finally
+    TMonitor.Exit(ACachedBitmaps);
+  End;
+
+  Result := nil;
+
+end;
+{$ENDIF}
+
+{********************}
+{$IF defined(ANDROID)}
+procedure ALCacheJBitmap(
+            const ACachedBitmaps: TList<TALTriplet<TBytes, JBitmap, Integer>>;
+            const AMaxCachedBitmaps: Integer;
+            const AKey: TBytes;
+            const AHash: Integer;
+            var ABitmap: JBitmap);
+begin
+
+  {$IF defined(DEBUG)}
+  if Length(AKey) = 0 then
+    Raise Exception.Create('Error 0BE84913-2CE3-4A2B-B2F3-002A56C5BED5');
+  {$ENDIF}
+
+  TMonitor.Enter(ACachedBitmaps);
+  Try
+
+    var LList := ACachedBitmaps.PList;
+    for var I := ACachedBitmaps.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        ABitmap.recycle;
+        ABitmap := nil;
+        Exit;
+      end;
+    end;
+
+    while ACachedBitmaps.Count >= AMaxCachedBitmaps do begin
+      {$IF defined(DEBUG)}
+      //ALLog('ALCacheJBitmap', 'Remove ' + ALFormatCachedBitmapKeyLog(ACachedBitmaps.PList^[0].Key));
+      {$ENDIF}
+      var LBitmap := ACachedBitmaps.PList^[0].Value;
+      LBitmap.recycle;
+      LBitmap := nil;
+      ACachedBitmaps.Delete(0);
+    end;
+
+    {$IF defined(DEBUG)}
+    //ALLog('ALCacheJBitmap', 'Add ' + ALFormatCachedBitmapKeyLog(AKey));
+    {$ENDIF}
+    ACachedBitmaps.Add(TALTriplet<TBytes, JBitmap, Integer>.Create(AKey, ABitmap, AHash));
+
+  Finally
+    TMonitor.Exit(ACachedBitmaps);
+  End;
+
+end;
+{$ENDIF}
+
+{**********************}
+{$IF defined(ALAppleOS)}
+function ALGetCachedCGImageRef(
+           const ACachedImages: TList<TALTriplet<TBytes, CGImageRef, Integer>>;
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): CGImageRef;
+begin
+
+  if not ALGetCachedBitmapKey(
+           AResourceName, // const AResourceName: String;
+           AResourceStream, // const AResourceStream: TStream;
+           AMaskResourceName, // const AMaskResourceName: String;
+           AScale, // const AScale: Single;
+           W, H, // const W, H: single;
+           AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+           AWrapMode, // const AWrapMode: TALImageWrapMode;
+           ACropCenter, // const ACropCenter: TpointF;
+           ATintColor, // const ATintColor: TalphaColor;
+           ABlurRadius, // const ABlurRadius: single;
+           AXRadius, // const AXRadius: Single;
+           AYRadius, // const AYRadius: Single;
+           AKey, // out AKey: TBytes;
+           AHash) then // out AHash: Integer) then
+    exit(nil);
+
+  TMonitor.Enter(ACachedImages);
+  Try
+    var LList := ACachedImages.PList;
+    for var I := ACachedImages.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        Result := LList^[i].Value;
+        Exit;
+      end;
+    end;
+  Finally
+    TMonitor.Exit(ACachedImages);
+  End;
+
+  Result := nil;
+
+end;
+{$ENDIF}
+
+{**********************}
+{$IF defined(ALAppleOS)}
+procedure ALCacheCGImageRef(
+            const ACachedImages: TList<TALTriplet<TBytes, CGImageRef, Integer>>;
+            const AMaxCachedImages: Integer;
+            const AKey: TBytes;
+            const AHash: Integer;
+            var AImage: CGImageRef);
+begin
+
+  {$IF defined(DEBUG)}
+  if Length(AKey) = 0 then
+    Raise Exception.Create('Error 0BE84913-2CE3-4A2B-B2F3-002A56C5BED5');
+  {$ENDIF}
+
+  TMonitor.Enter(ACachedImages);
+  Try
+
+    var LList := ACachedImages.PList;
+    for var I := ACachedImages.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        CGImageRelease(AImage);
+        Exit;
+      end;
+    end;
+
+    while ACachedImages.Count >= AMaxCachedImages do begin
+      {$IF defined(DEBUG)}
+      //ALLog('ALCacheCGImageRef', 'Remove ' + ALFormatCachedBitmapKeyLog(ACachedImages.PList^[0].Key));
+      {$ENDIF}
+      var LImage := ACachedImages.PList^[0].Value;
+      CGImageRelease(LImage);
+      ACachedImages.Delete(0);
+    end;
+
+    {$IF defined(DEBUG)}
+    //ALLog('ALCacheCGImageRef', 'Add ' + ALFormatCachedBitmapKeyLog(AKey));
+    {$ENDIF}
+    ACachedImages.Add(TALTriplet<TBytes, CGImageRef, Integer>.Create(AKey, AImage, AHash));
+
+  Finally
+    TMonitor.Exit(ACachedImages);
+  End;
+
+end;
+{$ENDIF}
+
+{**************************}
+function ALGetCachedTBitmap(
+           const ACachedBitmaps: TList<TALTriplet<TBytes, TBitmap, Integer>>;
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): TBitmap;
+begin
+
+  if not ALGetCachedBitmapKey(
+           AResourceName, // const AResourceName: String;
+           AResourceStream, // const AResourceStream: TStream;
+           AMaskResourceName, // const AMaskResourceName: String;
+           AScale, // const AScale: Single;
+           W, H, // const W, H: single;
+           AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+           AWrapMode, // const AWrapMode: TALImageWrapMode;
+           ACropCenter, // const ACropCenter: TpointF;
+           ATintColor, // const ATintColor: TalphaColor;
+           ABlurRadius, // const ABlurRadius: single;
+           AXRadius, // const AXRadius: Single;
+           AYRadius, // const AYRadius: Single;
+           AKey, // out AKey: TBytes;
+           AHash) then // out AHash: Integer) then
+    exit(nil);
+
+  TMonitor.Enter(ACachedBitmaps);
+  Try
+    var LList := ACachedBitmaps.PList;
+    for var I := ACachedBitmaps.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        Result := LList^[i].Value;
+        Exit;
+      end;
+    end;
+  Finally
+    TMonitor.Exit(ACachedBitmaps);
+  End;
+
+  Result := nil;
+
+end;
+
+{***********************}
+procedure ALCacheTBitmap(
+            const ACachedBitmaps: TList<TALTriplet<TBytes, TBitmap, Integer>>;
+            const AMaxCachedBitmaps: Integer;
+            const AKey: TBytes;
+            const AHash: Integer;
+            var ABitmap: TBitmap);
+begin
+
+  {$IF defined(DEBUG)}
+  if Length(AKey) = 0 then
+    Raise Exception.Create('Error 0BE84913-2CE3-4A2B-B2F3-002A56C5BED5');
+  {$ENDIF}
+
+  TMonitor.Enter(ACachedBitmaps);
+  Try
+
+    var LList := ACachedBitmaps.PList;
+    for var I := ACachedBitmaps.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        ALFreeAndNil(ABitmap);
+        Exit;
+      end;
+    end;
+
+    while ACachedBitmaps.Count >= AMaxCachedBitmaps do begin
+      {$IF defined(DEBUG)}
+      //ALLog('ALCacheTBitmap', 'Remove ' + ALFormatCachedBitmapKeyLog(ACachedBitmaps.PList^[0].Key));
+      {$ENDIF}
+      var LBitmap := ACachedBitmaps.PList^[0].Value;
+      ALFreeAndNil(LBitmap);
+      ACachedBitmaps.Delete(0);
+    end;
+
+    {$IF defined(DEBUG)}
+    //ALLog('ALCacheTBitmap', 'Add ' + ALFormatCachedBitmapKeyLog(AKey));
+    {$ENDIF}
+    ACachedBitmaps.Add(TALTriplet<TBytes, TBitmap, Integer>.Create(AKey, ABitmap, AHash));
+
+  Finally
+    TMonitor.Exit(ACachedBitmaps);
+  End;
+
+end;
+
+{*************************}
+function ALGetCachedBitmap(
+           const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+           const AResourceName: String;
+           const AResourceStream: TStream;
+           const AMaskResourceName: String;
+           const AScale: Single;
+           const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
+           const AWrapMode: TALImageWrapMode;
+           const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
+           const ABlurRadius: single;
+           const AXRadius: Single;
+           const AYRadius: Single;
+           out AKey: TBytes;
+           out AHash: Integer): TALBitmap;
+begin
+
+  if not ALGetCachedBitmapKey(
+           AResourceName, // const AResourceName: String;
+           AResourceStream, // const AResourceStream: TStream;
+           AMaskResourceName, // const AMaskResourceName: String;
+           AScale, // const AScale: Single;
+           W, H, // const W, H: single;
+           AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+           AWrapMode, // const AWrapMode: TALImageWrapMode;
+           ACropCenter, // const ACropCenter: TpointF;
+           ATintColor, // const ATintColor: TalphaColor;
+           ABlurRadius, // const ABlurRadius: single;
+           AXRadius, // const AXRadius: Single;
+           AYRadius, // const AYRadius: Single;
+           AKey, // out AKey: TBytes;
+           AHash) then // out AHash: Integer) then
+    exit(ALNullBitmap);
+
+  TMonitor.Enter(ACachedBitmaps);
+  Try
+    var LList := ACachedBitmaps.PList;
+    for var I := ACachedBitmaps.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        Result := LList^[i].Value;
+        Exit;
+      end;
+    end;
+  Finally
+    TMonitor.Exit(ACachedBitmaps);
+  End;
+
+  Result := ALNullBitmap;
+
+end;
+
+{**********************}
+procedure ALCacheBitmap(
+            const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+            const AMaxCachedBitmaps: Integer;
+            const AKey: TBytes;
+            const AHash: Integer;
+            var ABitmap: TALBitmap);
+begin
+
+  {$IF defined(DEBUG)}
+  if Length(AKey) = 0 then
+    Raise Exception.Create('Error 0BE84913-2CE3-4A2B-B2F3-002A56C5BED5');
+  {$ENDIF}
+
+  TMonitor.Enter(ACachedBitmaps);
+  Try
+
+    var LList := ACachedBitmaps.PList;
+    for var I := ACachedBitmaps.Count - 1 downto 0 do begin
+      if (LList^[i].Extra = AHash) and
+         (Length(LList^[i].Key) = Length(AKey)) and
+         (CompareMem(@LList^[i].Key[0], @AKey[0], Length(AKey))) then begin
+        ALFreeAndNilBitmap(ABitmap);
+        Exit;
+      end;
+    end;
+
+    while ACachedBitmaps.Count >= AMaxCachedBitmaps do begin
+      {$IF defined(DEBUG)}
+      //ALLog('ALCacheBitmap', 'Remove ' + ALFormatCachedBitmapKeyLog(ACachedBitmaps.PList^[0].Key));
+      {$ENDIF}
+      var LBitmap := ACachedBitmaps.PList^[0].Value;
+      ALFreeAndNilBitmap(LBitmap);
+      ACachedBitmaps.Delete(0);
+    end;
+
+    {$IF defined(DEBUG)}
+    //ALLog('ALCacheBitmap', 'Add ' + ALFormatCachedBitmapKeyLog(AKey));
+    {$ENDIF}
+    ACachedBitmaps.Add(TALTriplet<TBytes, TALBitmap, Integer>.Create(AKey, ABitmap, AHash));
+
+  Finally
+    TMonitor.Exit(ACachedBitmaps);
+  End;
+
+end;
+
+{*************************************************************}
 constructor TALRefCountBitmap.Create(const ABitmap: TALBitmap);
 begin
   inherited create;
   FBitmap := ABitmap;
 end;
 
-{********************}
+{***********************************}
 destructor TALRefCountBitmap.Destroy;
 begin
   ALFreeAndNilBitmap(FBitmap);
   Inherited Destroy;
 end;
 
-{********************}
+{*************************************************************}
 function TALRefCountBitmap.IncreaseRefCount: TALRefCountBitmap;
 begin
   result := TALRefCountBitmap(inherited IncreaseRefCount);
 end;
 
+{****************************}
+{$IF defined(ALSkiaAvailable)}
+procedure ALReleaseMemPixelBufferProc(const pixels: Pointer; context: Pointer);
+begin
+  FreeMem(context);
+end;
+{$ENDIF}
+
+{*************************************************}
+{$IF defined(ANDROID) and defined(ALSkiaAvailable)}
+procedure ALReleaseJavaPixelBufferProc(const pixels: Pointer; context: Pointer);
+begin
+  {$IF defined(DEBUG)}
+  ALLog('ALCreateSkImageFromJBitmap.ReleaseJavaPixelBufferProc');
+  {$ENDIF}
+  TJavaArray<Integer>(context).Free;
+end;
+{$ENDIF}
+
+{****************************}
+{$IF defined(ALSkiaAvailable)}
+function ALFileExtensionToSkEncodedImageFormat(const AExt: string): sk_encodedimageformat_t;
+begin
+  var LExt := ALLowerCase(AExt);
+  if LExt = '' then raise Exception.Create('Empty extension');
+  if LExt[low(LExt)] <> '.' then LExt := '.' + LExt;
+
+  if LExt = '.png' then Result := PNG_SK_ENCODEDIMAGEFORMAT
+  else if (LExt = '.jpg') or
+          (LExt = '.jpeg') or
+          (LExt = '.jpe') then Result := JPEG_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.webp' then Result := WEBP_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.gif' then Result := GIF_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.bmp' then Result := BMP_SK_ENCODEDIMAGEFORMAT
+  else if (LExt = '.heif') or
+          (LExt = '.heic') then Result := HEIF_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.avif' then Result := AVIF_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.ico' then Result := ICO_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.wbmp' then Result := WBMP_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.pkm' then Result := PKM_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.ktx' then Result := KTX_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.astc' then Result := ASTC_SK_ENCODEDIMAGEFORMAT
+  else if LExt = '.dng' then Result := DNG_SK_ENCODEDIMAGEFORMAT
+  else raise Exception.CreateFmt('Unknown extension "%s"', [AExt]);
+end;
+{$ENDIF}
+
+{********************}
+{$IF defined(ANDROID)}
+function ALFileExtensionToJBitmapCompressFormat(const AExt: string): JBitmap_CompressFormat;
+begin
+  var LExt := ALLowerCase(AExt);
+  if LExt = '' then raise Exception.Create('Empty extension');
+  if LExt[low(LExt)] <> '.' then LExt := '.' + LExt;
+
+  if LExt = '.png' then Result := TJBitmap_CompressFormat.JavaClass.PNG
+  else if (LExt = '.jpg') or
+          (LExt = '.jpeg') or
+          (LExt = '.jpe') then Result := TJBitmap_CompressFormat.JavaClass.JPEG
+  else if LExt = '.webp' then Result := TJBitmap_CompressFormat.JavaClass.WEBP_LOSSY
+  else raise Exception.CreateFmt('Unknown extension "%s"', [AExt]);
+end;
+{$ENDIF}
+
+{**********************}
+{$IF defined(ALAppleOS)}
+function ALFileExtensionToUTTypeImage(const AExt: string): CFStringRef;
+begin
+  var LExt := ALLowerCase(AExt);
+  if LExt = '' then raise Exception.Create('Empty extension');
+  if LExt[low(LExt)] <> '.' then LExt := '.' + LExt;
+
+  if LExt = '.png' then Result := CFSTR('public.png') // UTTypePNG
+  else if (LExt = '.jpg') or
+          (LExt = '.jpeg') or
+          (LExt = '.jpe') then Result := CFSTR('public.jpeg') // UTTypeJPEG
+  else if LExt = '.webp' then Result := CFSTR('org.webmproject.webp') // UTTypeWebP
+  else if LExt = '.gif' then Result := CFSTR('com.compuserve.gif') // UTTypeGIF
+  else if LExt = '.bmp' then Result := CFSTR('com.microsoft.bmp') // UTTypeBMP
+  else if LExt = '.heif' then Result := CFSTR('public.heif') // UTTypeHEIF
+  else if LExt = '.heic' then Result := CFSTR('public.heic')  // UTTypeHEIC
+  else if LExt = '.ico' then Result := CFSTR('com.microsoft.ico') // UTTypeICO
+  else if LExt = '.dng' then Result := CFSTR('com.adobe.raw-image') // UTTypeDNG
+  else if (LExt = '.tif') or
+          (LExt = '.tiff') then Result := CFSTR('public.tiff') // UTTypeTIFF
+  else raise Exception.CreateFmt('Unknown extension "%s"', [AExt]);
+end;
+{$ENDIF}
+
+{*************************************************}
+{$IF defined(ANDROID) and defined(ALSkiaAvailable)}
+function ALCreateSkImageFromJBitmap(const aBitmap: Jbitmap): sk_image_t;
+begin
+  var LWidth: Integer := ABitmap.getWidth;
+  var LHeight: Integer := ABitmap.getHeight;
+  var LPixelBuffer: TJavaArray<Integer> := TJavaArray<Integer>.Create(LWidth * LHeight);
+  try
+    ABitmap.getPixels(
+      LPixelBuffer, // pixels: TJavaArray<Integer>;
+      0, // offset: Integer;
+      LWidth, // stride: Integer;
+      0, // x: Integer;
+      0, // y: Integer;
+      LWidth, // width: Integer;
+      LHeight); // height: Integer
+    var LImageInfo := ALGetSkImageinfo(LWidth, LHeight);
+    LImageInfo.color_type := sk_colortype_t.BGRA8888_SK_COLORTYPE;
+    var LPixmap: sk_pixmap_t := ALSkCheckHandle(
+                                  sk4d_pixmap_create(
+                                    @LImageInfo,
+                                    LPixelBuffer.Data,
+                                    LWidth * 4));
+    try
+      Result := ALSkCheckHandle(
+                  sk4d_image_make_from_raster(
+                    LPixmap, // const pixmap: sk_pixmap_t;
+                    @ALReleaseJavaPixelBufferProc, // proc: sk_image_raster_release_proc;
+                    LPixelBuffer)); // proc_context: Pointer
+    finally
+      sk4d_refcnt_unref(LPixmap);
+    end;
+  except
+    ALFreeAndNil(LPixelBuffer);
+    raise;
+  end;
+end;
+{$ENDIF}
 
 {********************}
 {$IF defined(ANDROID)}
@@ -845,31 +1830,24 @@ begin
   result := ALDefaultContextIsOpenGL;
 end;
 
-{***********************************************************}
-function ALGetImageDimensions(const aStream: TStream): TSize;
+{*************************************************************************************************************}
+function ALGetImageDimensions(const AStream: TStream; const AApplyMetadataOrientation: boolean = false): TSize;
 begin
 
   {$REGION 'ANDROID'}
   {$IF defined(ANDROID)}
-  var LSavedPosition := AStream.Position;
-  var LLength := AStream.Size-AStream.Position;
+  var LLength := AStream.Size;
   var LArray := TJavaArray<Byte>.Create(LLength);
   try
+    AStream.Position := 0;
     AStream.ReadBuffer(LArray.Data^, LLength);
     var LOptions := TJBitmapFactory_Options.Javaclass.Init;
-    if TOSVersion.Check(8, 0) then LOptions.inPreferredColorSpace := ALGetGlobalJColorSpace;
-    var LBitmap := TJBitmapFactory.JavaClass.decodeByteArray(LArray, 0, LLength, LOptions);
-    if LBitmap = nil then raise Exception.create('Failed to decode bitmap from stream');
-    try
-      result := TSize.Create(LBitmap.getWidth, LBitmap.getHeight);
-    finally
-      LBitmap.recycle;
-      LBitmap := nil;
-    end;
+    LOptions.inJustDecodeBounds := True;
+    TJBitmapFactory.JavaClass.decodeByteArray(LArray, 0, LLength, LOptions);
+    Result := TSize.Create(LOptions.outWidth, LOptions.outHeight);
     LOptions := nil;
   finally
     ALfreeandNil(LArray);
-    AStream.Position := LSavedPosition;
   end;
   {$ENDIF}
   {$ENDREGION}
@@ -879,248 +1857,16 @@ begin
   var LBuffer: Pointer := nil;
   var LLength: Int64 := 0;
   var LMemoryStream: TCustomMemoryStream := nil;
-  if (AStream is TCustomMemoryStream) and (AStream.Position = 0) then begin
+  if AStream is TCustomMemoryStream then begin
     LBuffer := TCustomMemoryStream(AStream).Memory;
     LLength := AStream.Size;
   end
   else LMemoryStream := TMemoryStream.Create;
   try
     if LMemoryStream <> nil then begin
-      var LSavedPosition := AStream.Position;
-      LMemoryStream.CopyFrom(AStream, AStream.Size - AStream.Position);
+      LMemoryStream.CopyFrom(AStream);
       LBuffer := LMemoryStream.Memory;
       LLength := LMemoryStream.Size;
-      AStream.Position := LSavedPosition;
-    end;
-    var LData := TNSData.Wrap(
-                   TNSData.alloc.initWithBytesNoCopy(
-                     LBuffer, // bytes: A buffer containing data for the new object. If flag is YES, bytes must point to a memory block allocated with malloc.
-                     LLength, // length: The number of bytes to hold from bytes. This value must not exceed the length of bytes.
-                     False)); // flag: If YES, the returned object takes ownership of the bytes pointer and frees it on deallocation.
-    try
-      var LImage := TALOSImage.Wrap(TALOSImage.alloc.initWithData(LData));
-      if LImage = nil then raise Exception.create('Failed to decode image from stream');
-      try
-        Result := TSize.Create(
-                    ALOSImageGetWidth(LImage),
-                    ALOSImageGetHeight(LImage));
-      finally
-        LImage.release;
-      end;
-    finally
-      LData.release;
-    end;
-  finally
-    ALFreeAndNil(LMemoryStream);
-  end;
-  {$ENDIF}
-  {$ENDREGION}
-
-  {$REGION 'MSWINDOWS'}
-  {$IF defined(MSWINDOWS)}
-  var LSavedPosition := AStream.Position;
-  var LBitmap := Tbitmap.CreateFromStream(aStream);
-  try
-    Result := TSize.Create(LBitmap.Width, LBitmap.height);
-  finally
-    AlFreeAndNil(LBitmap);
-    AStream.Position := LSavedPosition;
-  end;
-  {$ENDIF}
-  {$ENDREGION}
-
-end;
-
-{*********************************************************************************}
-function AlGetExifOrientationInfo(const aFilename: String): TalExifOrientationInfo;
-begin
-
-  // You can download sample images at : https://github.com/recurser/exif-orientation-examples
-
-  {$REGION 'ANDROID'}
-  {$IF defined(ANDROID)}
-  var LExifInterface := TJExifInterface.javaclass.init(StringToJString(aFilename));
-  var LOrientation := LExifInterface.getAttributeInt(TJExifInterface.JavaClass.TAG_ORIENTATION, TJExifInterface.JavaClass.ORIENTATION_NORMAL);
-  if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_HORIZONTAL then result := TalExifOrientationInfo.FLIP_HORIZONTAL
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_VERTICAL then result := TalExifOrientationInfo.FLIP_VERTICAL
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_NORMAL then result := TalExifOrientationInfo.NORMAL
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_180 then result := TalExifOrientationInfo.ROTATE_180
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_270 then result := TalExifOrientationInfo.ROTATE_270
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_90 then result := TalExifOrientationInfo.ROTATE_90
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSPOSE then result := TalExifOrientationInfo.TRANSPOSE
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSVERSE then result := TalExifOrientationInfo.TRANSVERSE
-  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_UNDEFINED then result := TalExifOrientationInfo.UNDEFINED
-  else result := TalExifOrientationInfo.UNDEFINED;
-  {$ENDIF}
-  {$ENDREGION}
-
-  {$REGION 'APPLEOS'}
-  {$IF defined(ALAppleOS)}
-  result := TalExifOrientationInfo.UNDEFINED;
-  var LPath := CFStringCreateWithCString(nil{alloc}, MarshaledAString(UTF8Encode(AFileName)){cStr}, kCFStringEncodingUTF8{encoding});
-  if LPath = nil then raise Exception.Create('Failed to create CFString from file name');
-  try
-    var LUrl := CFURLCreateWithFileSystemPath(nil{allocator}, LPath{filePath}, kCFURLPOSIXPathStyle{pathStyle}, False{isDirectory});
-    if LUrl = nil then raise Exception.Create('Failed to create CFURL from file path');
-    try
-      var LImgSourceRef := CGImageSourceCreateWithURL(LUrl{url}, nil{options});
-      if LImgSourceRef = nil then raise Exception.Create('Failed to create CGImageSource from URL');
-      try
-        var LDictionaryRef := CGImageSourceCopyPropertiesAtIndex(LImgSourceRef{isrc}, 0{index}, nil{options});
-        if LDictionaryRef = nil then raise Exception.Create('Failed to retrieve image properties');
-        try
-          var LOrientation := TNSNumber.Wrap(CFDictionaryGetValue(LDictionaryRef, kCGImagePropertyOrientation));
-          if LOrientation <> nil then begin
-
-            //typedef CF_ENUM(uint32_t, CGImagePropertyOrientation) {
-            //    kCGImagePropertyOrientationUp = 1,        // 0th row at top,    0th column on left   - default orientation
-            //    kCGImagePropertyOrientationUpMirrored,    // 0th row at top,    0th column on right  - horizontal flip
-            //    kCGImagePropertyOrientationDown,          // 0th row at bottom, 0th column on right  - 180 deg rotation
-            //    kCGImagePropertyOrientationDownMirrored,  // 0th row at bottom, 0th column on left   - vertical flip
-            //    kCGImagePropertyOrientationLeftMirrored,  // 0th row on left,   0th column at top
-            //    kCGImagePropertyOrientationRight,         // 0th row on right,  0th column at top    - 90 deg CW
-            //    kCGImagePropertyOrientationRightMirrored, // 0th row on right,  0th column on bottom
-            //    kCGImagePropertyOrientationLeft           // 0th row on left,   0th column at bottom - 90 deg CCW
-            //};
-
-            case LOrientation.integerValue of
-
-              //Top, left (UIImageOrientationUp)
-              1: result := TalExifOrientationInfo.NORMAL;
-
-              //Top, right (UIImageOrientationUpMirrored)
-              2: result := TalExifOrientationInfo.FLIP_HORIZONTAL;
-
-              //Bottom, right (UIImageOrientationDown)
-              3: result := TalExifOrientationInfo.ROTATE_180;
-
-              //Bottom, left (UIImageOrientationDownMirrored)
-              4: result := TalExifOrientationInfo.FLIP_VERTICAL;
-
-              //Left, top (UIImageOrientationLeftMirrored)
-              5: result := TalExifOrientationInfo.transpose;
-
-              //Right, top (UIImageOrientationRight)
-              6: result := TalExifOrientationInfo.ROTATE_90;
-
-              //Right, bottom (UIImageOrientationRightMirrored)
-              7: result := TalExifOrientationInfo.transverse;
-
-              //Left, bottom (UIImageOrientationLeft)
-              8: result := TalExifOrientationInfo.ROTATE_270;
-
-            end;
-          end;
-        finally
-          CGImageRelease(LDictionaryRef);
-        end;
-      finally
-        CFRelease(LImgSourceRef);
-      end;
-    finally
-      CFRelease(LUrl);
-    end;
-  finally
-    CFRelease(LPath);
-  end;
-  {$ENDIF}
-  {$ENDREGION}
-
-  {$REGION 'MSWINDOWS'}
-  {$IF defined(MSWINDOWS)}
-  var LImage := TGPImage.Create(AFileName);
-  try
-    var LPropSize := LImage.GetPropertyItemSize(PropertyTagOrientation);
-    if LPropSize > 0 then begin
-      var LPropItem: PPropertyItem;
-      GetMem(LPropItem, LPropSize);
-      try
-        if LImage.GetPropertyItem(PropertyTagOrientation, LPropSize, LPropItem) = Ok then begin
-          var LValue := PWord(LPropItem^.Value)^;
-          case LValue of
-            1: result := TalExifOrientationInfo.NORMAL;
-            2: result := TalExifOrientationInfo.FLIP_HORIZONTAL;
-            3: result := TalExifOrientationInfo.ROTATE_180;
-            4: result := TalExifOrientationInfo.FLIP_VERTICAL;
-            5: result := TalExifOrientationInfo.TRANSPOSE;
-            6: result := TalExifOrientationInfo.ROTATE_90;
-            7: result := TalExifOrientationInfo.TRANSVERSE;
-            8: result := TalExifOrientationInfo.ROTATE_270;
-            else result := TalExifOrientationInfo.UNDEFINED;
-          end;
-        end
-        else
-          result := TalExifOrientationInfo.UNDEFINED;
-      finally
-        FreeMem(LPropItem);
-      end;
-    end
-    else
-      result := TalExifOrientationInfo.UNDEFINED;
-  finally
-    ALFreeAndNil(LImage);
-  end;
-  {$ENDIF}
-  {$ENDREGION}
-
-end;
-
-{********************************************************************************}
-function AlGetExifOrientationInfo(const aStream: TStream): TalExifOrientationInfo;
-begin
-
-  // You can download sample images at : https://github.com/recurser/exif-orientation-examples
-
-  {$REGION 'ANDROID'}
-  {$IF defined(ANDROID)}
-  var LSavedPosition := AStream.Position;
-  var LLength := AStream.Size-AStream.Position;
-  var LArray := TJavaArray<Byte>.Create(LLength);
-  try
-    AStream.ReadBuffer(LArray.Data^, LLength);
-    var LByteArrayInputStream: JByteArrayInputStream := TJByteArrayInputStream.JavaClass.init(LArray);
-    try
-      var LExifInterface := TJExifInterface.javaclass.init(LByteArrayInputStream);
-      var LOrientation := LExifInterface.getAttributeInt(TJExifInterface.JavaClass.TAG_ORIENTATION, TJExifInterface.JavaClass.ORIENTATION_NORMAL);
-      if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_HORIZONTAL then result := TalExifOrientationInfo.FLIP_HORIZONTAL
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_VERTICAL then result := TalExifOrientationInfo.FLIP_VERTICAL
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_NORMAL then result := TalExifOrientationInfo.NORMAL
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_180 then result := TalExifOrientationInfo.ROTATE_180
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_270 then result := TalExifOrientationInfo.ROTATE_270
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_90 then result := TalExifOrientationInfo.ROTATE_90
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSPOSE then result := TalExifOrientationInfo.TRANSPOSE
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSVERSE then result := TalExifOrientationInfo.TRANSVERSE
-      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_UNDEFINED then result := TalExifOrientationInfo.UNDEFINED
-      else result := TalExifOrientationInfo.UNDEFINED;
-    finally
-      LByteArrayInputStream.close;
-      LByteArrayInputStream := nil;
-    end;
-  finally
-    ALfreeandNil(LArray);
-    AStream.Position := LSavedPosition;
-  end;
-  {$ENDIF}
-  {$ENDREGION}
-
-  {$REGION 'APPLEOS'}
-  {$IF defined(ALAppleOS)}
-  result := TalExifOrientationInfo.UNDEFINED;
-  var LBuffer: Pointer := nil;
-  var LLength: Int64 := 0;
-  var LMemoryStream: TCustomMemoryStream := nil;
-  if (AStream is TCustomMemoryStream) and (AStream.Position = 0) then begin
-    LBuffer := TCustomMemoryStream(AStream).Memory;
-    LLength := AStream.Size;
-  end
-  else LMemoryStream := TMemoryStream.Create;
-  try
-    if LMemoryStream <> nil then begin
-      var LSavedPosition := AStream.Position;
-      LMemoryStream.CopyFrom(AStream, AStream.Size - AStream.Position);
-      LBuffer := LMemoryStream.Memory;
-      LLength := LMemoryStream.Size;
-      AStream.Position := LSavedPosition;
     end;
     var LDataRef := CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, LBuffer, LLength, kCFAllocatorNull);
     if LDataRef = nil then raise Exception.Create('Failed to create CFDataRef from given stream');
@@ -1131,50 +1877,20 @@ begin
         var LDictionaryRef := CGImageSourceCopyPropertiesAtIndex(LImgSourceRef{isrc}, 0{index}, nil{options});
         if LDictionaryRef = nil then raise Exception.Create('Failed to retrieve image properties');
         try
-          var LOrientation := TNSNumber.Wrap(CFDictionaryGetValue(LDictionaryRef, kCGImagePropertyOrientation));
-          if LOrientation <> nil then begin
 
-            //typedef CF_ENUM(uint32_t, CGImagePropertyOrientation) {
-            //    kCGImagePropertyOrientationUp = 1,        // 0th row at top,    0th column on left   - default orientation
-            //    kCGImagePropertyOrientationUpMirrored,    // 0th row at top,    0th column on right  - horizontal flip
-            //    kCGImagePropertyOrientationDown,          // 0th row at bottom, 0th column on right  - 180 deg rotation
-            //    kCGImagePropertyOrientationDownMirrored,  // 0th row at bottom, 0th column on left   - vertical flip
-            //    kCGImagePropertyOrientationLeftMirrored,  // 0th row on left,   0th column at top
-            //    kCGImagePropertyOrientationRight,         // 0th row on right,  0th column at top    - 90 deg CW
-            //    kCGImagePropertyOrientationRightMirrored, // 0th row on right,  0th column on bottom
-            //    kCGImagePropertyOrientationLeft           // 0th row on left,   0th column at bottom - 90 deg CCW
-            //};
+          var LCFValue := CFDictionaryGetValue(LDictionaryRef, kCGImagePropertyPixelWidth);
+          if (LCFValue = nil) or (CFGetTypeID(LCFValue) <> CFNumberGetTypeID) then raise Exception.Create('kCGImagePropertyPixelWidth missing or not numeric');
+          var LInt32: Int32;
+          if not CFNumberGetValue(LCFValue, kCFNumberSInt32Type, @LInt32) then raise Exception.Create('kCGImagePropertyPixelWidth not convertible to 32-bit integer');
+          Result.Width := LInt32;
 
-            case LOrientation.integerValue of
+          LCFValue := CFDictionaryGetValue(LDictionaryRef, kCGImagePropertyPixelHeight);
+          if (LCFValue = nil) or (CFGetTypeID(LCFValue) <> CFNumberGetTypeID) then raise Exception.Create('kCGImagePropertyPixelHeight missing or not numeric');
+          if not CFNumberGetValue(LCFValue, kCFNumberSInt32Type, @LInt32) then raise Exception.Create('kCGImagePropertyPixelHeight not convertible to 32-bit integer');
+          Result.Height := LInt32;
 
-              //Top, left (UIImageOrientationUp)
-              1: result := TalExifOrientationInfo.NORMAL;
-
-              //Top, right (UIImageOrientationUpMirrored)
-              2: result := TalExifOrientationInfo.FLIP_HORIZONTAL;
-
-              //Bottom, right (UIImageOrientationDown)
-              3: result := TalExifOrientationInfo.ROTATE_180;
-
-              //Bottom, left (UIImageOrientationDownMirrored)
-              4: result := TalExifOrientationInfo.FLIP_VERTICAL;
-
-              //Left, top (UIImageOrientationLeftMirrored)
-              5: result := TalExifOrientationInfo.transpose;
-
-              //Right, top (UIImageOrientationRight)
-              6: result := TalExifOrientationInfo.ROTATE_90;
-
-              //Right, bottom (UIImageOrientationRightMirrored)
-              7: result := TalExifOrientationInfo.transverse;
-
-              //Left, bottom (UIImageOrientationLeft)
-              8: result := TalExifOrientationInfo.ROTATE_270;
-
-            end;
-          end;
         finally
-          CGImageRelease(LDictionaryRef);
+          CFRelease(LDictionaryRef);
         end;
       finally
         CFRelease(LImgSourceRef);
@@ -1190,8 +1906,146 @@ begin
 
   {$REGION 'MSWINDOWS'}
   {$IF defined(MSWINDOWS)}
-  var LSavedPosition := AStream.Position;
-  var LImage := TGPImage.Create(TStreamAdapter.Create(aStream));
+  AStream.Position := 0;
+  var LBitmap := Tbitmap.CreateFromStream(AStream);
+  try
+    Result := TSize.Create(LBitmap.Width, LBitmap.height);
+  finally
+    AlFreeAndNil(LBitmap);
+  end;
+  {$ENDIF}
+  {$ENDREGION}
+
+  if AApplyMetadataOrientation then begin
+    var LExifOrientation := AlGetExifOrientation(AStream);
+    if LExifOrientation in [TALExifOrientation.TRANSPOSE,
+                            TALExifOrientation.ROTATE_90,
+                            TALExifOrientation.TRANSVERSE,
+                            TALExifOrientation.ROTATE_270] then begin
+      var LWidth: Integer := Result.Width;
+      Result.Width := Result.Height;
+      Result.Height := LWidth;
+    end;
+  end;
+
+end;
+
+{******************************************************************************************************************}
+function ALGetImageDimensions(const AResourceName: String; const AApplyMetadataOrientation: boolean = false): TSize;
+begin
+  var LFileName := ALGetResourceFilename(AResourceName);
+  var LStream: TStream;
+  if LFileName <> '' then LStream := TFileStream.Create(LFileName, fmOpenRead)
+  else LStream := ALCreateResourceStream(AResourceName);
+  try
+    Result := ALGetImageDimensions(LStream, AApplyMetadataOrientation);
+  finally
+    ALfreeandNil(LStream);
+  end;
+end;
+
+{*************************************************************************}
+function AlGetExifOrientation(const AFilename: String): TALExifOrientation;
+begin
+
+  // You can download sample images at : https://github.com/recurser/exif-orientation-examples
+
+  {$REGION 'ANDROID'}
+  {$IF defined(ANDROID)}
+  var LExifInterface := TJExifInterface.javaclass.init(StringToJString(AFilename));
+  var LOrientation := LExifInterface.getAttributeInt(TJExifInterface.JavaClass.TAG_ORIENTATION, TJExifInterface.JavaClass.ORIENTATION_NORMAL);
+  if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_HORIZONTAL then result := TALExifOrientation.FLIP_HORIZONTAL
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_VERTICAL then result := TALExifOrientation.FLIP_VERTICAL
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_NORMAL then result := TALExifOrientation.NORMAL
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_180 then result := TALExifOrientation.ROTATE_180
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_270 then result := TALExifOrientation.ROTATE_270
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_90 then result := TALExifOrientation.ROTATE_90
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSPOSE then result := TALExifOrientation.TRANSPOSE
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSVERSE then result := TALExifOrientation.TRANSVERSE
+  else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_UNDEFINED then result := TALExifOrientation.UNDEFINED
+  else result := TALExifOrientation.UNDEFINED;
+  {$ENDIF}
+  {$ENDREGION}
+
+  {$REGION 'APPLEOS'}
+  {$IF defined(ALAppleOS)}
+  result := TALExifOrientation.UNDEFINED;
+  var LPath := CFStringCreateWithCString(nil{alloc}, MarshaledAString(UTF8Encode(AFilename)){cStr}, kCFStringEncodingUTF8{encoding});
+  if LPath = nil then raise Exception.Create('Failed to create CFString from file name');
+  try
+    var LUrl := CFURLCreateWithFileSystemPath(nil{allocator}, LPath{filePath}, kCFURLPOSIXPathStyle{pathStyle}, False{isDirectory});
+    if LUrl = nil then raise Exception.Create('Failed to create CFURL from file path');
+    try
+      var LImgSourceRef := CGImageSourceCreateWithURL(LUrl{url}, nil{options});
+      if LImgSourceRef = nil then raise Exception.Create('Failed to create CGImageSource from URL');
+      try
+        var LDictionaryRef := CGImageSourceCopyPropertiesAtIndex(LImgSourceRef{isrc}, 0{index}, nil{options});
+        if LDictionaryRef = nil then raise Exception.Create('Failed to retrieve image properties');
+        try
+          var LCFValue := CFDictionaryGetValue(LDictionaryRef, kCGImagePropertyOrientation);
+          if LCFValue <> nil then begin
+
+            if CFGetTypeID(LCFValue) <> CFNumberGetTypeID then raise Exception.Create('kCGImagePropertyOrientation is not numeric');
+            var LOrientation: Int32;
+            if not CFNumberGetValue(LCFValue, kCFNumberSInt32Type, @LOrientation) then raise Exception.Create('kCGImagePropertyOrientation not convertible to 32-bit integer');
+
+            //typedef CF_ENUM(uint32_t, CGImagePropertyOrientation) {
+            //    kCGImagePropertyOrientationUp = 1,        // 0th row at top,    0th column on left   - default orientation
+            //    kCGImagePropertyOrientationUpMirrored,    // 0th row at top,    0th column on right  - horizontal flip
+            //    kCGImagePropertyOrientationDown,          // 0th row at bottom, 0th column on right  - 180 deg rotation
+            //    kCGImagePropertyOrientationDownMirrored,  // 0th row at bottom, 0th column on left   - vertical flip
+            //    kCGImagePropertyOrientationLeftMirrored,  // 0th row on left,   0th column at top
+            //    kCGImagePropertyOrientationRight,         // 0th row on right,  0th column at top    - 90 deg CW
+            //    kCGImagePropertyOrientationRightMirrored, // 0th row on right,  0th column on bottom
+            //    kCGImagePropertyOrientationLeft           // 0th row on left,   0th column at bottom - 90 deg CCW
+            //};
+
+            case LOrientation of
+
+              //Top, left (UIImageOrientationUp)
+              1: result := TALExifOrientation.NORMAL;
+
+              //Top, right (UIImageOrientationUpMirrored)
+              2: result := TALExifOrientation.FLIP_HORIZONTAL;
+
+              //Bottom, right (UIImageOrientationDown)
+              3: result := TALExifOrientation.ROTATE_180;
+
+              //Bottom, left (UIImageOrientationDownMirrored)
+              4: result := TALExifOrientation.FLIP_VERTICAL;
+
+              //Left, top (UIImageOrientationLeftMirrored)
+              5: result := TALExifOrientation.transpose;
+
+              //Right, top (UIImageOrientationRight)
+              6: result := TALExifOrientation.ROTATE_90;
+
+              //Right, bottom (UIImageOrientationRightMirrored)
+              7: result := TALExifOrientation.transverse;
+
+              //Left, bottom (UIImageOrientationLeft)
+              8: result := TALExifOrientation.ROTATE_270;
+
+            end;
+          end;
+        finally
+          CFRelease(LDictionaryRef);
+        end;
+      finally
+        CFRelease(LImgSourceRef);
+      end;
+    finally
+      CFRelease(LUrl);
+    end;
+  finally
+    CFRelease(LPath);
+  end;
+  {$ENDIF}
+  {$ENDREGION}
+
+  {$REGION 'MSWINDOWS'}
+  {$IF defined(MSWINDOWS)}
+  var LImage := TGPImage.Create(AFilename);
   try
     var LPropSize := LImage.GetPropertyItemSize(PropertyTagOrientation);
     if LPropSize > 0 then begin
@@ -1201,28 +2055,191 @@ begin
         if LImage.GetPropertyItem(PropertyTagOrientation, LPropSize, LPropItem) = Ok then begin
           var LValue := PWord(LPropItem^.Value)^;
           case LValue of
-            1: result := TalExifOrientationInfo.NORMAL;
-            2: result := TalExifOrientationInfo.FLIP_HORIZONTAL;
-            3: result := TalExifOrientationInfo.ROTATE_180;
-            4: result := TalExifOrientationInfo.FLIP_VERTICAL;
-            5: result := TalExifOrientationInfo.TRANSPOSE;
-            6: result := TalExifOrientationInfo.ROTATE_90;
-            7: result := TalExifOrientationInfo.TRANSVERSE;
-            8: result := TalExifOrientationInfo.ROTATE_270;
-            else result := TalExifOrientationInfo.UNDEFINED;
+            1: result := TALExifOrientation.NORMAL;
+            2: result := TALExifOrientation.FLIP_HORIZONTAL;
+            3: result := TALExifOrientation.ROTATE_180;
+            4: result := TALExifOrientation.FLIP_VERTICAL;
+            5: result := TALExifOrientation.TRANSPOSE;
+            6: result := TALExifOrientation.ROTATE_90;
+            7: result := TALExifOrientation.TRANSVERSE;
+            8: result := TALExifOrientation.ROTATE_270;
+            else result := TALExifOrientation.UNDEFINED;
           end;
         end
         else
-          result := TalExifOrientationInfo.UNDEFINED;
+          result := TALExifOrientation.UNDEFINED;
       finally
         FreeMem(LPropItem);
       end;
     end
     else
-      result := TalExifOrientationInfo.UNDEFINED;
+      result := TALExifOrientation.UNDEFINED;
   finally
     ALFreeAndNil(LImage);
-    AStream.Position := LSavedPosition;
+  end;
+  {$ENDIF}
+  {$ENDREGION}
+
+end;
+
+{************************************************************************}
+function AlGetExifOrientation(const AStream: TStream): TALExifOrientation;
+begin
+
+  // You can download sample images at : https://github.com/recurser/exif-orientation-examples
+
+  {$REGION 'ANDROID'}
+  {$IF defined(ANDROID)}
+  var LLength := AStream.Size;
+  var LArray := TJavaArray<Byte>.Create(LLength);
+  try
+    AStream.Position := 0;
+    AStream.ReadBuffer(LArray.Data^, LLength);
+    var LByteArrayInputStream: JByteArrayInputStream := TJByteArrayInputStream.JavaClass.init(LArray);
+    try
+      var LExifInterface := TJExifInterface.javaclass.init(LByteArrayInputStream);
+      var LOrientation := LExifInterface.getAttributeInt(TJExifInterface.JavaClass.TAG_ORIENTATION, TJExifInterface.JavaClass.ORIENTATION_NORMAL);
+      if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_HORIZONTAL then result := TALExifOrientation.FLIP_HORIZONTAL
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_FLIP_VERTICAL then result := TALExifOrientation.FLIP_VERTICAL
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_NORMAL then result := TALExifOrientation.NORMAL
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_180 then result := TALExifOrientation.ROTATE_180
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_270 then result := TALExifOrientation.ROTATE_270
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_ROTATE_90 then result := TALExifOrientation.ROTATE_90
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSPOSE then result := TALExifOrientation.TRANSPOSE
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_TRANSVERSE then result := TALExifOrientation.TRANSVERSE
+      else if LOrientation = TJExifInterface.JavaClass.ORIENTATION_UNDEFINED then result := TALExifOrientation.UNDEFINED
+      else result := TALExifOrientation.UNDEFINED;
+    finally
+      LByteArrayInputStream.close;
+      LByteArrayInputStream := nil;
+    end;
+  finally
+    ALfreeandNil(LArray);
+  end;
+  {$ENDIF}
+  {$ENDREGION}
+
+  {$REGION 'APPLEOS'}
+  {$IF defined(ALAppleOS)}
+  result := TALExifOrientation.UNDEFINED;
+  var LBuffer: Pointer := nil;
+  var LLength: Int64 := 0;
+  var LMemoryStream: TCustomMemoryStream := nil;
+  if AStream is TCustomMemoryStream then begin
+    LBuffer := TCustomMemoryStream(AStream).Memory;
+    LLength := AStream.Size;
+  end
+  else LMemoryStream := TMemoryStream.Create;
+  try
+    if LMemoryStream <> nil then begin
+      LMemoryStream.CopyFrom(AStream);
+      LBuffer := LMemoryStream.Memory;
+      LLength := LMemoryStream.Size;
+    end;
+    var LDataRef := CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, LBuffer, LLength, kCFAllocatorNull);
+    if LDataRef = nil then raise Exception.Create('Failed to create CFDataRef from given stream');
+    try
+      var LImgSourceRef := CGImageSourceCreateWithData(LDataRef{CFDataRef}, nil{options});
+      if LImgSourceRef = nil then raise Exception.Create('Failed to create CGImageSource from CFDataRef');
+      try
+        var LDictionaryRef := CGImageSourceCopyPropertiesAtIndex(LImgSourceRef{isrc}, 0{index}, nil{options});
+        if LDictionaryRef = nil then raise Exception.Create('Failed to retrieve image properties');
+        try
+          var LCFValue := CFDictionaryGetValue(LDictionaryRef, kCGImagePropertyOrientation);
+          if LCFValue <> nil then begin
+
+            if CFGetTypeID(LCFValue) <> CFNumberGetTypeID then raise Exception.Create('kCGImagePropertyOrientation is not numeric');
+            var LOrientation: Int32;
+            if not CFNumberGetValue(LCFValue, kCFNumberSInt32Type, @LOrientation) then raise Exception.Create('kCGImagePropertyOrientation not convertible to 32-bit integer');
+
+            //typedef CF_ENUM(uint32_t, CGImagePropertyOrientation) {
+            //    kCGImagePropertyOrientationUp = 1,        // 0th row at top,    0th column on left   - default orientation
+            //    kCGImagePropertyOrientationUpMirrored,    // 0th row at top,    0th column on right  - horizontal flip
+            //    kCGImagePropertyOrientationDown,          // 0th row at bottom, 0th column on right  - 180 deg rotation
+            //    kCGImagePropertyOrientationDownMirrored,  // 0th row at bottom, 0th column on left   - vertical flip
+            //    kCGImagePropertyOrientationLeftMirrored,  // 0th row on left,   0th column at top
+            //    kCGImagePropertyOrientationRight,         // 0th row on right,  0th column at top    - 90 deg CW
+            //    kCGImagePropertyOrientationRightMirrored, // 0th row on right,  0th column on bottom
+            //    kCGImagePropertyOrientationLeft           // 0th row on left,   0th column at bottom - 90 deg CCW
+            //};
+
+            case LOrientation of
+
+              //Top, left (UIImageOrientationUp)
+              1: result := TALExifOrientation.NORMAL;
+
+              //Top, right (UIImageOrientationUpMirrored)
+              2: result := TALExifOrientation.FLIP_HORIZONTAL;
+
+              //Bottom, right (UIImageOrientationDown)
+              3: result := TALExifOrientation.ROTATE_180;
+
+              //Bottom, left (UIImageOrientationDownMirrored)
+              4: result := TALExifOrientation.FLIP_VERTICAL;
+
+              //Left, top (UIImageOrientationLeftMirrored)
+              5: result := TALExifOrientation.transpose;
+
+              //Right, top (UIImageOrientationRight)
+              6: result := TALExifOrientation.ROTATE_90;
+
+              //Right, bottom (UIImageOrientationRightMirrored)
+              7: result := TALExifOrientation.transverse;
+
+              //Left, bottom (UIImageOrientationLeft)
+              8: result := TALExifOrientation.ROTATE_270;
+
+            end;
+          end;
+        finally
+          CFRelease(LDictionaryRef);
+        end;
+      finally
+        CFRelease(LImgSourceRef);
+      end;
+    finally
+      CFRelease(LDataRef);
+    end;
+  finally
+    ALFreeAndNil(LMemoryStream);
+  end;
+  {$ENDIF}
+  {$ENDREGION}
+
+  {$REGION 'MSWINDOWS'}
+  {$IF defined(MSWINDOWS)}
+  AStream.Position := 0;
+  var LImage := TGPImage.Create(TStreamAdapter.Create(AStream));
+  try
+    var LPropSize := LImage.GetPropertyItemSize(PropertyTagOrientation);
+    if LPropSize > 0 then begin
+      var LPropItem: PPropertyItem;
+      GetMem(LPropItem, LPropSize);
+      try
+        if LImage.GetPropertyItem(PropertyTagOrientation, LPropSize, LPropItem) = Ok then begin
+          var LValue := PWord(LPropItem^.Value)^;
+          case LValue of
+            1: result := TALExifOrientation.NORMAL;
+            2: result := TALExifOrientation.FLIP_HORIZONTAL;
+            3: result := TALExifOrientation.ROTATE_180;
+            4: result := TALExifOrientation.FLIP_VERTICAL;
+            5: result := TALExifOrientation.TRANSPOSE;
+            6: result := TALExifOrientation.ROTATE_90;
+            7: result := TALExifOrientation.TRANSVERSE;
+            8: result := TALExifOrientation.ROTATE_270;
+            else result := TALExifOrientation.UNDEFINED;
+          end;
+        end
+        else
+          result := TALExifOrientation.UNDEFINED;
+      finally
+        FreeMem(LPropItem);
+      end;
+    end
+    else
+      result := TALExifOrientation.UNDEFINED;
+  finally
+    ALFreeAndNil(LImage);
   end;
   {$ENDIF}
   {$ENDREGION}
@@ -1230,23 +2247,22 @@ begin
 end;
 
 {*************************************************************************************************}
-function AlGetImageSignature(const aStream: TStream; const aSignatureLength: integer = 12): Tbytes;
+function AlGetImageSignature(const AStream: TStream; const ASignatureLength: integer = 12): Tbytes;
 begin
-  var LSavedPosition := AStream.Position;
-  SetLength(result, aSignatureLength);
-  aStream.ReadBuffer(result[0], min(length(result),aStream.Size));
-  if aStream.Size < length(Result) then
-    for var I := aStream.Size to High(result) do
+  AStream.Position := 0;
+  SetLength(result, ASignatureLength);
+  AStream.ReadBuffer(result[0], min(length(result), AStream.Size));
+  if AStream.Size < length(Result) then
+    for var I := AStream.Size to High(result) do
       result[i] := $00;
-  AStream.Position := LSavedPosition;
 end;
 
 {**************************************************************************************************}
-function AlGetImageSignature(const aFileName: string; const aSignatureLength: integer = 12): Tbytes;
+function AlGetImageSignature(const AFilename: string; const ASignatureLength: integer = 12): Tbytes;
 begin
-  var LFileStream := TFileStream.Create(aFileName, fmOpenRead);
+  var LFileStream := TFileStream.Create(AFilename, fmOpenRead);
   try
-    result := AlGetImageSignature(LFileStream, aSignatureLength);
+    result := AlGetImageSignature(LFileStream, ASignatureLength);
   finally
     ALFreeAndNil(LFileStream);
   end;
@@ -1257,10 +2273,10 @@ end;
 // https://en.wikipedia.org/wiki/List_of_file_signatures
 // https://github.com/strukturag/libheif/issues/83
 // https://nokiatech.github.io/heif/technical.html
-function AlDetectImageExtension(const aStream: Tstream): String;
+function AlDetectImageExtension(const AStream: Tstream): String;
 begin
 
-  var LFirstBytes := AlGetImageSignature(aStream);
+  var LFirstBytes := AlGetImageSignature(AStream);
   if length(LFirstBytes) < 12 then exit('');
 
   if (LFirstBytes[0] = $FF) and
@@ -1320,9 +2336,9 @@ begin
 end;
 
 {***************************************************************}
-function AlDetectImageExtension(const aFileName: string): String;
+function AlDetectImageExtension(const AFilename: string): String;
 begin
-  var LFileStream := TFileStream.Create(aFileName, fmOpenRead);
+  var LFileStream := TFileStream.Create(AFilename, fmOpenRead);
   try
     result := AlDetectImageExtension(LFileStream);
   finally
@@ -1364,7 +2380,7 @@ begin
     TAlphaColorRec(Result).A := Round(LOutAlpha * 255);
   end
   else
-    Result := TAlphacolors.Null;
+    Result := TAlphaColors.Null;
 end;
 
 {**************************************************************************************************************}
@@ -1422,6 +2438,8 @@ begin
     var LMaxRadius := Min(AScaledRect.Width / 2, AScaledRect.Height / 2);
     LScaledXRadius := min(LScaledXRadius, LMaxRadius);
     LScaledYRadius := min(LScaledYRadius, LMaxRadius);
+    LScaledXRadius := min(LScaledXRadius, LScaledYRadius);
+    LScaledYRadius := LScaledXRadius;
   end;
   AXRadius := Min(AScaledRect.Width / 2, LScaledXRadius);
   AYRadius := Min(AScaledRect.Height / 2, LScaledYRadius);
@@ -1465,6 +2483,7 @@ end;
 {*****************************}
 function ALGetShapeSurfaceRect(
            const ARect: TRectF;
+           const AAlignToPixel: Boolean;
            const AFillColor: TAlphaColor;
            const AFillGradientColors: TArray<TAlphaColor>;
            const AFillResourceName: String;
@@ -1480,34 +2499,69 @@ function ALGetShapeSurfaceRect(
            const AShadowOffsetX: Single;
            const AShadowOffsetY: Single): TRectF; overload;
 begin
+
+  // AAlignToPixel is important here because ALDrawDrawable aligns
+  // the final image before drawing it on the form.
+  //
+  // Example: suppose a radio button has a bounding rect of (0,0,10,10) in its normal state,
+  // and (-15.7,-15.7,25.7,25.7) in its hovered state.
+  //
+  // In the hovered state, there will be -15.7 pixels (rounded to -16 by TALDrawRectangleHelper.Draw)
+  // between the edge of the image and the stroke of the radio button.
+  //
+  // When ALDrawDrawable draws at position (0,0), it may align to (-0.5, -0.5) depending on the matrix.
+  // But when drawing at -15.7, it may align to -15.5 instead of -16.5.
+  //
+  // As a result, visually:
+  // - In the normal state, there's a 16-pixel gap from the image edge to the stroke.
+  // - In the hovered state, only a 15-pixel gap appears.
+  //
+  // This causes a subtle visual shift, making the radio button appear to move slightly to the right.
+
   Result := ARect;
+  //if AAlignToPixel then Result := ALAlignEdgesToPixelRound(Result, ALGetScreenScale, TEpsilon.Position);
   //--
-  if (AFillColor <> TalphaColorRec.Null) or
+  if (AFillColor <> TAlphaColors.Null) or
      (length(AFillGradientColors) > 0) then begin
+    var LFillBackgroundMarginsRect := AFillBackgroundMarginsRect;
+    if AAlignToPixel then LFillBackgroundMarginsRect := ALAlignEdgesToPixelRound(LFillBackgroundMarginsRect, ALGetScreenScale, TEpsilon.Position);
     var LBackgroundRect := ARect;
-    LBackgroundRect.Inflate(-AFillBackgroundMarginsRect.Left, -AFillBackgroundMarginsRect.Top, -AFillBackgroundMarginsRect.Right, -AFillBackgroundMarginsRect.Bottom);
+    LBackgroundRect.Inflate(-LFillBackgroundMarginsRect.Left, -LFillBackgroundMarginsRect.Top, -LFillBackgroundMarginsRect.Right, -LFillBackgroundMarginsRect.Bottom);
     Result := TRectF.Union(LBackgroundRect, Result);
   end;
   //--
-  if (AStateLayerColor <> TalphaColorRec.Null) or (AStateLayerUseContentColor) and
+  if (AStateLayerColor <> TAlphaColors.Null) or (AStateLayerUseContentColor) and
      (CompareValue(AStateLayerOpacity, 0, TEpsilon.Scale) > 0) then begin
+    var LStateLayerMarginsRect := AStateLayerMarginsRect;
+    if AAlignToPixel then LStateLayerMarginsRect := ALAlignEdgesToPixelRound(LStateLayerMarginsRect, ALGetScreenScale, TEpsilon.Position);
     var LStateLayerRect := ARect;
-    LStateLayerRect.Inflate(-AStateLayerMarginsRect.Left, -AStateLayerMarginsRect.Top, -AStateLayerMarginsRect.Right, -AStateLayerMarginsRect.Bottom);
+    LStateLayerRect.Inflate(-LStateLayerMarginsRect.Left, -LStateLayerMarginsRect.Top, -LStateLayerMarginsRect.Right, -LStateLayerMarginsRect.Bottom);
     Result := TRectF.Union(LStateLayerRect, Result);
   end;
   //--
   if (AFillResourceName <> '') or (AFillResourceStream <> nil) then begin
+    var LFillImageMarginsRect := AFillImageMarginsRect;
+    if AAlignToPixel then LFillImageMarginsRect := ALAlignEdgesToPixelRound(LFillImageMarginsRect, ALGetScreenScale, TEpsilon.Position);
     var LImageRect := ARect;
-    LImageRect.Inflate(-AFillImageMarginsRect.Left, -AFillImageMarginsRect.Top, -AFillImageMarginsRect.Right, -AFillImageMarginsRect.Bottom);
+    LImageRect.Inflate(-LFillImageMarginsRect.Left, -LFillImageMarginsRect.Top, -LFillImageMarginsRect.Right, -LFillImageMarginsRect.Bottom);
     Result := TRectF.Union(LImageRect, Result);
   end;
   //--
-  if (AShadowColor <> TalphaColorRec.Null) and
+  if (AShadowColor <> TAlphaColors.Null) and
      (CompareValue(AShadowBlur, 0, TEpsilon.position) > 0) then begin
     var LShadowRect := Result;
-    var LShadowWidth := ALGetShadowWidth(AShadowBlur);
-    LShadowRect.Inflate(LShadowWidth, LShadowWidth);
-    LShadowRect.Offset(AShadowOffsetX, AShadowOffsetY);
+    if AAlignToPixel then begin
+      var LShadowWidth: Single := ALAlignDimensionToPixelRound(ALGetShadowWidth(AShadowBlur), ALGetScreenScale, TEpsilon.Position);
+      LShadowRect.Inflate(LShadowWidth, LShadowWidth);
+      LShadowRect.Offset(
+        ALAlignDimensionToPixelRound(AShadowOffsetX, ALGetScreenScale, TEpsilon.Position),
+        ALAlignDimensionToPixelRound(AShadowOffsetY, ALGetScreenScale, TEpsilon.Position));
+    end
+    else begin
+      var LShadowWidth: Single := ALGetShadowWidth(AShadowBlur);
+      LShadowRect.Inflate(LShadowWidth, LShadowWidth);
+      LShadowRect.Offset(AShadowOffsetX, AShadowOffsetY);
+    end;
     Result := TRectF.Union(LShadowRect, Result);
   end;
 end;
@@ -1515,8 +2569,8 @@ end;
 {*****************************}
 function ALGetShapeSurfaceRect(
            const ARect: TrectF;
+           const AAlignToPixel: Boolean;
            const AFill: TALBrush;
-           const AFillResourceStream: TStream;
            const AStateLayer: TALStateLayer;
            const AShadow: TALShadow): TRectF;
 begin
@@ -1524,12 +2578,14 @@ begin
   var LFillColor: TAlphaColor;
   var LFillGradientColors: TArray<TAlphaColor>;
   var LFillResourceName: String;
+  var LFillResourceStream: TStream;
   var LFillBackgroundMarginsRect: TRectF;
   var LFillImageMarginsRect: TRectF;
   if AFill <> nil then begin
     LFillColor := AFill.Color;
     LFillGradientColors := Afill.Gradient.Colors;
     LFillResourceName := AFill.ResourceName;
+    LFillResourceStream := AFill.ResourceStream;
     LFillBackgroundMarginsRect := AFill.BackgroundMargins.Rect;
     LFillImageMarginsRect := AFill.ImageMargins.Rect;
   end
@@ -1537,6 +2593,7 @@ begin
     LFillColor := TAlphaColors.Null;
     LFillGradientColors := [];
     LFillResourceName := '';
+    LFillResourceStream := nil;
     LFillBackgroundMarginsRect := TRectF.Empty;
     LFillImageMarginsRect := TRectF.Empty;
   end;
@@ -1571,7 +2628,7 @@ begin
     LShadowOffsetY := AShadow.OffsetY;
   end
   else begin
-    LShadowColor := TalphaColors.Null;
+    LShadowColor := TAlphaColors.Null;
     LShadowBlur := 0;
     LShadowOffsetX := 0;
     LShadowOffsetY := 0;
@@ -1579,10 +2636,11 @@ begin
 
   Result := ALGetShapeSurfaceRect(
               ARect, // const ARect: TrectF;
+              AAlignToPixel, // const AAlignToPixel: Boolean;
               LFillColor, // const AFillColor: TAlphaColor;
               LFillGradientColors, // const AFillGradientColors: TArray<TAlphaColor>;
               LFillResourceName, // const AFillResourceName: String;
-              AFillResourceStream, // const AFillResourceStream: TStream;
+              LFillResourceStream, // const AFillResourceStream: TStream;
               LFillBackgroundMarginsRect, // Const AFillBackgroundMarginsRect: TRectF;
               LFillImageMarginsRect, // Const AFillImageMarginsRect: TRectF;
               LStateLayerOpacity, // const AStateLayerOpacity: Single;
@@ -1669,6 +2727,7 @@ procedure ALDrawSkImage(
             const AOpacity: Single;
             const AMaskImage: sk_image_t;
             const ACropCenter: TpointF; // Used only when AMaskImage is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -1706,129 +2765,158 @@ begin
     sk4d_paint_set_antialias(LPaint, true);
     sk4d_paint_set_dither(LPaint, true);
 
-    // Init LRRect
-    var LRRect: sk_rrect_t := 0;
+    // Save State
+    sk4d_canvas_save(ACanvas);
     try
 
-      // Init LBlender
-      var LBlender: sk_blender_t := 0;
+      // Init LRRect
+      var LRRect: sk_rrect_t := 0;
       try
 
-        // Mask
-        if AMaskImage <> 0 then begin
-          var LMaskScrRect := TrectF.Create(0, 0, sk4d_image_get_width(AMaskImage), sk4d_image_get_Height(AMaskImage));
-          var LSamplingoptions := ALGetCubicMitchellNetravaliSkSamplingoptions;
-          sk4d_canvas_draw_image_rect(
-            ACanvas, // self: sk_canvas_t;
-            AMaskImage, // const image: sk_image_t;
-            @LMaskScrRect, // const src: psk_rect_t;
-            @LScaledDstRect,  // const dest: psk_rect_t;
-            @LSamplingoptions, // const sampling: psk_samplingoptions_t;
-            LPaint, // const paint: sk_paint_t;
-            FAST_SK_SRCRECTCONSTRAINT); // constraint: sk_srcrectconstraint_t)
-          LBlender := ALSkCheckHandle(
-                        sk4d_blender_make_mode(
-                          sk_blendmode_t.SRC_IN_SK_BLENDMODE));
-          sk4d_paint_set_blender(LPaint, LBlender);
-        end
-
-        // Oval
-        else if SameValue(LScaledXRadius, LScaledDstRect.Width / 2, TEpsilon.position) and
-                SameValue(LScaledYRadius, LScaledDstRect.Height / 2, TEpsilon.position) then begin
-          LRRect :=  ALSkCheckHandle(sk4d_rrect_create);
-          sk4d_rrect_set_oval(
-            LRRect, // self: sk_rrect_t;
-            @LScaledDstRect); // const rect: psk_rect_t;
-          sk4d_canvas_clip_rrect(
-            ACanvas, // self: sk_canvas_t;
-            LRRect, // const rrect: sk_rrect_t;
-            sk_clipop_t.INTERSECT_SK_CLIPOP, // op: sk_clipop_t;
-            true); // anti_alias: _bool);
-        end
-
-        // RoundRect
-        else if (compareValue(LScaledXRadius, 0, TEpsilon.Position) > 0) and
-                (compareValue(LScaledYRadius, 0, TEpsilon.position) > 0) then begin
-          LRRect :=  ALSkCheckHandle(sk4d_rrect_create);
-          sk4d_rrect_set_rect3(
-            LRRect, // self: sk_rrect_t;
-            @LScaledDstRect, // const rect: psk_rect_t;
-            LScaledXRadius, // radius_x,
-            LScaledYRadius); // radius_y: float)
-          sk4d_canvas_clip_rrect(
-            ACanvas, // self: sk_canvas_t;
-            LRRect, // const rrect: sk_rrect_t;
-            sk_clipop_t.INTERSECT_SK_CLIPOP, // op: sk_clipop_t;
-            true); // anti_alias: _bool);
-        end
-
-        // Rect
-        else if (compareValue(LScaledBlurRadius, 0, Tepsilon.Vector) > 0) then begin
-          // The issue with the blur effect is that at the edges, it uses transparent
-          // pixels to calculate the color. To prevent this, we clip the rect and
-          // later draw a slightly larger version of the image. This ensures that
-          // the algorithm doesn't sample transparent pixels at the edges when
-          // calculating the blur effect.
-          LRRect :=  ALSkCheckHandle(sk4d_rrect_create);
-          sk4d_rrect_set_rect(
-            LRRect, // self: sk_rrect_t;
-            @LScaledDstRect); // const rect: psk_rect_t;
-          sk4d_canvas_clip_rrect(
-            ACanvas, // self: sk_canvas_t;
-            LRRect, // const rrect: sk_rrect_t;
-            sk_clipop_t.INTERSECT_SK_CLIPOP, // op: sk_clipop_t;
-            true); // anti_alias: _bool);
-        end;
-
-        // Init LImageFilter
-        var LImageFilter: sk_imagefilter_t := 0;
+        // Init LBlender
+        var LBlender: sk_blender_t := 0;
         try
 
-          // Blur
-          if compareValue(LScaledBlurRadius, 0, Tepsilon.Vector) > 0 then begin
-            // The issue with the blur effect is that it samples transparent pixels at the edges,
-            // which affects the color calculation. To mitigate this, we clip the rect and draw
-            // a slightly enlarged version of the image. This helps ensure that the algorithm
-            // avoids sampling transparent pixels at the edges when applying the blur effect.
-            // However, this is not an ideal method to dilate the image; I would prefer to use
-            // a mirroring approach, but I haven't found a way to implement it yet.
-            var LDelta: Single := ALConvertRadiusToSigma(LScaledBlurRadius) * 2;
-            LScaledDstRect.Inflate(LDelta,LDelta,LDelta,LDelta);
-            LImageFilter := ALSkCheckHandle(
-                              sk4d_imagefilter_make_blur(
-                                ALConvertRadiusToSigma(LScaledBlurRadius), //sigma_x,
-                                ALConvertRadiusToSigma(LScaledBlurRadius), //sigma_y: float;
-                                sk_tilemode_t.CLAMP_SK_TILEMODE, //tile_mode: sk_tilemode_t;
-                                0, //input: sk_imagefilter_t;
-                                @LScaledDstRect));//const crop_rect: psk_rect_t
-            sk4d_paint_set_Image_filter(LPaint, LImageFilter);
+          // Mask
+          if AMaskImage <> 0 then begin
+            var LMaskScrRect := TrectF.Create(0, 0, sk4d_image_get_width(AMaskImage), sk4d_image_get_Height(AMaskImage));
+            var LSamplingoptions := ALGetCubicMitchellNetravaliSkSamplingoptions;
+            sk4d_canvas_draw_image_rect(
+              ACanvas, // self: sk_canvas_t;
+              AMaskImage, // const image: sk_image_t;
+              @LMaskScrRect, // const src: psk_rect_t;
+              @LScaledDstRect,  // const dest: psk_rect_t;
+              @LSamplingoptions, // const sampling: psk_samplingoptions_t;
+              LPaint, // const paint: sk_paint_t;
+              FAST_SK_SRCRECTCONSTRAINT); // constraint: sk_srcrectconstraint_t)
+            LBlender := ALSkCheckHandle(
+                          sk4d_blender_make_mode(
+                            sk_blendmode_t.SRC_IN_SK_BLENDMODE));
+            sk4d_paint_set_blender(LPaint, LBlender);
+          end
+
+          // Oval
+          else if SameValue(LScaledXRadius, LScaledDstRect.Width / 2, TEpsilon.position) and
+                  SameValue(LScaledYRadius, LScaledDstRect.Height / 2, TEpsilon.position) then begin
+            LRRect :=  ALSkCheckHandle(sk4d_rrect_create);
+            sk4d_rrect_set_oval(
+              LRRect, // self: sk_rrect_t;
+              @LScaledDstRect); // const rect: psk_rect_t;
+            sk4d_canvas_clip_rrect(
+              ACanvas, // self: sk_canvas_t;
+              LRRect, // const rrect: sk_rrect_t;
+              sk_clipop_t.INTERSECT_SK_CLIPOP, // op: sk_clipop_t;
+              true); // anti_alias: _bool);
+          end
+
+          // RoundRect
+          else if (compareValue(LScaledXRadius, 0, TEpsilon.Position) > 0) and
+                  (compareValue(LScaledYRadius, 0, TEpsilon.position) > 0) then begin
+            LRRect :=  ALSkCheckHandle(sk4d_rrect_create);
+            sk4d_rrect_set_rect3(
+              LRRect, // self: sk_rrect_t;
+              @LScaledDstRect, // const rect: psk_rect_t;
+              LScaledXRadius, // radius_x,
+              LScaledYRadius); // radius_y: float)
+            sk4d_canvas_clip_rrect(
+              ACanvas, // self: sk_canvas_t;
+              LRRect, // const rrect: sk_rrect_t;
+              sk_clipop_t.INTERSECT_SK_CLIPOP, // op: sk_clipop_t;
+              true); // anti_alias: _bool);
+          end
+
+          // Rect
+          else if (compareValue(LScaledBlurRadius, 0, Tepsilon.Vector) > 0) then begin
+            // The issue with the blur effect is that at the edges, it uses transparent
+            // pixels to calculate the color. To prevent this, we clip the rect and
+            // later draw a slightly larger version of the image. This ensures that
+            // the algorithm doesn't sample transparent pixels at the edges when
+            // calculating the blur effect.
+            LRRect :=  ALSkCheckHandle(sk4d_rrect_create);
+            sk4d_rrect_set_rect(
+              LRRect, // self: sk_rrect_t;
+              @LScaledDstRect); // const rect: psk_rect_t;
+            sk4d_canvas_clip_rrect(
+              ACanvas, // self: sk_canvas_t;
+              LRRect, // const rrect: sk_rrect_t;
+              sk_clipop_t.INTERSECT_SK_CLIPOP, // op: sk_clipop_t;
+              true); // anti_alias: _bool);
           end;
 
-          var LSamplingoptions := ALGetCubicMitchellNetravaliSkSamplingoptions;
-          sk4d_canvas_draw_image_rect(
-            ACanvas, // self: sk_canvas_t;
-            AImage, // const image: sk_image_t;
-            @ASrcRect, // const src: psk_rect_t;
-            @LScaledDstRect,  // const dest: psk_rect_t;
-            @LSamplingoptions, // const sampling: psk_samplingoptions_t;
-            LPaint, // const paint: sk_paint_t;
-            FAST_SK_SRCRECTCONSTRAINT); // constraint: sk_srcrectconstraint_t)
+          // Init LImageFilter
+          var LImageFilter: sk_imagefilter_t := 0;
+          try
+
+            // Blur
+            if compareValue(LScaledBlurRadius, 0, Tepsilon.Vector) > 0 then begin
+              // The issue with the blur effect is that it samples transparent pixels at the edges,
+              // which affects the color calculation. To mitigate this, we clip the rect and draw
+              // a slightly enlarged version of the image. This helps ensure that the algorithm
+              // avoids sampling transparent pixels at the edges when applying the blur effect.
+              // However, this is not an ideal method to dilate the image; I would prefer to use
+              // a mirroring approach, but I haven't found a way to implement it yet.
+              var LDelta: Single := ALConvertRadiusToSigma(LScaledBlurRadius) * 2;
+              LScaledDstRect.Inflate(LDelta,LDelta,LDelta,LDelta);
+              LImageFilter := ALSkCheckHandle(
+                                sk4d_imagefilter_make_blur(
+                                  ALConvertRadiusToSigma(LScaledBlurRadius), //sigma_x,
+                                  ALConvertRadiusToSigma(LScaledBlurRadius), //sigma_y: float;
+                                  sk_tilemode_t.CLAMP_SK_TILEMODE, //tile_mode: sk_tilemode_t;
+                                  0, //input: sk_imagefilter_t;
+                                  @LScaledDstRect));//const crop_rect: psk_rect_t
+              sk4d_paint_set_Image_filter(LPaint, LImageFilter);
+            end;
+
+            // Init LColorfilter
+            var LColorfilter: sk_colorfilter_t := 0;
+            try
+
+              // Tint Color
+              if ATintColor <> TAlphaColors.Null then begin
+                LColorfilter := ALSkCheckHandle(
+                                  sk4d_colorfilter_make_blend(
+                                    ATintColor, // color: sk_color_t;
+                                    sk_blendmode_t.SRC_IN_SK_BLENDMODE)); // mode: sk_blendmode_t): sk_colorfilter_t
+                sk4d_paint_set_color_filter(LPaint, LColorfilter);
+              end;
+
+              // AOpacity
+              if CompareValue(AOpacity, 1, TEpsilon.Scale) <> 1 then
+                sk4d_paint_set_alpha(LPaint, Round(AOpacity * 255));
+
+              // Draw the image
+              var LSamplingoptions := ALGetCubicMitchellNetravaliSkSamplingoptions;
+              sk4d_canvas_draw_image_rect(
+                ACanvas, // self: sk_canvas_t;
+                AImage, // const image: sk_image_t;
+                @ASrcRect, // const src: psk_rect_t;
+                @LScaledDstRect,  // const dest: psk_rect_t;
+                @LSamplingoptions, // const sampling: psk_samplingoptions_t;
+                LPaint, // const paint: sk_paint_t;
+                FAST_SK_SRCRECTCONSTRAINT); // constraint: sk_srcrectconstraint_t)
+
+            finally
+              if LColorfilter <> 0 then
+                sk4d_refcnt_unref(LColorfilter);
+            end;
+
+          finally
+            if LImageFilter <> 0 then
+              sk4d_refcnt_unref(LImageFilter);
+          end;
 
         finally
-          if LImageFilter <> 0 then
-            sk4d_refcnt_unref(LImageFilter);
+          If LBlender <> 0 then
+            sk4d_refcnt_unref(LBlender)
         end;
 
       finally
-        If LBlender <> 0 then
-          sk4d_refcnt_unref(LBlender)
+        if LRRect <> 0 then
+          sk4d_rrect_destroy(LRRect);
       end;
 
     finally
-      if LRRect <> 0 then begin
-        sk4d_canvas_restore(ACanvas);
-        sk4d_rrect_destroy(LRRect);
-      end;
+      sk4d_canvas_restore(ACanvas);
     end;
 
   finally
@@ -1844,11 +2932,12 @@ function ALCreateSkSurfaceFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: sk_image_t;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): sk_surface_t;
@@ -1856,6 +2945,7 @@ begin
 
   var LImage: sk_image_t;
   if AResourceStream <> nil then begin
+    AResourceStream.Position := 0;
     var LSkStream: sk_streamadapter_t := ALSkCheckHandle(sk4d_streamadapter_create(AResourceStream));
     try
       LImage := ALSkCheckHandle(sk4d_image_make_from_encoded_stream(LSkStream));
@@ -1867,11 +2957,36 @@ begin
     var LFileName := ALGetResourceFilename(AResourceName);
     if LFileName <> '' then LImage := ALSkCheckHandle(sk4d_image_make_from_encoded_file(MarshaledAString(UTF8String(LFileName))))
     else begin
-      var LResourceStream := TResourceStream.Create(HInstance, AResourceName, RT_RCDATA);
+      var LResourceStream := ALCreateResourceStream(AResourceName);
       try
         var LSkStream: sk_streamadapter_t := ALSkCheckHandle(sk4d_streamadapter_create(LResourceStream));
         try
           LImage := ALSkCheckHandle(sk4d_image_make_from_encoded_stream(LSkStream));
+          {$IF defined(DEBUG)}
+          if (SameValue(ALGetScreenScale, 4, TEpsilon.Scale)) then begin
+            ALLog(
+              'ALCreateSkSurfaceFromResource',
+              '%s (%.g×%.g @ scale %.g)',
+              [AResourceName, RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale]);
+
+            if (not ALDisableResourceScaleMismatchLog) and
+               (
+                ((AWrapMode in [TALImageWrapMode.Fit, TALImageWrapMode.FitAndCrop]) and
+                 (not SameValue(((W * AScale) / ALGetScreenScale) * 4, sk4d_image_get_width(LImage), TEpsilon.Position)) and
+                 (not SameValue(((H * AScale) / ALGetScreenScale) * 4, sk4d_image_get_height(LImage), TEpsilon.Position)))
+                or
+                ((AWrapMode in [TALImageWrapMode.Stretch]) and
+                 ((not SameValue(((W * AScale) / ALGetScreenScale) * 4, sk4d_image_get_width(LImage), TEpsilon.Position)) or
+                  (not SameValue(((H * AScale) / ALGetScreenScale) * 4, sk4d_image_get_height(LImage), TEpsilon.Position))))
+               )
+            then
+              ALLog(
+                'ALCreateSkSurfaceFromResource',
+                '"%s" is %dx%d; expected ~4× (%.g×%.g). Requested %.g×%.g @ scale %.g',
+                [AResourceName, sk4d_image_get_width(LImage), sk4d_image_get_height(LImage), RoundTo(((W * AScale) / ALGetScreenScale) * 4, -2), RoundTo(((H * AScale) / ALGetScreenScale) * 4, -2), RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale],
+                TALLogType.WARN);
+          end;
+          {$ENDIF}
         finally
           sk4d_streamadapter_destroy(LSkStream);
         end;
@@ -1885,26 +3000,49 @@ begin
 
   try
 
-    // handle AMaskImage / AMaskImage
-    var LOwnMaskImage := False;
-    var LMaskImage := AMaskImage;
+    // handle AMaskResourceName
+    var LMaskImage: sk_image_t := 0;
+    var LKey: TBytes;
+    var LHash: Integer;
+    var LIsCachedMaskImage: Boolean := False;
     try
 
       // Create the MaskImage
-      if (AMaskResourceName <> '') and (LMaskImage = 0) then begin
-        LMaskImage := ALCreateSkImageFromResource(
+      if (AMaskResourceName <> '') then begin
+        LMaskImage := ALGetCachedSkImage(
+                        ALCachedMaskSkImages, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
                         AMaskResourceName, // const AResourceName: String;
                         nil, // const AResourceStream: TStream;
                         '', // const AMaskResourceName: String;
-                        0, // const AMaskImage: sk_image_t;
                         AScale, // const AScale: Single;
                         W, H, // const W, H: single;
+                        False, // const AApplyMetadataOrientation: Boolean;
                         AWrapMode, // const AWrapMode: TALImageWrapMode;
-                        TpointF.Create(-50, -50), // const ACropCenter: TpointF;
+                        TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                        TAlphaColors.Null, // const ATintColor: TalphaColor;
                         0, // const ABlurRadius: single;
                         AXRadius, // const AXRadius: Single;
-                        AYRadius); // const AYRadius: Single)
-        LOwnMaskImage := True;
+                        AYRadius, // const AYRadius: Single)
+                        LKey, // out AKey: TBytes
+                        LHash); // out AHash: Integer)
+        if LMaskImage = 0 then begin
+          LIsCachedMaskImage := False;
+          LMaskImage := ALCreateSkImageFromResource(
+                          AMaskResourceName, // const AResourceName: String;
+                          nil, // const AResourceStream: TStream;
+                          '', // const AMaskResourceName: String;
+                          AScale, // const AScale: Single;
+                          W, H, // const W, H: single;
+                          False, // const AApplyMetadataOrientation: Boolean;
+                          AWrapMode, // const AWrapMode: TALImageWrapMode;
+                          TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                          TAlphaColors.Null, // const ATintColor: TalphaColor;
+                          0, // const ABlurRadius: single;
+                          AXRadius, // const AXRadius: Single;
+                          AYRadius); // const AYRadius: Single)
+        end
+        else
+          LIsCachedMaskImage := True;
       end;
 
       var LSrcRect: TRectF;
@@ -1976,6 +3114,7 @@ begin
           1, // const AOpacity: Single;
           LMaskImage, // const AMaskImage: sk_image_t;
           ACropCenter, // const ACropCenter: TpointF;
+          ATintColor, // const ATintColor: TalphaColor;
           ABlurRadius, // const ABlurRadius: single;
           AXRadius, // const AXRadius: Single;
           AYRadius); // const AYRadius: Single)
@@ -1986,8 +3125,12 @@ begin
       end;
 
     finally
-      if LOwnMaskImage then
-        sk4d_refcnt_unref(LMaskImage);
+      if (LMaskImage <> 0) and (not LIsCachedMaskImage) then begin
+        if length(LKey) > 0 then
+          ALCacheSkImage(ALCachedMaskSkImages, ALMaxCachedMaskBitmaps, LKey, LHash, LMaskImage)
+        else
+          sk4d_refcnt_unref(LMaskImage);
+      end;
     end;
 
   finally
@@ -2003,11 +3146,12 @@ function ALCreateSkImageFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: sk_image_t;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): sk_image_t;
@@ -2016,11 +3160,12 @@ begin
                     AResourceName, // const AResourceName: String;
                     AResourceStream, // const AResourceStream: TStream;
                     AMaskResourceName, // const AMaskResourceName: String;
-                    AMaskImage, // const AMaskImage: sk_image_t;
                     AScale, // const AScale: Single;
                     W, H, // const W, H: single;
+                    AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                     AWrapMode, // const AWrapMode: TALImageWrapMode;
                     ACropCenter, // const ACropCenter: TpointF;
+                    ATintColor, // const ATintColor: TalphaColor;
                     ABlurRadius, // const ABlurRadius: single;
                     AXRadius, // const AXRadius: Single;
                     AYRadius); // const AYRadius: Single)
@@ -2044,6 +3189,7 @@ procedure ALDrawJBitmap(
             const AOpacity: Single;
             const AMaskBitmap: JBitmap;
             const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -2091,7 +3237,7 @@ begin
       try
 
         // RenderEffect is approximately 2.5x slower than the deprecated RenderScript :(
-        if TOSVersion.Check(12, 0) and
+        if TOSVersion.Check(12, 0) {API level >= 31 (Android S)} and
            TJHardwareBuffer.javaclass.isSupported(
              LTmpBitmap.getWidth, // width: Integer;
              LTmpBitmap.getHeight, // height: Integer;
@@ -2119,7 +3265,7 @@ begin
                                            LScaledBlurRadius,
                                            TJShader_TileMode.JavaClass.MIRROR);
                 LRenderNode.setRenderEffect(LBlurRenderEffect);
-                var LrenderCanvas := TJALRecordingCanvas.wrap(LrenderNode.beginRecording);
+                var LRenderCanvas := LrenderNode.beginRecording;
                 LRenderCanvas.drawBitmap(LTmpBitmap, 0{left}, 0{top}, nil{paint});
                 LRenderNode.endRecording;
                 LHardwareRenderer.createRenderRequest.setWaitForPresent(true).syncAndDraw;
@@ -2247,6 +3393,17 @@ begin
       LPaint.setXfermode(LPorterDuffXfermode);
     end;
 
+    // Tint Color
+    var LColorFilter: JPorterDuffColorFilter := nil;
+    if ATintColor <> TAlphaColors.Null then begin
+      LColorFilter := TJPorterDuffColorFilter.JavaClass.init(integer(ATintColor), TJPorterDuff_Mode.JavaClass.SRC_IN);
+      LPaint.setColorFilter(LColorFilter);
+    end;
+
+    // AOpacity
+    if CompareValue(AOpacity, 1, TEpsilon.Scale) <> 1 then
+      LPaint.setAlpha(Round(AOpacity * 255));
+
     // Draw the bitmap
     if LBlurredBitmap <> nil then begin
       var LJScaledDestRect := TJRectF.JavaClass.init(LScaledDstRect.left, LScaledDstRect.top, LScaledDstRect.right, LScaledDstRect.bottom);
@@ -2263,6 +3420,7 @@ begin
       LJSrcRect := nil;
     end;
 
+    LColorFilter := nil;
     LPorterDuffXfermode := nil;
     LPaint := nil;
 
@@ -2282,11 +3440,12 @@ function ALCreateJBitmapFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: JBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): JBitmap;
@@ -2294,12 +3453,13 @@ function ALCreateJBitmapFromResource(
   {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   Function _CreateJBitmapFromStream(Const AStream: Tstream): JBitmap;
   begin
-    var LLength := AStream.Size-AStream.Position;
+    var LLength := AStream.Size;
     var LArray := TJavaArray<Byte>.Create(LLength);
     try
+      AStream.Position := 0;
       AStream.ReadBuffer(LArray.Data^, LLength);
       var LOptions := TJBitmapFactory_Options.Javaclass.Init;
-      if TOSVersion.Check(8, 0) then LOptions.inPreferredColorSpace := ALGetGlobalJColorSpace;
+      if TOSVersion.Check(8, 0) {API level >= 26 (Android O)} then LOptions.inPreferredColorSpace := ALGetGlobalJColorSpace;
       Result := TJBitmapFactory.JavaClass.decodeByteArray(LArray, 0, LLength, LOptions);
       if Result = nil then raise Exception.create('Failed to decode bitmap from stream');
       LOptions := nil;
@@ -2312,23 +3472,87 @@ function ALCreateJBitmapFromResource(
   Function _CreateJBitmapFromFile(Const AFilename: String): JBitmap;
   begin
     var LOptions := TJBitmapFactory_Options.Javaclass.Init;
-    if TOSVersion.Check(8, 0) then LOptions.inPreferredColorSpace := ALGetGlobalJColorSpace;
-    Result := TJBitmapFactory.JavaClass.decodeFile(StringToJString(AFileName), LOptions);
+    if TOSVersion.Check(8, 0) {API level >= 26 (Android O)} then LOptions.inPreferredColorSpace := ALGetGlobalJColorSpace;
+    Result := TJBitmapFactory.JavaClass.decodeFile(StringToJString(AFilename), LOptions);
     if Result = nil then raise Exception.create('Failed to load bitmap from file');
     LOptions := nil;
+  end;
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  function _ApplyExifOrientationToBitmap(const ABitmap: JBitmap; const AOrientation: TALExifOrientation): JBitmap;
+  begin
+    if (AOrientation in [TALExifOrientation.NORMAL, TALExifOrientation.UNDEFINED]) then
+      Exit(ABitmap);
+
+    var LMatrix := TJMatrix.JavaClass.init;
+
+    case AOrientation of
+      TALExifOrientation.FLIP_HORIZONTAL: LMatrix.preScale(-1, 1);
+      TALExifOrientation.ROTATE_180: LMatrix.postRotate(180);
+      TALExifOrientation.FLIP_VERTICAL: LMatrix.preScale(1, -1);
+      TALExifOrientation.TRANSPOSE: begin
+        LMatrix.postRotate(90);
+        LMatrix.postScale(-1, 1);
+      end;
+      TALExifOrientation.ROTATE_90: LMatrix.postRotate(90);
+      TALExifOrientation.TRANSVERSE: begin
+        LMatrix.postRotate(-90);
+        LMatrix.postScale(-1, 1);
+      end;
+      TALExifOrientation.ROTATE_270: LMatrix.postRotate(-90);
+      else
+        raise Exception.Create('Error E3F0905C-E18D-41B4-B506-63DA55D671D2');
+    end;
+
+    Result := TJBitmap.JavaClass.createBitmap(ABitmap{source}, 0{x}, 0{y}, ABitmap.getWidth{width}, ABitmap.getHeight{height}, LMatrix{m}, True{filter});
+    if Result = nil then raise Exception.create('Failed to apply exif orientation');
+    LMatrix := nil;
   end;
 
 begin
 
   var LBitmap: JBitmap;
-  if AResourceStream <> nil then LBitmap := _CreateJBitmapFromStream(AResourceStream)
+  var LExifOrientation := TALExifOrientation.UNDEFINED;
+  if AResourceStream <> nil then begin
+    if AApplyMetadataOrientation then LExifOrientation := AlGetExifOrientation(AResourceStream);
+    LBitmap := _CreateJBitmapFromStream(AResourceStream);
+  end
   else if AResourceName <> '' then begin
     var LFileName := ALGetResourceFilename(AResourceName);
-    if LFileName <> '' then LBitmap := _CreateJBitmapFromFile(LFileName)
+    if LFileName <> '' then begin
+      if AApplyMetadataOrientation then LExifOrientation := AlGetExifOrientation(LFileName);
+      LBitmap := _CreateJBitmapFromFile(LFileName)
+    end
     else begin
-      var LResourceStream := TResourceStream.Create(HInstance, AResourceName, RT_RCDATA);
+      var LResourceStream := ALCreateResourceStream(AResourceName);
       try
-        LBitmap := _CreateJBitmapFromStream(LResourceStream)
+        if AApplyMetadataOrientation then LExifOrientation := AlGetExifOrientation(LResourceStream);
+        LBitmap := _CreateJBitmapFromStream(LResourceStream);
+        {$IF defined(DEBUG)}
+        if (SameValue(ALGetScreenScale, 4, TEpsilon.Scale)) then begin
+          ALLog(
+            'ALCreateSkSurfaceFromResource',
+            '%s (%.g×%.g @ scale %.g)',
+            [AResourceName, RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale]);
+
+        if (not ALDisableResourceScaleMismatchLog) and
+           (
+            ((AWrapMode in [TALImageWrapMode.Fit, TALImageWrapMode.FitAndCrop]) and
+             (not SameValue(((W * AScale) / ALGetScreenScale) * 4, LBitmap.GetWidth, TEpsilon.Position)) and
+             (not SameValue(((H * AScale) / ALGetScreenScale) * 4, LBitmap.GetHeight, TEpsilon.Position)))
+            or
+            ((AWrapMode in [TALImageWrapMode.Stretch]) and
+             ((not SameValue(((W * AScale) / ALGetScreenScale) * 4, LBitmap.GetWidth, TEpsilon.Position)) or
+              (not SameValue(((H * AScale) / ALGetScreenScale) * 4, LBitmap.GetHeight, TEpsilon.Position))))
+           )
+        then
+          ALLog(
+            'ALCreateJBitmapFromResource',
+            '"%s" is %dx%d; expected ~4× (%.g×%.g). Requested %.g×%.g @ scale %.g',
+            [AResourceName, LBitmap.GetWidth, LBitmap.GetHeight, RoundTo(((W * AScale) / ALGetScreenScale) * 4, -2), RoundTo(((H * AScale) / ALGetScreenScale) * 4, -2), RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale],
+            TALLogType.WARN);
+        end;
+        {$ENDIF}
       finally
         ALfreeandNil(LResourceStream);
       end;
@@ -2339,26 +3563,58 @@ begin
 
   try
 
-    // handle AMaskBitmap / AMaskBitmap
-    var LOwnMaskBitmap := False;
-    var LMaskBitmap := AMaskBitmap;
+    // Apply EXIF orientation (if requested) BEFORE wrap/crop/tint/blur
+    if AApplyMetadataOrientation and (not (LExifOrientation in [TALExifOrientation.NORMAL, TALExifOrientation.UNDEFINED])) then begin
+      var LRotatedBitmap := _ApplyExifOrientationToBitmap(LBitmap, LExifOrientation);
+      if not LBitmap.equals(LRotatedBitmap) then begin
+        LBitmap.recycle;
+        LBitmap := LRotatedBitmap;
+      end;
+    end;
+
+    // handle AMaskResourceName
+    var LMaskBitmap: JBitmap := nil;
+    var LKey: TBytes;
+    var LHash: Integer;
+    var LIsCachedMaskBitmap: Boolean := False;
     try
 
       // Create the MaskBitmap
-      if (AMaskResourceName <> '') and (LMaskBitmap = nil) then begin
-        LMaskBitmap := ALCreateJbitmapFromResource(
+      if (AMaskResourceName <> '') then begin
+        LMaskBitmap := ALGetCachedJBitmap(
+                         ALCachedMaskJBitmaps, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
                          AMaskResourceName, // const AResourceName: String;
                          nil, // const AResourceStream: TStream;
                          '', // const AMaskResourceName: String;
-                         nil, // const AMaskBitmap: JBitmap;
                          AScale, // const AScale: Single;
                          W, H, // const W, H: single;
+                         False, // const AApplyMetadataOrientation: Boolean;
                          AWrapMode, // const AWrapMode: TALImageWrapMode;
-                         TpointF.Create(-50, -50), // const ACropCenter: TpointF;
+                         TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                         TAlphaColors.Null, // const ATintColor: TalphaColor;
                          0, // const ABlurRadius: single;
                          AXRadius, // const AXRadius: Single;
-                         AYRadius); // const AYRadius: Single)
-        LOwnMaskBitmap := True;
+                         AYRadius, // const AYRadius: Single)
+                         LKey, // out AKey: TBytes
+                         LHash); // out AHash: Integer)
+        if LMaskBitmap = nil then begin
+          LIsCachedMaskBitmap := False;
+          LMaskBitmap := ALCreateJbitmapFromResource(
+                           AMaskResourceName, // const AResourceName: String;
+                           nil, // const AResourceStream: TStream;
+                           '', // const AMaskResourceName: String;
+                           AScale, // const AScale: Single;
+                           W, H, // const W, H: single;
+                           False, // const AApplyMetadataOrientation: Boolean;
+                           AWrapMode, // const AWrapMode: TALImageWrapMode;
+                           TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                           TAlphaColors.Null, // const ATintColor: TalphaColor;
+                           0, // const ABlurRadius: single;
+                           AXRadius, // const AXRadius: Single;
+                           AYRadius); // const AYRadius: Single)
+        end
+        else
+          LIsCachedMaskBitmap := True;
       end;
 
       var LSrcRect: TRectF;
@@ -2415,6 +3671,7 @@ begin
       LDstRect.bottom := LDstRect.bottom / AScale;
 
       If (LMaskBitmap = nil) and
+         (ATintColor = TAlphaColors.Null) and
          (SameValue(ABlurRadius, 0, TEpsilon.Vector)) and
          (SameValue(AXRadius, 0, TEpsilon.Vector)) and
          (SameValue(AYRadius, 0, TEpsilon.Vector)) then begin
@@ -2449,6 +3706,7 @@ begin
             1, // const AOpacity: Single;
             LMaskBitmap, // const AMaskBitmap: JBitmap;
             ACropCenter, // const ACropCenter: TpointF;
+            ATintColor, // const ATintColor: TalphaColor;
             ABlurRadius, // const ABlurRadius: single;
             AXRadius, // const AXRadius: Single;
             AYRadius); // const AYRadius: Single)
@@ -2463,9 +3721,13 @@ begin
       end;
 
     finally
-      if LOwnMaskBitmap then begin
-        LMaskBitmap.recycle;
-        LMaskBitmap := nil;
+      if (LMaskBitmap <> nil) and (not LIsCachedMaskBitmap) then begin
+        if length(LKey) > 0 then
+          ALCacheJBitmap(ALCachedMaskJBitmaps, ALMaxCachedMaskBitmaps, LKey, LHash, LMaskBitmap)
+        else begin
+          LMaskBitmap.recycle;
+          LMaskBitmap := nil;
+        end;
       end;
     end;
 
@@ -2489,6 +3751,7 @@ procedure ALDrawCGImageRef(
             const AOpacity: Single;
             const AMaskImage: CGImageRef;
             const ACropCenter: TpointF; // Used only when AMaskImage is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -2570,37 +3833,39 @@ begin
                                ASrcRect.height,
                                CGImageGetHeight(AImage)));
       try
-        var LCIImage := TCIImage.Wrap(TCIImage.OCClass.imageWithCGImage(LCroppedImage));
-        Try
-          // Gaussian blur CIFilter naturally creates artifacts at the borders of the
-          // output image. It is happening because the gaussian blur filter samples
-          // pixels outside the edges of the image. But because there are no pixels,
-          // you get this weird artefact. You can use "CIAffineClamp" filter to
-          // "extend" your image infinitely in all directions.
-          var LClampFilter := {$IF defined(ALMacOS)}TALCIFilter{$ELSE}TCIFilter{$ENDIF}.Wrap(TCIFilter.OCClass.filterWithName(StrToNsStr('CIAffineClamp')));
-          Try
-            LClampFilter.setDefaults;
-            LClampFilter.setValueforKey(NSObjectToID(LCIImage), kCIInputImageKey);
-            var LBlurFilter := {$IF defined(ALMacOS)}TALCIFilter{$ELSE}TCIFilter{$ENDIF}.Wrap(TCIFilter.OCClass.filterWithName(StrToNsStr('CIGaussianBlur')));
-            try
-              LBlurFilter.setValueforKey(NSObjectToID(LClampFilter.outputImage), kCIInputImageKey);
-              LBlurFilter.setValueforKey(TNSNumber.OCClass.numberWithFloat(LScaledBlurRadius), kCIInputRadiusKey);
-              var LCIContext := TCIContext.Wrap({$IF defined(ALMacOS)}TALCIContext{$ELSE}TCIContext{$ENDIF}.OCClass.contextWithOptions(nil));
-              try
-                LBlurredImage := LCIContext.createCGImage(LBlurFilter.outputImage, LCIImage.extent);
-                if LBlurredImage = nil then raise Exception.Create('Failed to create CGImageRef from CIContext');
-              finally
-                LCIContext.release;
-              end;
-            finally
-              LBlurFilter.release;
-            end
-          finally
-            LClampFilter.release;
-          end;
-        finally
-          LCIImage.release;
-        end;
+        {$IFNDEF ALCompilerVersionSupported130}
+          {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4347 was corrected and adjust the IFDEF'}
+          {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4348 was corrected and adjust the IFDEF'}
+          {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4349 was corrected and adjust the IFDEF'}
+          {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4350 was corrected and adjust the IFDEF'}
+        {$ENDIF}
+        var LCIImage := {$IF defined(ALMacOS)}TCIImage.Wrap({$ENDIF}TCIImage.OCClass.imageWithCGImage(LCroppedImage){$IF defined(ALMacOS)}){$ENDIF};
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+        // No release required for LCIImage because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+
+        // Gaussian blur CIFilter naturally creates artifacts at the borders of the
+        // output image. It is happening because the gaussian blur filter samples
+        // pixels outside the edges of the image. But because there are no pixels,
+        // you get this weird artefact. You can use "CIAffineClamp" filter to
+        // "extend" your image infinitely in all directions.
+        var LClampFilter := {$IF defined(ALMacOS)}TALCIFilter.Wrap({$ENDIF}TCIFilter.OCClass.filterWithName(StrToNsStr('CIAffineClamp')){$IF defined(ALMacOS)}){$ENDIF};
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+        // No release required for LClampFilter because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+
+        LClampFilter.setDefaults;
+        LClampFilter.setValueforKey(NSObjectToID(LCIImage), kCIInputImageKey);
+        var LBlurFilter := {$IF defined(ALMacOS)}TALCIFilter.Wrap({$ENDIF}TCIFilter.OCClass.filterWithName(StrToNsStr('CIGaussianBlur')){$IF defined(ALMacOS)}){$ENDIF};
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+        // No release required for LBlurFilter because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+
+        LBlurFilter.setValueforKey(NSObjectToID(LClampFilter.outputImage), kCIInputImageKey);
+        LBlurFilter.setValueforKey({$IF not defined(ALMacOS)}NSObjectToID({$ENDIF}TNSNumber.OCClass.numberWithFloat(LScaledBlurRadius){$IF not defined(ALMacOS)}){$ENDIF}, kCIInputRadiusKey);
+        var LCIContext := {$IF defined(ALMacOS)}TCIContext.Wrap({$ENDIF}TCIContext.OCClass.contextWithOptions(nil){$IF defined(ALMacOS)}){$ENDIF};
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+        // No release required for LCIContext because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+
+        LBlurredImage := LCIContext.createCGImage(LBlurFilter.outputImage, LCIImage.extent);
+        if LBlurredImage = nil then raise Exception.Create('Failed to create CGImageRef from CIContext');
       finally
         CGImageRelease(LCroppedImage);
       end;
@@ -2674,6 +3939,10 @@ begin
         CGContextClip(ACanvas);
       end;
 
+      // AOpacity
+      if CompareValue(AOpacity, 1, TEpsilon.Scale) <> 1 then
+        CGContextSetAlpha(ACanvas, AOpacity);
+
       // Draw the bitmap
       if LBlurredImage <> nil then begin
         CGContextDrawImage(
@@ -2700,6 +3969,26 @@ begin
           AImage);
       end;
 
+      if ATintColor <> TAlphaColors.Null then begin
+        if CompareValue(AOpacity, 1, TEpsilon.Scale) <> 1 then
+          CGContextSetAlpha(ACanvas, 1{AOpacity});
+        CGContextSetBlendMode(ACanvas, kCGBlendModeSourceIn);
+        var LTintColorF := TAlphaColorCGFloat.Create(ATintColor);
+        var LTintColorCG := CGColorCreate(ALGetGlobalCGColorSpace, @LTintColorF);
+        try
+          CGContextSetFillColorWithColor(ACanvas, LTintColorCG);
+          CGContextFillRect(
+            ACanvas,
+            ALLowerLeftCGRect(
+              LScaledDstRect.TopLeft,
+              LScaledDstRect.Width,
+              LScaledDstRect.Height,
+              LGridHeight));
+        finally
+          CGColorRelease(LTintColorCG);
+        end;
+      end;
+
     finally
       CGContextRestoreGState(ACanvas);
     end;
@@ -2718,11 +4007,12 @@ function ALCreateCGContextRefFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: CGImageRef;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): CGContextRef;
@@ -2733,15 +4023,14 @@ function ALCreateCGContextRefFromResource(
     var LBuffer: Pointer := nil;
     var LLength: Int64 := 0;
     var LMemoryStream: TCustomMemoryStream := nil;
-    if (AStream is TCustomMemoryStream) and (AStream.Position = 0) then begin
+    if AStream is TCustomMemoryStream then begin
       LBuffer := TCustomMemoryStream(AStream).Memory;
       LLength := AStream.Size;
-      AStream.Position := AStream.Size;
     end
     else LMemoryStream := TMemoryStream.Create;
     try
       if LMemoryStream <> nil then begin
-        LMemoryStream.CopyFrom(AStream, AStream.Size - AStream.Position);
+        LMemoryStream.CopyFrom(AStream);
         LBuffer := LMemoryStream.Memory;
         LLength := LMemoryStream.Size;
       end;
@@ -2768,17 +4057,135 @@ function ALCreateCGContextRefFromResource(
     if Result = nil then raise Exception.create('Failed to load image from file');
   end;
 
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  function _ApplyExifOrientationToCGImage(const AImage: CGImageRef; const AOrientation: TALExifOrientation): CGImageRef;
+  begin
+    var W := CGImageGetWidth(AImage);
+    var H := CGImageGetHeight(AImage);
+    var LAngle: CGFloat := 0;
+    var LSwapWH := False;
+
+    case AOrientation of
+      TALExifOrientation.UNDEFINED,
+      TALExifOrientation.NORMAL:;
+      TALExifOrientation.FLIP_HORIZONTAL:;
+      TALExifOrientation.ROTATE_180: LAngle := Pi;
+      TALExifOrientation.FLIP_VERTICAL:;
+      TALExifOrientation.TRANSPOSE: begin
+        LAngle := Pi/2;
+        LSwapWH := True;
+      end;
+      TALExifOrientation.ROTATE_90: begin
+        LAngle := -Pi/2;
+        LSwapWH := True;
+      end;
+      TALExifOrientation.TRANSVERSE: begin
+        LAngle := -Pi/2;
+        LSwapWH := True;
+      end;
+      TALExifOrientation.ROTATE_270: begin
+        LAngle := Pi/2;
+        LSwapWH := True;
+      end;
+      else
+        raise Exception.Create('Error B2716781-C812-4F7C-932F-375DDF9BC7F9');
+    end;
+
+    var LNewW: NativeUInt;
+    var LNewH: NativeUInt;
+    if LSwapWH then begin
+      LNewW := H;
+      LNewH := W;
+    end
+    else begin
+      LNewW := W;
+      LNewH := H;
+    end;
+
+    var LColorSpace := CGImageGetColorSpace(AImage);
+    if LColorSpace = nil then LColorSpace := ALGetGlobalCGColorSpace;
+
+    var LContextRef := CGBitmapContextCreate(
+                         nil, // data: Pointer;
+                         LNewW, // width: NativeUInt;
+                         LNewH, // height: NativeUInt;
+                         CGImageGetBitsPerComponent(AImage), // bitsPerComponent: NativeUInt;
+                         0, // bytesPerRow: NativeUInt;
+                         LColorSpace, // space: CGColorSpaceRef;
+                         CGImageGetBitmapInfo(AImage)); // bitmapInfo: UInt32
+    if LContextRef = nil then raise Exception.Create('Failed to create bitmap context');
+    try
+
+      CGContextTranslateCTM(LContextRef, LNewW/2, LNewH/2);
+      if not SameValue(LAngle, 0, TEpsilon.Angle) then CGContextRotateCTM(LContextRef, LAngle);
+
+      case AOrientation of
+        TALExifOrientation.UNDEFINED,
+        TALExifOrientation.NORMAL:;
+        TALExifOrientation.FLIP_HORIZONTAL: CGContextScaleCTM(LContextRef, -1, 1); // Mirror H
+        TALExifOrientation.ROTATE_180: ; // rotation already done
+        TALExifOrientation.FLIP_VERTICAL: CGContextScaleCTM(LContextRef, 1, -1); // Mirror V
+        TALExifOrientation.TRANSPOSE: CGContextScaleCTM(LContextRef, -1, 1); // After 90°, mirror H
+        TALExifOrientation.ROTATE_90:; // rotation already done
+        TALExifOrientation.TRANSVERSE: CGContextScaleCTM(LContextRef, -1, 1); // After -90°, mirror H
+        TALExifOrientation.ROTATE_270:; // rotation already done
+        else raise Exception.Create('Error E9427EDE-2857-4001-869B-A7BE04745AC2');
+      end;
+
+      CGContextDrawImage(LContextRef, CGRectMake(-CGFloat(W)/2, -CGFloat(H)/2, CGFloat(W), CGFloat(H)), AImage);
+
+      Result := CGBitmapContextCreateImage(LContextRef);
+      if Result = nil then raise Exception.Create('Failed to create oriented CGImage');
+
+    finally
+      CGContextRelease(LContextRef);
+    end;
+  end;
+
 begin
 
   var LOSImage: ALOSImage;
-  if AResourceStream <> nil then LOSImage := _CreateOSImageFromStream(AResourceStream)
+  var LExifOrientation := TALExifOrientation.UNDEFINED;
+  if AResourceStream <> nil then begin
+    if AApplyMetadataOrientation then LExifOrientation := AlGetExifOrientation(AResourceStream);
+    LOSImage := _CreateOSImageFromStream(AResourceStream)
+  end
   else if AResourceName <> '' then begin
     var LFileName := ALGetResourceFilename(AResourceName);
-    if LFileName <> '' then LOSImage := _CreateOSImageFromFile(LFileName)
+    if LFileName <> '' then begin
+      if AApplyMetadataOrientation then LExifOrientation := AlGetExifOrientation(LFileName);
+      LOSImage := _CreateOSImageFromFile(LFileName)
+    end
     else begin
-      var LResourceStream := TResourceStream.Create(HInstance, AResourceName, RT_RCDATA);
+      var LResourceStream := ALCreateResourceStream(AResourceName);
       try
-        LOSImage := _CreateOSImageFromStream(LResourceStream)
+        if AApplyMetadataOrientation then LExifOrientation := AlGetExifOrientation(LResourceStream);
+        LOSImage := _CreateOSImageFromStream(LResourceStream);
+        {$IF defined(DEBUG)}
+        if (SameValue(ALGetScreenScale, 4, TEpsilon.Scale)) then begin
+          ALLog(
+            'ALCreateSkSurfaceFromResource',
+            '%s (%.g×%.g @ scale %.g)',
+            [AResourceName, RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale]);
+
+        if (not ALDisableResourceScaleMismatchLog) and
+           (
+            ((AWrapMode in [TALImageWrapMode.Fit, TALImageWrapMode.FitAndCrop]) and
+             (not SameValue(((W * AScale) / ALGetScreenScale) * 4, ALOSImageGetWidth(LOSImage), TEpsilon.Position)) and
+             (not SameValue(((H * AScale) / ALGetScreenScale) * 4, ALOSImageGetHeight(LOSImage), TEpsilon.Position)))
+            or
+            ((AWrapMode in [TALImageWrapMode.Stretch]) and
+             ((not SameValue(((W * AScale) / ALGetScreenScale) * 4, ALOSImageGetWidth(LOSImage), TEpsilon.Position)) or
+              (not SameValue(((H * AScale) / ALGetScreenScale) * 4, ALOSImageGetHeight(LOSImage), TEpsilon.Position))))
+           )
+        then
+          ALLog(
+            'ALCreateCGContextRefFromResource',
+            '"%s" is %dx%d; expected ~4× (%.g×%.g). Requested %.g×%.g @ scale %.g',
+            [AResourceName, ALOSImageGetWidth(LOSImage), ALOSImageGetHeight(LOSImage), RoundTo(((W * AScale) / ALGetScreenScale) * 4, -2), RoundTo(((H * AScale) / ALGetScreenScale) * 4, -2), RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale],
+            TALLogType.WARN);
+        end;
+        {$ENDIF}
       finally
         ALfreeandNil(LResourceStream);
       end;
@@ -2791,27 +4198,57 @@ begin
 
     // Init LImage
     var LImage := ALOSImageGetCgImage(LOSImage);
+    var LOwnsImage := False;
 
-    // handle AMaskImage / AMaskImage
-    var LOwnMaskImage := False;
-    var LMaskImage := AMaskImage;
+    // handle AMaskResourceName
+    var LMaskImage: CGImageRef := nil;
+    var LKey: TBytes;
+    var LHash: Integer;
+    var LIsCachedMaskImage: Boolean := False;
     try
 
+      // Apply EXIF orientation (if requested) BEFORE wrap/crop/tint/blur
+      if AApplyMetadataOrientation and (not (LExifOrientation in [TALExifOrientation.NORMAL, TALExifOrientation.UNDEFINED])) then begin
+        LImage := _ApplyExifOrientationToCGImage(LImage, LExifOrientation);
+        LOwnsImage := True;
+      end;
+
       // Create the MaskImage
-      if (AMaskResourceName <> '') and (LMaskImage = nil) then begin
-        LMaskImage := ALCreateCGImageRefFromResource(
+      if (AMaskResourceName <> '') then begin
+        LMaskImage := ALGetCachedCGImageRef(
+                        ALCachedMaskCGImageRefs, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
                         AMaskResourceName, // const AResourceName: String;
                         nil, // const AResourceStream: TStream;
                         '', // const AMaskResourceName: String;
-                        nil, // const AMaskImage: CGImageRef;
                         AScale, // const AScale: Single;
                         W, H, // const W, H: single;
+                        False, // const AApplyMetadataOrientation: Boolean;
                         AWrapMode, // const AWrapMode: TALImageWrapMode;
-                        TpointF.Create(-50, -50), // const ACropCenter: TpointF;
+                        TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                        TAlphaColors.Null, // const ATintColor: TalphaColor;
                         0, // const ABlurRadius: single;
                         AXRadius, // const AXRadius: Single;
-                        AYRadius); // const AYRadius: Single)
-        LOwnMaskImage := True;
+                        AYRadius, // const AYRadius: Single)
+                        LKey, // out AKey: TBytes
+                        LHash); // out AHash: Integer)
+        if LMaskImage = nil then begin
+          LIsCachedMaskImage := False;
+          LMaskImage := ALCreateCGImageRefFromResource(
+                          AMaskResourceName, // const AResourceName: String;
+                          nil, // const AResourceStream: TStream;
+                          '', // const AMaskResourceName: String;
+                          AScale, // const AScale: Single;
+                          W, H, // const W, H: single;
+                          False, // const AApplyMetadataOrientation: Boolean;
+                          AWrapMode, // const AWrapMode: TALImageWrapMode;
+                          TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                          TAlphaColors.Null, // const ATintColor: TalphaColor;
+                          0, // const ABlurRadius: single;
+                          AXRadius, // const AXRadius: Single;
+                          AYRadius); // const AYRadius: Single)
+        end
+        else
+          LIsCachedMaskImage := True;
       end;
 
       var LSrcRect: TRectF;
@@ -2882,6 +4319,7 @@ begin
           1, // const AOpacity: Single;
           LMaskImage, // const AMaskImage: CGImageRef;
           ACropCenter, // const ACropCenter: TpointF;
+          ATintColor, // const ATintColor: TalphaColor;
           ABlurRadius, // const ABlurRadius: single;
           AXRadius, // const AXRadius: Single;
           AYRadius); // const AYRadius: Single)
@@ -2892,8 +4330,13 @@ begin
       end;
 
     finally
-      if LOwnMaskImage then
-        CGImageRelease(LMaskImage);
+      if (LMaskImage <> nil) and (not LIsCachedMaskImage) then begin
+        if length(LKey) > 0 then
+          ALCacheCGImageRef(ALCachedMaskCGImageRefs, ALMaxCachedMaskBitmaps, LKey, LHash, LMaskImage)
+        else
+          CGImageRelease(LMaskImage);
+      end;
+      if LOwnsImage then CGImageRelease(LImage);
     end;
 
   finally
@@ -2909,11 +4352,12 @@ function ALCreateCGImageRefFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskImage: CGImageRef;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): CGImageRef;
@@ -2922,11 +4366,12 @@ begin
                          AResourceName, // const AResourceName: String;
                          AResourceStream, // const AResourceStream: TStream;
                          AMaskResourceName, // const AMaskResourceName: String;
-                         AMaskImage, // const AMaskImage: CGImageRef;
                          AScale, // const AScale: Single;
                          W, H, // const W, H: single;
+                         AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                          AWrapMode, // const AWrapMode: TALImageWrapMode;
                          ACropCenter, // const ACropCenter: TpointF;
+                         ATintColor, // const ATintColor: TalphaColor;
                          ABlurRadius, // const ABlurRadius: single;
                          AXRadius, // const AXRadius: Single;
                          AYRadius); // const AYRadius: Single)
@@ -2956,6 +4401,7 @@ procedure ALDrawTBitmap(
             const AOpacity: Single;
             const AMaskBitmap: TBitmap;
             const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -3026,7 +4472,7 @@ begin
 
     if ACanvas.BeginScene then
     try
-      ACanvas.Clear(TAlphaColorRec.Null);
+      ACanvas.Clear(TAlphaColors.Null);
       ACanvas.Fill.Bitmap.Bitmap.Assign(ABitmap);
       ACanvas.Fill.bitmap.WrapMode := TWrapMode.TileStretch;
       ACanvas.Fill.Kind := TBrushKind.Bitmap;
@@ -3043,7 +4489,7 @@ begin
 
     if ACanvas.BeginScene then
     try
-      ACanvas.Clear(TAlphaColorRec.Null);
+      ACanvas.Clear(TAlphaColors.Null);
       ACanvas.Fill.Bitmap.Bitmap.Assign(ABitmap);
       ACanvas.Fill.bitmap.WrapMode := TWrapMode.TileStretch;
       ACanvas.Fill.Kind := TBrushKind.Bitmap;
@@ -3101,11 +4547,12 @@ function ALCreateTBitmapFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: TBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): TBitmap;
@@ -3117,9 +4564,34 @@ begin
     var LFileName := ALGetResourceFilename(AResourceName);
     if LFileName <> '' then LBitmap := Tbitmap.CreateFromFile(LFileName)
     else begin
-      var LResourceStream := TResourceStream.Create(HInstance, AResourceName, RT_RCDATA);
+      var LResourceStream := ALCreateResourceStream(AResourceName);
       try
         LBitmap := Tbitmap.CreateFromStream(LResourceStream);
+        {$IF defined(DEBUG)}
+        if (SameValue(ALGetScreenScale, 4, TEpsilon.Scale)) then begin
+          ALLog(
+            'ALCreateSkSurfaceFromResource',
+            '%s (%.g×%.g @ scale %.g)',
+            [AResourceName, RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale]);
+
+        if (not ALDisableResourceScaleMismatchLog) and
+           (
+            ((AWrapMode in [TALImageWrapMode.Fit, TALImageWrapMode.FitAndCrop]) and
+             (not SameValue(((W * AScale) / ALGetScreenScale) * 4, LBitmap.Width, TEpsilon.Position)) and
+             (not SameValue(((H * AScale) / ALGetScreenScale) * 4, LBitmap.Height, TEpsilon.Position)))
+            or
+            ((AWrapMode in [TALImageWrapMode.Stretch]) and
+             ((not SameValue(((W * AScale) / ALGetScreenScale) * 4, LBitmap.Width, TEpsilon.Position)) or
+              (not SameValue(((H * AScale) / ALGetScreenScale) * 4, LBitmap.Height, TEpsilon.Position))))
+           )
+        then
+          ALLog(
+            'ALCreateTBitmapFromResource',
+            '"%s" is %dx%d; expected ~4× (%.g×%.g). Requested %.g×%.g @ scale %.g',
+            [AResourceName, LBitmap.Width, LBitmap.Height, RoundTo(((W * AScale) / ALGetScreenScale) * 4, -2), RoundTo(((H * AScale) / ALGetScreenScale) * 4, -2), RoundTo(W * AScale, -2), RoundTo(H * AScale, -2), ALGetScreenScale],
+            TALLogType.WARN);
+        end;
+        {$ENDIF}
       finally
         ALfreeandNil(LResourceStream);
       end;
@@ -3130,26 +4602,49 @@ begin
 
   try
 
-    // handle AMaskBitmap / AMaskBitmap
-    var LOwnMaskBitmap := False;
-    var LMaskBitmap := AMaskBitmap;
+    // handle AMaskResourceName
+    var LMaskBitmap: TBitmap := nil;
+    var LKey: TBytes;
+    var LHash: Integer;
+    var LIsCachedMaskBitmap: Boolean := False;
     try
 
       // Create the MaskBitmap
-      if (AMaskResourceName <> '') and (LMaskBitmap = nil) then begin
-        LMaskBitmap := ALCreateTBitmapFromResource(
+      if (AMaskResourceName <> '') then begin
+        LMaskBitmap := ALGetCachedTBitmap(
+                         ALCachedMaskTBitmaps, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
                          AMaskResourceName, // const AResourceName: String;
                          nil, // const AResourceStream: TStream;
                          '', // const AMaskResourceName: String;
-                         nil, // const AMaskBitmap: TBitmap;
                          AScale, // const AScale: Single;
                          W, H, // const W, H: single;
+                         False, // const AApplyMetadataOrientation: Boolean;
                          AWrapMode, // const AWrapMode: TALImageWrapMode;
-                         TpointF.Create(-50, -50), // const ACropCenter: TpointF;
+                         TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                         TAlphaColors.Null, // const ATintColor: TalphaColor;
                          0, // const ABlurRadius: single;
                          AXRadius, // const AXRadius: Single;
-                         AYRadius); // const AYRadius: Single)
-        LOwnMaskBitmap := True;
+                         AYRadius, // const AYRadius: Single)
+                         LKey, // out AKey: TBytes
+                         LHash); // out AHash: Integer)
+        if LMaskBitmap = nil then begin
+          LIsCachedMaskBitmap := False;
+          LMaskBitmap := ALCreateTBitmapFromResource(
+                           AMaskResourceName, // const AResourceName: String;
+                           nil, // const AResourceStream: TStream;
+                           '', // const AMaskResourceName: String;
+                           AScale, // const AScale: Single;
+                           W, H, // const W, H: single;
+                           False, // const AApplyMetadataOrientation: Boolean;
+                           AWrapMode, // const AWrapMode: TALImageWrapMode;
+                           TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                           TAlphaColors.Null, // const ATintColor: TalphaColor;
+                           0, // const ABlurRadius: single;
+                           AXRadius, // const AXRadius: Single;
+                           AYRadius); // const AYRadius: Single)
+        end
+        else
+          LIsCachedMaskBitmap := True;
       end;
 
       var LSrcRect: TRectF;
@@ -3221,6 +4716,7 @@ begin
           1, // const AOpacity: Single;
           LMaskBitmap, // const AMaskBitmap: TBitmap;
           ACropCenter, // const ACropCenter: TpointF;
+          ATintColor, // const ATintColor: TalphaColor;
           ABlurRadius, // const ABlurRadius: single;
           AXRadius, // const AXRadius: Single;
           AYRadius); // const AYRadius: Single)
@@ -3231,8 +4727,12 @@ begin
       end;
 
     finally
-      if LOwnMaskBitmap then
-        ALFreeAndNil(LMaskBitmap);
+      if (LMaskBitmap <> nil) and (not LIsCachedMaskBitmap) then begin
+        if length(LKey) > 0 then
+          ALCacheTBitmap(ALCachedMaskTBitmaps, ALMaxCachedMaskBitmaps, LKey, LHash, LMaskBitmap)
+        else
+          ALFreeAndNil(LMaskBitmap);
+      end;
     end;
 
   finally
@@ -3252,6 +4752,7 @@ procedure ALDrawBitmap(
             const AOpacity: Single;
             const AMaskBitmap: TALBitmap;
             const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+            const ATintColor: TalphaColor;
             const ABlurRadius: single;
             const AXRadius: Single;
             const AYRadius: Single);
@@ -3267,6 +4768,7 @@ begin
     AOpacity, // const AOpacity: Single;
     AMaskBitmap, // const AMaskImage: sk_image_t;
     ACropCenter, // const ACropCenter: TpointF; // Used only when AMaskImage is not nil to center the image on the mask
+    ATintColor, // const ATintColor: TalphaColor;
     ABlurRadius, // const ABlurRadius: single;
     AXRadius, // const AXRadius: Single;
     AYRadius); // const AYRadius: Single);
@@ -3281,6 +4783,7 @@ begin
     AOpacity, // const AOpacity: Single;
     AMaskBitmap, // const AMaskBitmap: JBitmap;
     ACropCenter, // const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+    ATintColor, // const ATintColor: TalphaColor;
     ABlurRadius, // const ABlurRadius: single;
     AXRadius, // const AXRadius: Single;
     AYRadius); // const AYRadius: Single);
@@ -3295,6 +4798,7 @@ begin
     AOpacity, // const AOpacity: Single;
     AMaskBitmap, // const AMaskImage: CGImageRef;
     ACropCenter, // const ACropCenter: TpointF; // Used only when AMaskImage is not nil to center the image on the mask
+    ATintColor, // const ATintColor: TalphaColor;
     ABlurRadius, // const ABlurRadius: single;
     AXRadius, // const AXRadius: Single;
     AYRadius); // const AYRadius: Single);
@@ -3309,6 +4813,7 @@ begin
     AOpacity, // const AOpacity: Single;
     AMaskBitmap, // const AMaskBitmap: TBitmap;
     ACropCenter, // const ACropCenter: TpointF; // Used only when AMaskBitmap is not nil to center the image on the mask
+    ATintColor, // const ATintColor: TalphaColor;
     ABlurRadius, // const ABlurRadius: single;
     AXRadius, // const AXRadius: Single;
     AYRadius); // const AYRadius: Single);
@@ -3320,11 +4825,12 @@ function ALCreateBitmapFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: TALBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): TALBitmap;
@@ -3334,11 +4840,12 @@ begin
               AResourceName, // const AResourceName: String;
               AResourceStream, // const AResourceStream: TStream;
               AMaskResourceName, // const AMaskResourceName: String;
-              AMaskBitmap, // const AMaskImage: sk_image_t;
               AScale, // const AScale: Single;
               W, H, // const W, H: single;
+              AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
               AWrapMode, // const AWrapMode: TALImageWrapMode;
               ACropCenter, // const ACropCenter: TpointF;
+              ATintColor, // const ATintColor: TalphaColor;
               ABlurRadius, // const ABlurRadius: single;
               AXRadius, // const AXRadius: Single;
               AYRadius); // const AYRadius: Single);
@@ -3347,11 +4854,12 @@ begin
               AResourceName, // const AResourceName: String;
               AResourceStream, // const AResourceStream: TStream;
               AMaskResourceName, // const AMaskResourceName: String;
-              AMaskBitmap, // const AMaskBitmap: JBitmap;
               AScale, // const AScale: Single;
               W, H, // const W, H: single;
+              AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
               AWrapMode, // const AWrapMode: TALImageWrapMode;
               ACropCenter, // const ACropCenter: TpointF;
+              ATintColor, // const ATintColor: TalphaColor;
               ABlurRadius, // const ABlurRadius: single;
               AXRadius, // const AXRadius: Single;
               AYRadius); // const AYRadius: Single);
@@ -3360,11 +4868,12 @@ begin
               AResourceName, // const AResourceName: String;
               AResourceStream, // const AResourceStream: TStream;
               AMaskResourceName, // const AMaskResourceName: String;
-              AMaskBitmap, // const AMaskImage: CGImageRef;
               AScale, // const AScale: Single;
               W, H, // const W, H: single;
+              AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
               AWrapMode, // const AWrapMode: TALImageWrapMode;
               ACropCenter, // const ACropCenter: TpointF;
+              ATintColor, // const ATintColor: TalphaColor;
               ABlurRadius, // const ABlurRadius: single;
               AXRadius, // const AXRadius: Single;
               AYRadius); // const AYRadius: Single);
@@ -3373,15 +4882,115 @@ begin
               AResourceName, // const AResourceName: String;
               AResourceStream, // const AResourceStream: TStream;
               AMaskResourceName, // const AMaskResourceName: String;
-              AMaskBitmap, // const AMaskBitmap: TBitmap;
               AScale, // const AScale: Single;
               W, H, // const W, H: single;
+              AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
               AWrapMode, // const AWrapMode: TALImageWrapMode;
               ACropCenter, // const ACropCenter: TpointF;
+              ATintColor, // const ATintColor: TalphaColor;
               ABlurRadius, // const ABlurRadius: single;
               AXRadius, // const AXRadius: Single;
               AYRadius); // const AYRadius: Single);;
   {$ENDIF}
+end;
+
+{***************************}
+procedure ALSaveBitmapToFile(
+            const AFilename: String;
+            const ABitmap: TALBitmap;
+            const AQuality: integer);
+begin
+
+  if AFilename = '' then
+    raise Exception.Create('AFilename must not be empty');
+  TDirectory.CreateDirectory(TPath.GetDirectoryName(AFilename));
+
+  if ALIsBitmapNull(ABitmap) then
+    raise Exception.Create('ABitmap must not be nil');
+
+  var LQuality: Integer := EnsureRange(AQuality, 0, 100);
+
+  {$IF defined(ALSkiaEngine)}
+
+  if not sk4d_image_encode_to_file(
+           ABitmap, // const self: sk_image_t;
+           MarshaledAString(UTF8String(AFilename)), // const file_name: MarshaledAString;
+           ALFileExtensionToSkEncodedImageFormat(ALExtractFileExt(AFileName)), // format: sk_encodedimageformat_t;
+           LQuality) then // quality: int32_t
+    raise Exception.Create('sk4d_image_encode_to_file failed');
+
+  {$ELSEIF defined(ANDROID)}
+
+  var LFileOutputStream := TJFileOutputStream.JavaClass.init(TJFile.JavaClass.init(StringToJString(AFilename)));
+  try
+    if not ABitmap.compress(
+             ALFileExtensionToJBitmapCompressFormat(ALExtractFileExt(AFileName)), // format: JBitmap_CompressFormat
+             LQuality, // quality: Integer
+             LFileOutputStream) then // stream: JOutputStream
+      raise Exception.Create('JBitmap.compress failed');
+    LFileOutputStream.flush;
+  finally
+    LFileOutputStream.close;
+  end;
+
+  {$ELSEIF defined(ALAppleOS)}
+
+  var LPath: CFStringRef := CFStringCreateWithCString(nil{alloc}, MarshaledAString(UTF8Encode(AFileName)){cStr}, kCFStringEncodingUTF8{encoding});
+  if LPath = nil then raise Exception.Create('Unable to convert filename to CFString');
+  try
+    var LUrl: CFURLRef := CFURLCreateWithFileSystemPath(nil{allocator}, LPath{filePath}, kCFURLPOSIXPathStyle{pathStyle}, False{isDirectory});
+    if LUrl = nil then raise Exception.Create('Unable to create file URL');
+    try
+      var LImageDestinationRef := CGImageDestinationCreateWithURL(
+                                    LURL, // url: CFURLRef;
+                                    ALFileExtensionToUTTypeImage(ALExtractFileExt(AFileName)), // &type: CFStringRef;
+                                    1, // count: NativeUInt;
+                                    nil); // options: CFDictionaryRef
+      if LImageDestinationRef = nil then raise Exception.Create('Unable to create CGImageDestination');
+      try
+        var LKeys: array [0..0] of Pointer;
+        var LValue: array [0..0] of Pointer;
+        var LFloatVal: Single := LQuality / 100;
+        LKeys[0] := kCGImageDestinationLossyCompressionQuality;
+        LValue[0] := CFNumberCreate(nil{allocator}, kCFNumberFloat32Type{theType}, @LFloatVal{valuePtr});
+        try
+          var LProperties := CFDictionaryCreate(nil{allocator}, @LKeys[0]{keys}, @LValue[0]{values}, 1{numValues}, nil{keyCallBacks}, nil{valueCallBacks});
+          if LProperties = nil then raise Exception.Create('Unable to create export properties');
+          try
+            CGImageDestinationAddImage(LImageDestinationRef{idst}, ABitmap{image}, LProperties{properties});
+            {$IFNDEF ALCompilerVersionSupported130}
+              {$MESSAGE WARN 'Check the status of https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4714 and adjust the IFDEF'}
+            {$ENDIF}
+            {$IF defined(IOS)}
+            if not CGImageDestinationFinalize(LImageDestinationRef{idst}) then
+            {$ELSE}
+            if not Boolean(CGImageDestinationFinalize(LImageDestinationRef{idst})) then
+            {$ENDIF}
+              raise Exception.Create('Unable to finalize image export');
+          finally
+            CFRelease(LProperties);
+          end;
+        finally
+          CFRelease(LValue[0]);
+        end;
+      finally
+        CFRelease(LImageDestinationRef);
+      end;
+    finally
+      CFRelease(LUrl);
+    end;
+  finally
+    CFRelease(LPath);
+  end;
+
+  {$ELSE}
+
+  var LBitmapCodecSaveParams: TBitmapCodecSaveParams;
+  LBitmapCodecSaveParams.Quality := LQuality;
+  Abitmap.SaveToFile(AFilename, @LBitmapCodecSaveParams);
+
+  {$ENDIF}
+
 end;
 
 {***********************}
@@ -3525,11 +5134,12 @@ function ALCreateDrawableFromResource(
            const AResourceName: String;
            const AResourceStream: TStream;
            const AMaskResourceName: String;
-           const AMaskBitmap: TALBitmap;
            const AScale: Single;
            const W, H: single;
+           const AApplyMetadataOrientation: Boolean;
            const AWrapMode: TALImageWrapMode;
            const ACropCenter: TpointF;
+           const ATintColor: TalphaColor;
            const ABlurRadius: single;
            const AXRadius: Single;
            const AYRadius: Single): TALDrawable;
@@ -3540,11 +5150,12 @@ begin
                 AResourceName, // const AResourceName: String;
                 AResourceStream, // const AResourceStream: TStream;
                 AMaskResourceName, // const AMaskResourceName: String;
-                AMaskBitmap, // const AMaskImage: sk_image_t;
                 AScale, // const AScale: Single;
                 W, H, // const W, H: single;
+                AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                 AWrapMode, // const AWrapMode: TALImageWrapMode;
                 ACropCenter, // const ACropCenter: TpointF;
+                ATintColor, // const ATintColor: TalphaColor;
                 ABlurRadius, // const ABlurRadius: single;
                 AXRadius, // const AXRadius: Single;
                 AYRadius); // const AYRadius: Single);
@@ -3553,11 +5164,12 @@ begin
                       AResourceName, // const AResourceName: String;
                       AResourceStream, // const AResourceStream: TStream;
                       AMaskResourceName, // const AMaskResourceName: String;
-                      AMaskBitmap, // const AMaskImage: sk_image_t;
                       AScale, // const AScale: Single;
                       W, H, // const W, H: single;
+                      AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                       AWrapMode, // const AWrapMode: TALImageWrapMode;
                       ACropCenter, // const ACropCenter: TpointF;
+                      ATintColor, // const ATintColor: TalphaColor;
                       ABlurRadius, // const ABlurRadius: single;
                       AXRadius, // const AXRadius: Single;
                       AYRadius); // const AYRadius: Single);
@@ -3576,11 +5188,12 @@ begin
                    AResourceName, // const AResourceName: String;
                    AResourceStream, // const AResourceStream: TStream;
                    AMaskResourceName, // const AMaskResourceName: String;
-                   AMaskBitmap, // const AMaskBitmap: JBitmap;
                    AScale, // const AScale: Single;
                    W, H, // const W, H: single;
+                   AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                    AWrapMode, // const AWrapMode: TALImageWrapMode;
                    ACropCenter, // const ACropCenter: TpointF;
+                   ATintColor, // const ATintColor: TalphaColor;
                    ABlurRadius, // const ABlurRadius: single;
                    AXRadius, // const AXRadius: Single;
                    AYRadius); // const AYRadius: Single);
@@ -3595,11 +5208,12 @@ begin
                          AResourceName, // const AResourceName: String;
                          AResourceStream, // const AResourceStream: TStream;
                          AMaskResourceName, // const AMaskResourceName: String;
-                         AMaskBitmap, // const AMaskImage: CGImageRef;
                          AScale, // const AScale: Single;
                          W, H, // const W, H: single;
+                         AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
                          AWrapMode, // const AWrapMode: TALImageWrapMode;
                          ACropCenter, // const ACropCenter: TpointF;
+                         ATintColor, // const ATintColor: TalphaColor;
                          ABlurRadius, // const ABlurRadius: single;
                          AXRadius, // const AXRadius: Single;
                          AYRadius); // const AYRadius: Single);
@@ -3617,11 +5231,12 @@ begin
               AResourceName, // const AResourceName: String;
               AResourceStream, // const AResourceStream: TStream;
               AMaskResourceName, // const AMaskResourceName: String;
-              AMaskBitmap, // const AMaskBitmap: TBitmap;
               AScale, // const AScale: Single;
               W, H, // const W, H: single;
+              AApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
               AWrapMode, // const AWrapMode: TALImageWrapMode;
               ACropCenter, // const ACropCenter: TpointF;
+              ATintColor, // const ATintColor: TalphaColor;
               ABlurRadius, // const ABlurRadius: single;
               AXRadius, // const AXRadius: Single;
               AYRadius); // const AYRadius: Single);;
@@ -3653,18 +5268,19 @@ begin
   FFillResourceName := '';
   FFillResourceStream := nil;
   FFillMaskResourceName := '';
-  FFillMaskBitmap := ALNullBitmap;
+  FFillApplyMetadataOrientation := False;
   FFillBackgroundMarginsRect := TRectF.Empty;
   FFillImageMarginsRect := TRectF.Empty;
+  FFillImageTintColor := TAlphaColors.Null;
   FFillImageNoRadius := False;
   FFillWrapMode := TALImageWrapMode.Fit;
-  FFillCropCenter := TpointF.Create(-50, -50);
+  FFillCropCenter := TpointF.Create(0.5,0.5);
   FFillBlurRadius := 0;
   FStateLayerOpacity := 0;
   FStateLayerColor := TAlphaColors.Null;
   FStateLayerMarginsRect := TRectF.Empty;
-  FStateLayerXRadius := 0;
-  FStateLayerYRadius := 0;
+  FStateLayerXRadius := NAN;
+  FStateLayerYRadius := NAN;
   FDrawStateLayerOnTop := True;
   FStrokeColor := TAlphaColors.Null;
   FStrokeThickness := 0;
@@ -3717,8 +5333,11 @@ begin
   FFillGradientColors := Afill.Gradient.Colors;
   FFillGradientOffsets := Afill.Gradient.Offsets;
   FFillResourceName := AFill.ResourceName;
+  FFillResourceStream := AFill.ResourceStream;
+  FFillApplyMetadataOrientation := AFill.ApplyMetadataOrientation;
   FFillBackgroundMarginsRect := AFill.BackgroundMargins.Rect;
   FFillImageMarginsRect := AFill.ImageMargins.Rect;
+  FFillImageTintColor := AFill.ImageTintColor;
   FFillImageNoRadius := AFill.ImageNoRadius;
   FFillWrapMode := AFill.WrapMode;
 end;
@@ -3793,10 +5412,10 @@ begin
   Result := @Self;
 end;
 
-{*************************************************************************************************}
-function TALDrawRectangleHelper.SetFillMaskBitmap(const AValue: TALBitmap): PALDrawRectangleHelper;
+{*************************************************************************************************************}
+function TALDrawRectangleHelper.SetFillApplyMetadataOrientation(const AValue: Boolean): PALDrawRectangleHelper;
 begin
-  FFillMaskBitmap := AValue;
+  FFillApplyMetadataOrientation := AValue;
   Result := @Self;
 end;
 
@@ -3811,6 +5430,13 @@ end;
 function TALDrawRectangleHelper.SetFillImageMarginsRect(const AValue: TRectF): PALDrawRectangleHelper;
 begin
   FFillImageMarginsRect := AValue;
+  Result := @Self;
+end;
+
+{*******************************************************************************************************}
+function TALDrawRectangleHelper.SetFillImageTintColor(const AValue: TAlphaColor): PALDrawRectangleHelper;
+begin
+  FFillImageTintColor := AValue;
   Result := @Self;
 end;
 
@@ -4072,9 +5698,9 @@ var
        (FCorners = AllCorners) and
        (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
+        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
           LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
         else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
           LRect.Inflate(-1, -1);
@@ -4096,9 +5722,9 @@ var
             (FCorners<>[]) and
             (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
+        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
           LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
         else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
           LRect.Inflate(-1, -1);
@@ -4136,9 +5762,9 @@ var
              (FCorners=[])) and
             (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
+        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
           LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
         else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
           LRect.Inflate(-1, -1);
@@ -4154,11 +5780,11 @@ var
       var LPathBuilder := ALSkCheckHandle(sk4d_pathbuilder_create);
       try
         var LHalfStrokeThickness: Single := 0;
-        if (LStrokeColor <> TalphaColorRec.Null) then begin
+        if (LStrokeColor <> TAlphaColors.Null) then begin
           var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
           if (aDrawOnlyBorder) or
              ((LRectIsEqualsToStrokeRect) and
-              (LShadowcolor = TalphaColorRec.Null) and
+              (LShadowcolor = TAlphaColors.Null) and
               (FCorners=AllCorners) and
               (FSides=AllSides)) then begin
             LHalfStrokeThickness := LScaledStrokeThickness / 2;
@@ -4396,9 +6022,9 @@ var
       // use drawcircle/drawOval
       if (not aForceDrawPath) and
          (not aClipPath) then begin
-        if (LStrokeColor <> TalphaColorRec.Null) then begin
+        if (LStrokeColor <> TAlphaColors.Null) then begin
           var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-          if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
+          if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
             LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
           else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
             LRect.Inflate(-1, -1);
@@ -4414,11 +6040,11 @@ var
       else begin
         var LPath := TJPath.Create;
         //--
-        if (LStrokeColor <> TalphaColorRec.Null) then begin
+        if (LStrokeColor <> TAlphaColors.Null) then begin
           var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
           if (aDrawOnlyBorder) or
              ((LRectIsEqualsToStrokeRect) and
-              (LShadowcolor = TalphaColorRec.Null)) then begin
+              (LShadowcolor = TAlphaColors.Null)) then begin
             LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2));
           end
           else if (LRectIsEqualsToStrokeRect) and
@@ -4447,54 +6073,135 @@ var
 
     end
 
-    // use drawRoundRect
-    else if (not aForceDrawPath) and
-            (not aClipPath) and
-            ((compareValue(LScaledXRadius, 0, TEpsilon.Position) > 0) and
+    // use drawRoundRect/addRoundRect+drawPath
+    else if ((compareValue(LScaledXRadius, 0, TEpsilon.Position) > 0) and
              (compareValue(LScaledYRadius, 0, TEpsilon.position) > 0)) and
             (FCorners=AllCorners) and
             (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
-        var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
-          LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
-        else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
-          LRect.Inflate(-1, -1);
+      // use drawRoundRect
+      if (not aForceDrawPath) and
+         (not aClipPath) then begin
+        if (LStrokeColor <> TAlphaColors.Null) then begin
+          var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
+          if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
+            LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
+          else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
+            LRect.Inflate(-1, -1);
+        end;
+        //--
+        var LJRect := TJRectf.JavaClass.init(LRect.left, LRect.top, LRect.right, LRect.bottom);
+        ACanvas.drawRoundRect(
+          LJRect{rect},
+          LScaledXRadius {rx},
+          LScaledYRadius {ry},
+          apaint);
+        LJRect := nil;
+      end
+
+      // use addRoundRect+drawPath
+      else begin
+        var LPath := TJPath.Create;
+        //--
+        if (LStrokeColor <> TAlphaColors.Null) then begin
+          var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
+          if (aDrawOnlyBorder) or
+             ((LRectIsEqualsToStrokeRect) and
+              (LShadowcolor = TAlphaColors.Null)) then begin
+            LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2));
+          end
+          else if (LRectIsEqualsToStrokeRect) and
+                  (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then begin
+            LRect.Inflate(-1, -1);
+          end;
+        end;
+        //--
+        var LXRadius: single := LScaledXRadius;
+        var LYradius: single := LScaledYRadius;
+        if (LXRadius > LRect.width / 2) then LXRadius := LRect.width / 2;
+        if (LYradius > LRect.height / 2) then LYradius := LRect.height / 2;
+        //--
+        var LJRect := TJRectf.JavaClass.init(LRect.left, LRect.top, LRect.right, LRect.bottom);
+        LPath.addRoundRect(
+          LJRect{rect},
+          LXRadius {rx},
+          LYRadius {ry},
+          TJPath_Direction.JavaClass.CW{dir});
+        //--
+        if aPaint <> nil then ACanvas.drawPath(LPath,aPaint);
+        if aClipPath then begin
+          ACanvas.save;
+          ACanvas.clipPath(LPath);
+          {$IF defined(DEBUG)}
+          if LPathClipped then
+            raise Exception.Create('Error 2001FF24-310A-48D3-9D9C-34B8C3358130');
+          {$ENDIF}
+          LPathClipped := True;
+        end;
+        LPath := nil;
       end;
-      //--
-      var LJRect := TJRectf.JavaClass.init(LRect.left, LRect.top, LRect.right, LRect.bottom);
-      ACanvas.drawRoundRect(
-        LJRect{rect},
-        LScaledXRadius {rx},
-        LScaledYRadius {ry},
-        apaint);
-      LJRect := nil;
 
     end
 
-    // use drawRect
-    else if (not aForceDrawPath) and
-            (not aClipPath) and
-            ((compareValue(LScaledXRadius, 0, TEpsilon.Position) = 0) or
+    // use drawRect/addRect+drawPath
+    else if ((compareValue(LScaledXRadius, 0, TEpsilon.Position) = 0) or
              (compareValue(LScaledYRadius, 0, TEpsilon.position) = 0) or
              (FCorners=[])) and
             (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
-        var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
-          LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
-        else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
-          LRect.Inflate(-1, -1);
+      // use drawRect
+      if (not aForceDrawPath) and
+         (not aClipPath) then begin
+        if (LStrokeColor <> TAlphaColors.Null) then begin
+          var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
+          if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
+            LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
+          else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
+            LRect.Inflate(-1, -1);
+        end;
+        //--
+        ACanvas.drawRect(
+          LRect.left{left},
+          LRect.top{top},
+          LRect.right{right},
+          LRect.bottom{bottom},
+          apaint);
+      end
+
+      // use addRect+drawPath
+      else begin
+        var LPath := TJPath.Create;
+        //--
+        if (LStrokeColor <> TAlphaColors.Null) then begin
+          var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
+          if (aDrawOnlyBorder) or
+             ((LRectIsEqualsToStrokeRect) and
+              (LShadowcolor = TAlphaColors.Null)) then begin
+            LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2));
+          end
+          else if (LRectIsEqualsToStrokeRect) and
+                  (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then begin
+            LRect.Inflate(-1, -1);
+          end;
+        end;
+        //--
+        var LJRect := TJRectf.JavaClass.init(LRect.left, LRect.top, LRect.right, LRect.bottom);
+        LPath.addRect(
+          LJRect{rect},
+          TJPath_Direction.JavaClass.CW{dir});
+        //--
+        if aPaint <> nil then ACanvas.drawPath(LPath,aPaint);
+        if aClipPath then begin
+          ACanvas.save;
+          ACanvas.clipPath(LPath);
+          {$IF defined(DEBUG)}
+          if LPathClipped then
+            raise Exception.Create('Error 2001FF24-310A-48D3-9D9C-34B8C3358130');
+          {$ENDIF}
+          LPathClipped := True;
+        end;
+        LPath := nil;
       end;
-      //--
-      ACanvas.drawRect(
-        LRect.left{left},
-        LRect.top{top},
-        LRect.right{right},
-        LRect.bottom{bottom},
-        apaint);
 
     end
 
@@ -4504,11 +6211,11 @@ var
       var LPath := TJPath.Create;
       //--
       var LHalfStrokeThickness: Single := 0;
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
         if (aDrawOnlyBorder) or
            ((LRectIsEqualsToStrokeRect) and
-            (LShadowcolor = TalphaColorRec.Null) and
+            (LShadowcolor = TAlphaColors.Null) and
             (FCorners=AllCorners) and
             (FSides=AllSides)) then begin
           LHalfStrokeThickness := LScaledStrokeThickness / 2;
@@ -4784,9 +6491,9 @@ var
        (FCorners = AllCorners) and
        (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
+        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
           LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
         else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
           LRect.Inflate(-1, -1);
@@ -4813,9 +6520,9 @@ var
              (FCorners=[])) and
             (FSides=AllSides) then begin
 
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
-        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TalphaColorRec.Null)) then
+        if aDrawOnlyBorder or (LRectIsEqualsToStrokeRect and (LShadowcolor = TAlphaColors.Null)) then
           LRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2))
         else if (LRectIsEqualsToStrokeRect) and (compareValue(LScaledStrokeThickness, 1, TEpsilon.position) > 0) then
           LRect.Inflate(-1, -1);
@@ -4843,11 +6550,11 @@ var
       CGContextBeginPath(ACanvas);
       //--
       var LHalfStrokeThickness: Single := 0;
-      if (LStrokeColor <> TalphaColorRec.Null) then begin
+      if (LStrokeColor <> TAlphaColors.Null) then begin
         var LRectIsEqualsToStrokeRect := LRect.EqualsTo(LScaledDstRect, TEpsilon.position);
         if (aDrawOnlyBorder) or
            ((LRectIsEqualsToStrokeRect) and
-            (LShadowcolor = TalphaColorRec.Null) and
+            (LShadowcolor = TAlphaColors.Null) and
             (FCorners=AllCorners) and
             (FSides=AllSides)) then begin
           LHalfStrokeThickness := LScaledStrokeThickness / 2;
@@ -5052,7 +6759,7 @@ var
     //     return radius > 0 ? 0.57735f * radius + 0.5f : 0.0f;
     //  }
     //But it's not very good, I think that a better value is just Shadow.blur / 2
-    if (LShadowColor <> TalphaColorRec.Null) then begin
+    if (LShadowColor <> TAlphaColors.Null) then begin
       var LImagefilter := ALSkCheckHandle(
                             sk4d_imagefilter_make_drop_shadow(
                               LScaledShadowOffsetX, // dx,
@@ -5077,7 +6784,7 @@ var
   {$IF (defined(ANDROID)) and (not defined(ALSkiaEngine))}
   procedure _SetShadow(const aPaint: JPaint);
   begin
-    if LShadowColor <> TalphaColorRec.Null then
+    if LShadowColor <> TAlphaColors.Null then
       APaint.setShadowLayer(
         LScaledShadowBlur{radius},
         LScaledShadowOffsetX{dx},
@@ -5091,7 +6798,7 @@ var
   {$IF (defined(ALAppleOS)) and (not defined(ALSkiaEngine))}
   procedure _SetShadow(const ACanvas: CGContextRef);
   begin
-    if LShadowColor <> TalphaColorRec.Null then begin
+    if LShadowColor <> TAlphaColors.Null then begin
       var LShadowColorF := TAlphaColorCGFloat.Create(LShadowColor);
       var LShadowColorCG := CGColorCreate(ALGetGlobalCGColorSpace, @LShadowColorF);
       try
@@ -5112,7 +6819,7 @@ var
   {$IF defined(ALSkiaEngine)}
   procedure _ClearShadow(const aPaint: sk_Paint_t);
   begin
-    if LShadowColor <> TalphaColorRec.Null then
+    if LShadowColor <> TAlphaColors.Null then
       sk4d_paint_set_image_filter(aPaint, 0);
   end;
   {$ENDIF}
@@ -5122,7 +6829,7 @@ var
   {$IF (defined(ANDROID)) and (not defined(ALSkiaEngine))}
   procedure _ClearShadow(const aPaint: JPaint);
   begin
-      if LShadowColor <> TalphaColorRec.Null then
+      if LShadowColor <> TAlphaColors.Null then
         APaint.clearShadowLayer;
   end;
   {$ENDIF}
@@ -5132,7 +6839,7 @@ var
   {$IF (defined(ALAppleOS)) and (not defined(ALSkiaEngine))}
   procedure _ClearShadow(const ACanvas: CGContextRef);
   begin
-    if LShadowColor <> TalphaColorRec.Null then
+    if LShadowColor <> TAlphaColors.Null then
       CGContextSetShadowWithColor(
         ACanvas,
         CGSizeMake(0, 0), // offset
@@ -5148,7 +6855,7 @@ var
     if length(LFillGradientColors) = 0 then exit(true);
     Result := False;
     for var I := Low(LFillGradientColors) to High(LFillGradientColors) do begin
-      Result := TAlphaColorRec(LFillGradientColors[i]).A < 255;
+      Result := TAlphaColorRec(LFillGradientColors[i]).A < $FF;
       if Result then exit;
     end;
   end;
@@ -5161,6 +6868,8 @@ var
 
     var LScaledStateLayerXRadius: Single := FStateLayerXRadius;
     var LScaledStateLayerYRadius: Single := FStateLayerYRadius;
+    if IsNaN(LScaledStateLayerXRadius) then LScaledStateLayerXRadius := FXRadius;
+    if IsNaN(LScaledStateLayerYRadius) then LScaledStateLayerYRadius := FYRadius;
     if LScaledStateLayerXRadius > 0 then LScaledStateLayerXRadius := LScaledStateLayerXRadius * FScale;
     if LScaledStateLayerYRadius > 0 then LScaledStateLayerYRadius := LScaledStateLayerYRadius* FScale;
 
@@ -5240,7 +6949,7 @@ begin
   LScaledFillGradientEndPoint.Y := LScaledFillGradientEndPoint.Y * FScale;
   //--
   var LScaledFillBackgroundMarginsRect: TRectF;
-  if (FFillColor <> TalphaColorRec.Null) or
+  if (FFillColor <> TAlphaColors.Null) or
      (length(FFillGradientColors) > 0) then begin
     LScaledFillBackgroundMarginsRect := FFillBackgroundMarginsRect;
     LScaledFillBackgroundMarginsRect.Top := LScaledFillBackgroundMarginsRect.Top * FScale;
@@ -5286,7 +6995,7 @@ begin
   var LFillColor := FFillColor;
   LFillGradientColors := FFillGradientColors;
   if LScaledBackgroundDstRect.IsEmpty then begin
-    LFillColor := TALphaColors.Null;
+    LFillColor := TAlphaColors.Null;
     setlength(LFillGradientColors, 0);
     setlength(LFillGradientOffsets, 0);
   end;
@@ -5322,7 +7031,7 @@ begin
   LFillWithImage := (LFillResourceName <> '') or (LFillResourceStream <> nil);
   //--
   var LScaledStateLayerMarginsRect: TRectF;
-  if (FStateLayerColor <> TalphaColorRec.Null) and
+  if (FStateLayerColor <> TAlphaColors.Null) and
      (CompareValue(FStateLayerOpacity, 0, TEpsilon.Scale) > 0) then begin
     LScaledStateLayerMarginsRect := FStateLayerMarginsRect;
     LScaledStateLayerMarginsRect.Top := LScaledStateLayerMarginsRect.Top * FScale;
@@ -5344,19 +7053,30 @@ begin
   LStateLayerColor := FStateLayerColor;
   if (LScaledStateLayerDstRect.IsEmpty) or
      (CompareValue(FStateLayerOpacity, 0, TEpsilon.Scale) <= 0) then
-    LStateLayerColor := TALphaColors.Null;
+    LStateLayerColor := TAlphaColors.Null;
   //--
-  if (LStateLayerColor <> TALphaColors.Null) and
+  if (LStateLayerColor <> TAlphaColors.Null) and
      (CompareValue(FStateLayerOpacity, 0, TEpsilon.Scale) > 0) and
      (LScaledStateLayerDstRect.EqualsTo(LScaledBackgroundDstRect)) and
      (LScaledStateLayerDstRect.EqualsTo(LScaledDstRect)) and
-     (sameValue(FStateLayerXRadius, FXRadius, TEpsilon.Vector)) and
-     (sameValue(FStateLayerYRadius, FYRadius, TEpsilon.Vector)) then begin
+     ((IsNaN(FStateLayerXRadius)) or (sameValue(FStateLayerXRadius, FXRadius, TEpsilon.Vector))) and
+     ((IsNaN(FStateLayerYRadius)) or (sameValue(FStateLayerYRadius, FYRadius, TEpsilon.Vector))) then begin
     LFillColor := ALblendColor(LfillColor, LStateLayerColor, FStateLayerOpacity);
     if (FDrawStateLayerOnTop) and
        (LStrokeColor <> TAlphaColors.Null) then
       LStrokeColor := ALblendColor(LStrokeColor, LStateLayerColor, FStateLayerOpacity);
-    LStateLayerColor := TALphaColors.Null;
+    LStateLayerColor := TAlphaColors.Null;
+  end;
+  //--
+  // Since the stroke is rendered half over the fill and half outside,
+  // a partially transparent stroke can create visible blending artifacts.
+  // To reduce this effect, we pre-blend the stroke color with the fill color
+  // when the fill is fully opaque and the stroke has transparency.
+  If (LStrokeColor <> TAlphaColors.Null) and
+     (TAlphaColorRec(LStrokeColor).A < $FF) and
+     (LFillColor <> TAlphaColors.Null) and
+     (TAlphaColorRec(LFillColor).A = $FF) then begin
+    LStrokeColor := ALblendColor(LFillColor{ABaseColor}, LStrokeColor{AOverlayColor});
   end;
   //--
   {$IF (defined(ANDROID)) and (not defined(ALSkiaEngine))}
@@ -5370,6 +7090,7 @@ begin
   if compareValue(FOpacity, 1, Tepsilon.Scale) < 0 then begin
     var LLayerRect := ALGetShapeSurfaceRect(
                         LScaledDstRect, // const ARect: TrectF;
+                        False, // const AAlignToPixel: Boolean;
                         LFillColor, // const AFillColor: TAlphaColor;
                         LFillGradientColors, // const AFillGradientColors: TArray<TAlphaColor>;
                         LFillResourceName, // const AFillResourceName: String;
@@ -5398,10 +7119,10 @@ begin
       sk4d_paint_set_dither(LPaint, true);
 
       // Fill the rectangle
-      if (LFillColor <> TalphaColorRec.Null) or
+      if (LFillColor <> TAlphaColors.Null) or
          (length(LFillGradientColors) > 0) or
          (LFillWithImage) or
-         (LShadowColor <> TalphaColorRec.Null) then begin
+         (LShadowColor <> TAlphaColors.Null) then begin
 
         // FILL_SK_PAINTSTYLE
         sk4d_paint_set_style(LPaint, sk_paintstyle_t.FILL_SK_PAINTSTYLE);
@@ -5444,13 +7165,13 @@ begin
         var LDrawnWithSolidColor := False;
 
         // Fill with transparent solid color and shadow
-        if (LShadowColor <> TalphaColorRec.Null) and // If null, skip drawing the shadow
-           (TAlphaColorRec(LFillColor).A < 255) and // Else, fill with solid color and shadow in one pass
+        if (LShadowColor <> TAlphaColors.Null) and // If null, skip drawing the shadow
+           (TAlphaColorRec(LFillColor).A < $FF) and // Else, fill with solid color and shadow in one pass
            (_FillGradientIsTransparent) and // Else, fill with gradient and shadow in one pass
            ((not LFillWithImage) or // If no image, no opaque fill color and no opaque gradient is present, then draw the shadow in two passes
-            (LFillColor <> TalphaColors.Null) or // If there is an image and a transparent fill color, then draw the shadow in two passes
+            (LFillColor <> TAlphaColors.Null) or // If there is an image and a transparent fill color, then draw the shadow in two passes
             (length(LFillGradientColors) > 0) or // If there is an image and a transparent gradient, draw the shadow in two passes
-            (LStrokeColor <> TalphaColorRec.Null)) then begin // If there is an image and a stroke, draw the shadow in two passes
+            (LStrokeColor <> TAlphaColors.Null)) then begin // If there is an image and a stroke, draw the shadow in two passes
 
           // First pass draw the shadow
           sk4d_paint_set_color(LPaint, ALSetColorAlpha(LFillColor, 1{AOpacity}));
@@ -5477,7 +7198,7 @@ begin
         end
 
         // Fill with solid color
-        else if (LFillColor <> TalphaColors.Null) then begin
+        else if (LFillColor <> TAlphaColors.Null) then begin
           sk4d_paint_set_color(LPaint, LFillColor);
           _SetShadow(LPaint);
           _DrawRect(FCanvas, LPaint, LScaledBackgroundDstRect, false{aDrawOnlyBorder}, False{aNoRadius});
@@ -5546,27 +7267,59 @@ begin
         // Fill with image
         if LFillWithImage then begin
           var LImage: sk_image_t;
+          var LKey: TBytes;
+          var LHash: Integer;
+          var LIsCachedImage: Boolean {$IFDEF ALDPK} := False {$ENDIF};
           {$IFDEF ALDPK}
           if (LFillResourceStream = nil) and (ALGetResourceFilename(LFillResourceName) = '') then
             LImage := 0
           else
           try
           {$ENDIF}
-            LImage := ALCreateSkImageFromResource(
-                        LFillResourceName, // const AResourceName: String;
-                        LFillResourceStream, // const AResourceStream: TStream;
-                        FFillMaskResourceName, // const AMaskResourceName: String;
-                        FFillMaskBitmap, // const AMaskImage: sk_image_t;
-                        1, // const AScale: Single;
-                        LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
-                        FFillWrapMode, // const AWrapMode: TALImageWrapMode;
-                        FFillCropCenter, // const ACropCenter: TpointF;
-                        FFillBlurRadius * FScale, // const ABlurRadius: single;
-                        0, // const AXRadius: Single;
-                        0); // const AYRadius: Single);
+            if TThread.Current.ThreadID = MainThreadID then
+              LImage := ALGetCachedBitmap(
+                          ALCachedSkImages, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                          LFillResourceName, // const AResourceName: String;
+                          LFillResourceStream, // const AResourceStream: TStream;
+                          FFillMaskResourceName, // const AMaskResourceName: String;
+                          1, // const AScale: Single;
+                          LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                          FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                          FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                          FFillCropCenter, // const ACropCenter: TpointF;
+                          FFillImageTintColor, // const ATintColor: TalphaColor;
+                          FFillBlurRadius * FScale, // const ABlurRadius: single;
+                          0, // const AXRadius: Single;
+                          0, // const AYRadius: Single);
+                          LKey, // out AKey: TBytes
+                          LHash) // out AHash: Integer)
+            else begin
+              LImage := ALNullBitmap;
+              SetLength(LKey, 0);
+            end;
+            if ALIsBitmapNull(LImage) then begin
+              LIsCachedImage := False;
+              LImage := ALCreateSkImageFromResource(
+                          LFillResourceName, // const AResourceName: String;
+                          LFillResourceStream, // const AResourceStream: TStream;
+                          FFillMaskResourceName, // const AMaskResourceName: String;
+                          1, // const AScale: Single;
+                          LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                          FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                          FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                          FFillCropCenter, // const ACropCenter: TpointF;
+                          FFillImageTintColor, // const ATintColor: TalphaColor;
+                          FFillBlurRadius * FScale, // const ABlurRadius: single;
+                          0, // const AXRadius: Single;
+                          0); // const AYRadius: Single);
+            end
+            else
+              LIsCachedImage := True;
           {$IFDEF ALDPK}
           except
             LImage := 0;
+            setlength(LKey, 0);
+            LIsCachedImage := False;
           end;
           If LImage <> 0 then
           {$ENDIF}
@@ -5599,7 +7352,12 @@ begin
               sk4d_paint_set_shader(LPaint, 0);
 
             finally
-              sk4d_refcnt_unref(LImage);
+              if not LIsCachedImage then begin
+                if length(LKey) > 0 then
+                  ALCacheBitmap(ALCachedSkImages, ALMaxCachedBitmaps, LKey, LHash, LImage)
+                else
+                  sk4d_refcnt_unref(LImage);
+              end;
             end;
         end;
 
@@ -5610,7 +7368,7 @@ begin
         _DrawStateLayer;
 
       // Stroke the rectangle
-      if LStrokeColor <> TalphaColorRec.Null then begin
+      if LStrokeColor <> TAlphaColors.Null then begin
         sk4d_paint_set_style(LPaint, sk_paintstyle_t.STROKE_SK_PAINTSTYLE);
         sk4d_paint_set_stroke_width(LPaint, LScaledStrokeThickness);
         sk4d_paint_set_color(LPaint, LStrokeColor);
@@ -5641,6 +7399,7 @@ begin
   if compareValue(FOpacity, 1, Tepsilon.Scale) < 0 then begin
     var LLayerRect := ALGetShapeSurfaceRect(
                         LScaledDstRect, // const ARect: TrectF;
+                        False, // const AAlignToPixel: Boolean;
                         LFillColor, // const AFillColor: TAlphaColor;
                         LFillGradientColors, // const AFillGradientColors: TArray<TAlphaColor>;
                         LFillResourceName, // const AFillResourceName: String;
@@ -5666,10 +7425,10 @@ begin
     LPaint.setDither(true); // Enabling this flag applies a dither to any blit operation where the target's colour space is more constrained than the source.
 
     // Fill the rectangle
-    if (LFillColor <> TalphaColorRec.Null) or
+    if (LFillColor <> TAlphaColors.Null) or
        (length(LFillGradientColors) > 0) or
        (LFillWithImage) or
-       (LShadowColor <> TalphaColorRec.Null) then begin
+       (LShadowColor <> TAlphaColors.Null) then begin
 
       //init LPaint
       LPaint.setStyle(TJPaint_Style.JavaClass.FILL); // FILL_AND_STROCK it's absolutely useless, because it's will fill on the full LScaledDstRect + StrokeThickness :( this result&ing in border if the fill is for exemple black and border white
@@ -5684,8 +7443,8 @@ begin
       //      var LPixelBuffer: Pointer;
       //      var LBitmapInfo: AndroidBitmapInfo;
       //      FillChar(LBitmapInfo, SizeOf(LBitmapInfo), 0);
-      //      if (AndroidBitmap_getInfo(TJNIResolver.GetJNIEnv, (LTmpBitmap as ILocalObject).GetObjectID, @LBitmapInfo) = 0) and
-      //         (AndroidBitmap_lockPixels(TJNIResolver.GetJNIEnv, (LTmpBitmap as ILocalObject).GetObjectID, @LPixelBuffer) = 0) then
+      //      if (AndroidBitmap_getInfo(TJNIResolver.GetJNIEnv, TAndroidHelper.JObjectToID(LTmpBitmap), @LBitmapInfo) = 0) and
+      //         (AndroidBitmap_lockPixels(TJNIResolver.GetJNIEnv, TAndroidHelper.JObjectToID(LTmpBitmap), @LPixelBuffer) = 0) then
       //      try
       //        var LBitmapData: TBitmapData;
       //        if FFill.Bitmap.Bitmap.Map(TMapAccess.Read, LBitmapData) then
@@ -5695,7 +7454,7 @@ begin
       //          FFill.Bitmap.Bitmap.Unmap(LBitmapData);
       //        end;
       //      finally
-      //        AndroidBitmap_unlockPixels(TJNIResolver.GetJNIEnv, (LTmpBitmap as ILocalObject).GetObjectID);
+      //        AndroidBitmap_unlockPixels(TJNIResolver.GetJNIEnv, TAndroidHelper.JObjectToID(LTmpBitmap));
       //      end;
       //      //--
       //      ...
@@ -5711,13 +7470,13 @@ begin
       var LDrawnWithSolidColor := False;
 
       // Fill with transparent solid color and shadow
-      if (LShadowColor <> TalphaColorRec.Null) and // If null, skip drawing the shadow
-         (TAlphaColorRec(LFillColor).A < 255) and // Else, fill with solid color and shadow in one pass
+      if (LShadowColor <> TAlphaColors.Null) and // If null, skip drawing the shadow
+         (TAlphaColorRec(LFillColor).A < $FF) and // Else, fill with solid color and shadow in one pass
          (_FillGradientIsTransparent) and // Else, fill with gradient and shadow in one pass
          ((not LFillWithImage) or // If no image, no opaque fill color and no opaque gradient is present, then draw the shadow in two passes
-          (LFillColor <> TalphaColors.Null) or // If there is an image and a transparent fill color, then draw the shadow in two passes
+          (LFillColor <> TAlphaColors.Null) or // If there is an image and a transparent fill color, then draw the shadow in two passes
           (length(LFillGradientColors) > 0) or // If there is an image and a transparent gradient, draw the shadow in two passes
-          (LStrokeColor <> TalphaColorRec.Null)) then begin // If there is an image and a stroke, draw the shadow in two passes
+          (LStrokeColor <> TAlphaColors.Null)) then begin // If there is an image and a stroke, draw the shadow in two passes
 
         // First pass draw the shadow
         LPaint.setColor(integer(ALSetColorAlpha(LFillColor, 1{AOpacity})));
@@ -5737,7 +7496,7 @@ begin
       end
 
       // Fill with solid color
-      else if (LFillColor <> TalphaColors.Null) then begin
+      else if (LFillColor <> TAlphaColors.Null) then begin
         LPaint.setColor(integer(LFillColor));
         _SetShadow(LPaint);
         _DrawRect(FCanvas, LPaint, LScaledBackgroundDstRect, false{aDrawOnlyBorder}, LFillWithImage{aForceDrawPath}, (LFillWithImage) and (length(LFillGradientColors) = 0) and (LScaledBackgroundDstRect.EqualsTo(LScaledImageDstRect, TEpsilon.position)){aClipPath}, False{aNoRadius});
@@ -5751,7 +7510,7 @@ begin
         // First pass draw the shadow if not already drawn
         // We must do this because else the shadow will be drawn with
         // the color of the gradient :(
-        if (LShadowColor <> TalphaColorRec.Null) and (not LDrawnWithSolidColor) then begin
+        if (LShadowColor <> TAlphaColors.Null) and (not LDrawnWithSolidColor) then begin
           LPaint.setColor(integer(ALSetColorAlpha(LShadowColor, 1{AOpacity})));
           _SetShadow(LPaint);
           _DrawRect(FCanvas, LPaint, LScaledBackgroundDstRect, false{aDrawOnlyBorder}, LFillWithImage{aForceDrawPath}, false{aClipPath}, False{aNoRadius});
@@ -5817,18 +7576,49 @@ begin
 
       // Fill with image
       if LFillWithImage then begin
-        var LBitmap: JBitmap := ALCreateJBitmapFromResource(
-                                  LFillResourceName, // const AResourceName: String;
-                                  LFillResourceStream, // const AResourceStream: TStream;
-                                  FFillMaskResourceName, // const AMaskResourceName: String;
-                                  FFillMaskBitmap, // const AMaskBitmap: JBitmap;
-                                  1, // const AScale: Single;
-                                  LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
-                                  FFillWrapMode, // const AWrapMode: TALImageWrapMode;
-                                  FFillCropCenter, // const ACropCenter: TpointF;
-                                  FFillBlurRadius * FScale, // const ABlurRadius: single;
-                                  0, // const AXRadius: Single;
-                                  0); // const AYRadius: Single);
+        var LBitmap: JBitmap;
+        var LKey: TBytes;
+        var LHash: Integer;
+        var LIsCachedBitmap: Boolean;
+        if TThread.Current.ThreadID = MainThreadID then
+          LBitmap := ALGetCachedBitmap(
+                       ALCachedJBitmaps, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                       LFillResourceName, // const AResourceName: String;
+                       LFillResourceStream, // const AResourceStream: TStream;
+                       FFillMaskResourceName, // const AMaskResourceName: String;
+                       1, // const AScale: Single;
+                       LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                       FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                       FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                       FFillCropCenter, // const ACropCenter: TpointF;
+                       FFillImageTintColor, // const ATintColor: TalphaColor;
+                       FFillBlurRadius * FScale, // const ABlurRadius: single;
+                       0, // const AXRadius: Single;
+                       0, // const AYRadius: Single);
+                       LKey, // out AKey: TBytes
+                       LHash) // out AHash: Integer)
+        else begin
+          LBitmap := ALNullBitmap;
+          SetLength(LKey, 0);
+        end;
+        if ALIsBitmapNull(LBitmap) then begin
+          LIsCachedBitmap := False;
+          LBitmap := ALCreateJBitmapFromResource(
+                       LFillResourceName, // const AResourceName: String;
+                       LFillResourceStream, // const AResourceStream: TStream;
+                       FFillMaskResourceName, // const AMaskResourceName: String;
+                       1, // const AScale: Single;
+                       LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                       FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                       FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                       FFillCropCenter, // const ACropCenter: TpointF;
+                       FFillImageTintColor, // const ATintColor: TalphaColor;
+                       FFillBlurRadius * FScale, // const ABlurRadius: single;
+                       0, // const AXRadius: Single;
+                       0); // const AYRadius: Single);
+        end
+        else
+          LIsCachedBitmap := True;
         try
 
           // On android the bitmap is drawed with the opacity of the paint color
@@ -5836,7 +7626,7 @@ begin
           LPaint.setColor(integer(TAlphaColors.White));
 
           // The shadow is made directly on the bitmap
-          if (not LDrawnWithSolidColor) and (LShadowColor <> TalphaColorRec.Null) then begin
+          if (not LDrawnWithSolidColor) and (LShadowColor <> TAlphaColors.Null) then begin
 
             // Their is corners so remove them from the LBitmap
             if (not FFillImageNoRadius) and
@@ -5904,8 +7694,14 @@ begin
           end;
 
         finally
-          LBitmap.recycle;
-          LBitmap := nil;
+          if not LIsCachedBitmap then begin
+            if length(LKey) > 0 then
+              ALCacheBitmap(ALCachedJBitmaps, ALMaxCachedBitmaps, LKey, LHash, LBitmap)
+            else begin
+              LBitmap.recycle;
+              LBitmap := nil;
+            end;
+          end;
         end;
       end;
 
@@ -5916,7 +7712,7 @@ begin
       _DrawStateLayer;
 
     //stroke the rectangle
-    if LStrokeColor <> TalphaColorRec.Null then begin
+    if LStrokeColor <> TAlphaColors.Null then begin
       LPaint.setStyle(TJPaint_Style.JavaClass.STROKE);
       LPaint.setStrokeWidth(LScaledStrokeThickness);
       LPaint.setColor(integer(LStrokeColor));
@@ -5946,6 +7742,7 @@ begin
   if compareValue(FOpacity, 1, Tepsilon.Scale) < 0 then begin
     var LLayerRect := ALGetShapeSurfaceRect(
                         LScaledDstRect, // const ARect: TrectF;
+                        False, // const AAlignToPixel: Boolean;
                         LFillColor, // const AFillColor: TAlphaColor;
                         LFillGradientColors, // const AFillGradientColors: TArray<TAlphaColor>;
                         LFillResourceName, // const AFillResourceName: String;
@@ -5965,10 +7762,10 @@ begin
   try
 
     // Fill the rectangle
-    if (LFillColor <> TalphaColorRec.Null) or
+    if (LFillColor <> TAlphaColors.Null) or
        (length(LFillGradientColors) > 0) or
        (LFillWithImage) or
-       (LShadowColor <> TalphaColorRec.Null) then begin
+       (LShadowColor <> TAlphaColors.Null) then begin
 
       //fill with bitmap
       //if FFill.Kind = TALBrushKind.Bitmap then begin
@@ -6006,13 +7803,13 @@ begin
       var LDrawnWithSolidColor := False;
 
       // Fill with transparent solid color and shadow
-      if (LShadowColor <> TalphaColorRec.Null) and // If null, skip drawing the shadow
-         (TAlphaColorRec(LFillColor).A < 255) and // Else, fill with solid color and shadow in one pass
+      if (LShadowColor <> TAlphaColors.Null) and // If null, skip drawing the shadow
+         (TAlphaColorRec(LFillColor).A < $FF) and // Else, fill with solid color and shadow in one pass
          (_FillGradientIsTransparent) and // Else, fill with gradient and shadow in one pass
          ((not LFillWithImage) or // If no image, no opaque fill color and no opaque gradient is present, then draw the shadow in two passes
-          (LFillColor <> TalphaColors.Null) or // If there is an image and a transparent fill color, then draw the shadow in two passes
+          (LFillColor <> TAlphaColors.Null) or // If there is an image and a transparent fill color, then draw the shadow in two passes
           (length(LFillGradientColors) > 0) or // If there is an image and a transparent gradient, draw the shadow in two passes
-          (LStrokeColor <> TalphaColorRec.Null)) then begin // If there is an image and a stroke, draw the shadow in two passes
+          (LStrokeColor <> TAlphaColors.Null)) then begin // If there is an image and a stroke, draw the shadow in two passes
 
         // First pass draw the shadow
         var LFillColorF := TAlphaColorCGFloat.Create(LFillColor);
@@ -6031,7 +7828,7 @@ begin
       end
 
       // Fill with solid color
-      else if (LFillColor <> TalphaColors.Null) then begin
+      else if (LFillColor <> TAlphaColors.Null) then begin
         var LFillColorF := TAlphaColorCGFloat.Create(LFillColor);
         CGContextSetRGBFillColor(FCanvas, LFillColorF.R, LFillColorF.G, LFillColorF.B, LFillColorF.A);
         _SetShadow(FCanvas);
@@ -6045,7 +7842,7 @@ begin
 
         // First pass draw the shadow if not already drawn
         // We must do this because else the shadow will not be drawn
-        if (LShadowColor <> TalphaColorRec.Null) and (not LDrawnWithSolidColor) then begin
+        if (LShadowColor <> TAlphaColors.Null) and (not LDrawnWithSolidColor) then begin
           var LFillColorF := TAlphaColorCGFloat.Create(LShadowColor);
           CGContextSetRGBFillColor(FCanvas, LFillColorF.R, LFillColorF.G, LFillColorF.B, 1{A});
           _SetShadow(FCanvas);
@@ -6129,22 +7926,53 @@ begin
 
       // Fill with image
       if LFillWithImage then begin
-        var LImage: CGImageRef := ALCreateCGImageRefFromResource(
-                                    LFillResourceName, // const AResourceName: String;
-                                    LFillResourceStream, // const AResourceStream: TStream;
-                                    FFillMaskResourceName, // const AMaskResourceName: String;
-                                    FFillMaskBitmap, // const AMaskImage: CGImageRef;
-                                    1, // const AScale: Single;
-                                    LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
-                                    FFillWrapMode, // const AWrapMode: TALImageWrapMode;
-                                    FFillCropCenter, // const ACropCenter: TpointF;
-                                    FFillBlurRadius * FScale, // const ABlurRadius: single;
-                                    0, // const AXRadius: Single;
-                                    0); // const AYRadius: Single);
+        var LImage: CGImageRef;
+        var LKey: TBytes;
+        var LHash: Integer;
+        var LIsCachedImage: Boolean;
+        if TThread.Current.ThreadID = MainThreadID then
+          LImage := ALGetCachedBitmap(
+                      ALCachedCGImageRefs, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                      LFillResourceName, // const AResourceName: String;
+                      LFillResourceStream, // const AResourceStream: TStream;
+                      FFillMaskResourceName, // const AMaskResourceName: String;
+                      1, // const AScale: Single;
+                      LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                      FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                      FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                      FFillCropCenter, // const ACropCenter: TpointF;
+                      FFillImageTintColor, // const ATintColor: TalphaColor;
+                      FFillBlurRadius * FScale, // const ABlurRadius: single;
+                      0, // const AXRadius: Single;
+                      0, // const AYRadius: Single);
+                      LKey, // out AKey: TBytes
+                      LHash) // out AHash: Integer)
+        else begin
+          LImage := ALNullBitmap;
+          SetLength(LKey, 0);
+        end;
+        if ALIsBitmapNull(LImage) then begin
+          LIsCachedImage := False;
+          LImage := ALCreateCGImageRefFromResource(
+                      LFillResourceName, // const AResourceName: String;
+                      LFillResourceStream, // const AResourceStream: TStream;
+                      FFillMaskResourceName, // const AMaskResourceName: String;
+                      1, // const AScale: Single;
+                      LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                      FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                      FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                      FFillCropCenter, // const ACropCenter: TpointF;
+                      FFillImageTintColor, // const ATintColor: TalphaColor;
+                      FFillBlurRadius * FScale, // const ABlurRadius: single;
+                      0, // const AXRadius: Single;
+                      0); // const AYRadius: Single);
+        end
+        else
+          LIsCachedImage := True;
         try
 
           // The shadow is made directly on the bitmap
-          if (not LDrawnWithSolidColor) and (LShadowColor <> TalphaColorRec.Null) then begin
+          if (not LDrawnWithSolidColor) and (LShadowColor <> TAlphaColors.Null) then begin
 
             // Their is corners so remove them from the LBitmap
             if (not FFillImageNoRadius) and
@@ -6203,7 +8031,12 @@ begin
           end;
 
         finally
-          CGImageRelease(LImage);
+          if not LIsCachedImage then begin
+            if length(LKey) > 0 then
+              ALCacheBitmap(ALCachedCGImageRefs, ALMaxCachedBitmaps, LKey, LHash, LImage)
+            else
+              CGImageRelease(LImage);
+          end;
         end;
       end;
 
@@ -6214,7 +8047,7 @@ begin
       _DrawStateLayer;
 
     //stroke the rectangle
-    if LStrokeColor <> TalphaColorRec.Null then begin
+    if LStrokeColor <> TAlphaColors.Null then begin
       CGContextSetLineWidth(FCanvas, LScaledStrokeThickness);
       var LStrokeColorF := TAlphaColorCGFloat.Create(LStrokeColor);
       CGContextSetRGBStrokeColor(FCanvas, LStrokeColorF.R, LStrokeColorF.G, LStrokeColorF.B, LStrokeColorF.A);
@@ -6240,32 +8073,85 @@ begin
   var LSaveState := FCanvas.SaveState;
   try
 
-    if LFillColor <> TAlphaColorRec.Null then begin
+    if LFillColor <> TAlphaColors.Null then begin
       FCanvas.Fill.Kind := TBrushKind.Solid;
       FCanvas.Fill.Color := LFillColor;
     end
     else if LFillWithImage then begin
-      FCanvas.Fill.Kind := TBrushKind.None;
+      var LBitmap: TBitmap;
+      var LKey: TBytes;
+      var LHash: Integer;
+      var LIsCachedBitmap: Boolean;
+      if TThread.Current.ThreadID = MainThreadID then
+        LBitmap := ALGetCachedBitmap(
+                     ALCachedTBitmaps, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                     LFillResourceName, // const AResourceName: String;
+                     LFillResourceStream, // const AResourceStream: TStream;
+                     FFillMaskResourceName, // const AMaskResourceName: String;
+                     1, // const AScale: Single;
+                     LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                     FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                     FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                     FFillCropCenter, // const ACropCenter: TpointF;
+                     FFillImageTintColor, // const ATintColor: TalphaColor;
+                     FFillBlurRadius * FScale, // const ABlurRadius: single;
+                     0, // const AXRadius: Single;
+                     0, // const AYRadius: Single);
+                     LKey, // out AKey: TBytes
+                     LHash) // out AHash: Integer)
+      else begin
+        LBitmap := ALNullBitmap;
+        SetLength(LKey, 0);
+      end;
+      if ALIsBitmapNull(LBitmap) then begin
+        LIsCachedBitmap := False;
+        LBitmap := ALCreateBitmapFromResource(
+                     LFillResourceName, // const AResourceName: String;
+                     LFillResourceStream, // const AResourceStream: TStream;
+                     FFillMaskResourceName, // const AMaskResourceName: String;
+                     1, // const AScale: Single;
+                     LScaledImageDstRect.Width, LScaledImageDstRect.Height, // const W, H: single;
+                     FFillApplyMetadataOrientation, // const AApplyMetadataOrientation: Boolean;
+                     FFillWrapMode, // const AWrapMode: TALImageWrapMode;
+                     FFillCropCenter, // const ACropCenter: TpointF;
+                     FFillImageTintColor, // const ATintColor: TalphaColor;
+                     FFillBlurRadius * FScale, // const ABlurRadius: single;
+                     0, // const AXRadius: Single;
+                     0); // const AYRadius: Single);
+      end
+      else
+        LIsCachedBitmap := True;
+      try
+        FCanvas.Fill.Kind := TBrushKind.Bitmap;
+        FCanvas.Fill.Bitmap.Bitmap.Assign(LBitmap);
+      finally
+        if not LIsCachedBitmap then begin
+          if length(LKey) > 0 then
+            ALCacheBitmap(ALCachedTBitmaps, ALMaxCachedBitmaps, LKey, LHash, LBitmap)
+          else
+            ALFreeAndNil(LBitmap);
+        end;
+      end;
     end
     else FCanvas.Fill.Kind := TBrushKind.None;
-    If LStrokeColor <> TalphaColorRec.Null then begin
+    If LStrokeColor <> TAlphaColors.Null then begin
       FCanvas.Stroke.Kind := TBrushKind.Solid;
       FCanvas.Stroke.Color := LStrokeColor;
       FCanvas.Stroke.Thickness := LScaledStrokeThickness;
     end
     else FCanvas.Stroke.Kind := TBrushKind.None;
 
-    if LStrokeColor <> TalphaColorRec.Null then
+    if LStrokeColor <> TAlphaColors.Null then
       LScaledDstRect.Inflate(-(LScaledStrokeThickness / 2), -(LScaledStrokeThickness / 2));
 
     var LScaledXRadius: Single := FXRadius;
     var LScaledYRadius: Single := FYRadius;
     ALNormalizeAndScaleRadii(LScaledXRadius, LScaledYRadius, FScale, LScaledDstRect);
 
-    if LFillColor <> TAlphaColorRec.Null then begin
+    if LFillColor <> TAlphaColors.Null then begin
       FCanvas.FillRect(LScaledDstRect, LScaledXRadius, LScaledYRadius, FCorners, FOpacity, FCanvas.Fill, TCornerType.Round{CornerType});
     end;
-    If LStrokeColor <> TalphaColorRec.Null then
+    If LStrokeColor <> TAlphaColors.Null then
       FCanvas.DrawRect(LScaledDstRect, LScaledXRadius, LScaledYRadius, FCorners, FOpacity, FCanvas.Stroke, TCornerType.Round{CornerType});
 
   finally
@@ -6329,7 +8215,7 @@ begin
   ASurface := Tbitmap.Create(
                 ALCeil(W * AScale, TEpsilon.Position) + ALIfThen(AAddPixelForAlignment, 1, 0),
                 ALCeil(H * AScale, TEpsilon.Position) + ALIfThen(AAddPixelForAlignment, 1, 0));
-  ASurface.Clear(TAlphaColorRec.Null);
+  ASurface.Clear(TAlphaColors.Null);
   ACanvas := ASurface.Canvas;
 
   {$ENDIF}
@@ -6447,7 +8333,7 @@ begin
   {$ENDIF}
 end;
 
-{*********************************************************}
+{******************************************************************************************}
 procedure ALFreeAndNilDrawable(var aDrawable: TALDrawable; const ADelayed: boolean = false);
 begin
   IF ALIsDrawableNull(aDrawable) then exit;
@@ -6462,7 +8348,7 @@ begin
   end;
 end;
 
-{***************************************************}
+{************************************************************************************}
 procedure ALFreeAndNilBitmap(var aBitmap: TALBitmap; const ADelayed: boolean = false);
 begin
   IF ALIsBitmapNull(aBitmap) then exit;
@@ -6930,7 +8816,7 @@ end;
 {$IF defined(ALSkiaAvailable)}
 function ALGetSkImageinfo(const W, H: int32_t): sk_imageinfo_t;
 begin
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if declaration of System.Skia.API.sk_imageinfo_t didn''t changed'}
   {$ENDIF}
   Result.width := W;
@@ -7244,7 +9130,7 @@ end;
 {$IF defined(ALSkiaAvailable)}
 function ALGetCubicMitchellNetravaliSkSamplingoptions: sk_samplingoptions_t;
 begin
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if declaration of System.Skia.API.sk_samplingoptions_t didn''t changed'}
   {$ENDIF}
   Result.max_anisotropic := 0;
@@ -7254,7 +9140,7 @@ begin
   Result.Cubic.b := 1 / 3;
   Result.Cubic.c := 1 / 3;
   Result.Filter := sk_filtermode_t.LINEAR_SK_FILTERMODE; // Not used unless use_cubic is false
-  Result.Mipmap := sk_mipmapmode_t.LINEAR_SK_MIPMAPMODE; // Use linear mipmap interpolation
+  Result.Mipmap := sk_mipmapmode_t.NONE_SK_MIPMAPMODE;
 end;
 {$ENDIF}
 
@@ -7262,7 +9148,7 @@ end;
 {$IF defined(ALSkiaAvailable)}
 function ALGetLinearSkSamplingoptions: sk_samplingoptions_t;
 begin
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if declaration of System.Skia.API.sk_samplingoptions_t didn''t changed'}
   {$ENDIF}
   Result.max_anisotropic := 0;
@@ -7270,7 +9156,7 @@ begin
   Result.Cubic.b := 0;
   Result.Cubic.c := 0;
   Result.Filter := sk_filtermode_t.LINEAR_SK_FILTERMODE;
-  Result.Mipmap := sk_mipmapmode_t.LINEAR_SK_MIPMAPMODE; // Use linear mipmap interpolation
+  Result.Mipmap := sk_mipmapmode_t.NONE_SK_MIPMAPMODE;
 end;
 {$ENDIF}
 
@@ -7278,7 +9164,7 @@ end;
 {$IF defined(ALSkiaAvailable)}
 function ALGetNearestSkSamplingoptions: sk_samplingoptions_t;
 begin
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if declaration of System.Skia.API.sk_samplingoptions_t didn''t changed'}
   {$ENDIF}
   Result.max_anisotropic := 0;
@@ -7354,7 +9240,7 @@ begin
     //
     //{$IF defined(ANDROID)}
     //
-    //if TOSVersion.Check(10, 0) and
+    //if TOSVersion.Check(10, 0) {API level >= 29 (Android Q)} and
     //   TAndroidHelper.Display.isWideColorGamut then begin
     //  LSKColorSpace := ALCreateDisplayP3SkColorSpace;
     //  {$IF defined(debug)}
@@ -7436,7 +9322,7 @@ begin
     var LColorSpace := TJColorSpace.JavaClass.get(TJColorSpace_Named.JavaClass.SRGB);
 
     //var LColorSpace: JColorSpace.;
-    //if TOSVersion.Check(10, 0) then LColorSpace := TAndroidHelper.Display.getPreferredWideGamutColorSpace;
+    //if TOSVersion.Check(10, 0) {API level >= 29 (Android Q)} then LColorSpace := TAndroidHelper.Display.getPreferredWideGamutColorSpace;
     //if LColorSpace = nil then LColorSpace := TJColorSpace.JavaClass.get(TJColorSpace_Named.JavaClass.SRGB);
 
     if LColorSpace = nil then raise Exception.Create('Failed to create JColorSpace');
@@ -7520,7 +9406,10 @@ end;
 {$IF defined(ALAppleOS)}
 function ALCreateCGContextRef(const W, H: integer; const AData: Pointer = nil; const ABytesPerRow: Integer = -1): CGContextRef;
 begin
-  var LbitmapInfo: CGBitmapInfo;
+  {$IFNDEF ALCompilerVersionSupported130}
+    {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4391 is corrected and if yes replace UInt32 by CGBitmapInfo'}
+  {$ENDIF}
+  var LbitmapInfo: UInt32{CGBitmapInfo};
   if GlobalUseMetal then LbitmapInfo := kCGImageAlphaPremultipliedFirst or kCGBitmapByteOrder32Little{Little-endian} // BGRA (The pixelformat of Metal)
   else LbitmapInfo := kCGImageAlphaPremultipliedLast or kCGBitmapByteOrder32Big{Big-endian}; // RGBA (The pixelformat of OpenGL)
 
@@ -7759,7 +9648,7 @@ begin
   // TCanvas/TBitmap do not work from a background thread. On Android/iOS,
   // and with Skia, we use platform API functions to draw images. However,
   // on other platforms, we resort to using TCanvas. :(
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-19673 is corrected and if yes remove the Synchronize'}
   {$ENDIF}
   TThread.Synchronize(nil,
@@ -7793,7 +9682,7 @@ begin
   // TCanvas/TBitmap do not work from a background thread. On Android/iOS,
   // and with Skia, we use platform API functions to draw images. However,
   // on other platforms, we resort to using TCanvas. :(
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-19673 is corrected and if yes remove the Synchronize'}
   {$ENDIF}
   TThread.Synchronize(nil,
@@ -7816,6 +9705,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Graphics','initialization');
+  {$ENDIF}
   {$IF defined(ALSkiaAvailable)}
   ALGlobalUseRasterSkSurface := True;
   ALGlobalUseRasterSkImage := True;
@@ -7841,9 +9733,86 @@ initialization
   TALGraphicThreadPool.FInstance := nil;
   TALGraphicThreadPool.CreateInstanceFunc := @TALGraphicThreadPool.CreateInstance;
   ALIsDefaultContextOpenGLDetermined := False;
+  //-- CachedBitmaps
+  ALMaxCachedBitmaps := 5;
+  {$IF defined(ALSkiaAvailable)}
+  ALCachedSkImages := TList<TALTriplet<TBytes, sk_image_t, Integer>>.Create;
+  {$ENDIF}
+  {$IF defined(ANDROID)}
+  ALCachedJBitmaps := TList<TALTriplet<TBytes, JBitmap, Integer>>.Create;
+  {$ENDIF}
+  {$IF defined(ALAppleOS)}
+  ALCachedCGImageRefs := TList<TALTriplet<TBytes, CGImageRef, Integer>>.Create;
+  {$ENDIF}
+  ALCachedTBitmaps := TList<TALTriplet<TBytes, TBitmap, Integer>>.Create;
+  //-- CachedMaskBitmaps
+  ALMaxCachedMaskBitmaps := 10;
+  {$IF defined(ALSkiaAvailable)}
+  ALCachedMaskSkImages := TList<TALTriplet<TBytes, sk_image_t, Integer>>.Create;
+  {$ENDIF}
+  {$IF defined(ANDROID)}
+  ALCachedMaskJBitmaps := TList<TALTriplet<TBytes, JBitmap, Integer>>.Create;
+  {$ENDIF}
+  {$IF defined(ALAppleOS)}
+  ALCachedMaskCGImageRefs := TList<TALTriplet<TBytes, CGImageRef, Integer>>.Create;
+  {$ENDIF}
+  ALCachedMaskTBitmaps := TList<TALTriplet<TBytes, TBitmap, Integer>>.Create;
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Graphics','finalization');
+  {$ENDIF}
+  //-- CachedBitmaps
+  {$IF defined(ALSkiaAvailable)}
+  for var I := 0 to ALCachedSkImages.Count - 1 do
+    sk4d_refcnt_unref(ALCachedSkImages.PList^[i].Value);
+  ALFreeAndNil(ALCachedSkImages);
+  {$ENDIF}
+  //--
+  {$IF defined(ANDROID)}
+  for var I := 0 to ALCachedJBitmaps.Count - 1 do begin
+    ALCachedJBitmaps.PList^[i].Value.recycle;
+    ALCachedJBitmaps.PList^[i].Value := nil;
+  end;
+  ALFreeAndNil(ALCachedJBitmaps);
+  {$ENDIF}
+  //--
+  {$IF defined(ALAppleOS)}
+  for var I := 0 to ALCachedCGImageRefs.Count - 1 do
+    CGImageRelease(ALCachedCGImageRefs.PList^[i].Value);
+  ALFreeAndNil(ALCachedCGImageRefs);
+  {$ENDIF}
+  //--
+  for var I := 0 to ALCachedTBitmaps.Count - 1 do
+    ALFreeAndNil(ALCachedTBitmaps.PList^[i].Value);
+  ALFreeAndNil(ALCachedTBitmaps);
+  //-- CachedMaskBitmaps
+  {$IF defined(ALSkiaAvailable)}
+  for var I := 0 to ALCachedMaskSkImages.Count - 1 do
+    sk4d_refcnt_unref(ALCachedMaskSkImages.PList^[i].Value);
+  ALFreeAndNil(ALCachedMaskSkImages);
+  {$ENDIF}
+  //--
+  {$IF defined(ANDROID)}
+  for var I := 0 to ALCachedMaskJBitmaps.Count - 1 do begin
+    ALCachedMaskJBitmaps.PList^[i].Value.recycle;
+    ALCachedMaskJBitmaps.PList^[i].Value := nil;
+  end;
+  ALFreeAndNil(ALCachedMaskJBitmaps);
+  {$ENDIF}
+  //--
+  {$IF defined(ALAppleOS)}
+  for var I := 0 to ALCachedMaskCGImageRefs.Count - 1 do
+    CGImageRelease(ALCachedMaskCGImageRefs.PList^[i].Value);
+  ALFreeAndNil(ALCachedMaskCGImageRefs);
+  {$ENDIF}
+  //--
+  for var I := 0 to ALCachedMaskTBitmaps.Count - 1 do
+    ALFreeAndNil(ALCachedMaskTBitmaps.PList^[i].Value);
+  ALFreeAndNil(ALCachedMaskTBitmaps);
+  //--
   ALFreeAndNil(TALGraphicThreadPool.FInstance);
+  //--
   {$IF defined(ALSkiaAvailable)}
   if ALGlobalSkColorSpace <> 0 then begin
     sk4d_colorspace_unref(ALGlobalSkColorSpace);

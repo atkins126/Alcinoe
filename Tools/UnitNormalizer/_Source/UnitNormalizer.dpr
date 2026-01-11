@@ -31,10 +31,6 @@ begin
     {$ENDIF}
     SetMultiByteConversionCodePage(CP_UTF8);
 
-    {$REGION 'Init local vars'}
-    var LNoInteraction: Boolean;
-    {$ENDREGION}
-
     {$REGION 'create local objects'}
     var LParamLst := TALStringListW.Create;
     var LFilesToIgnore := TALStringListW.Create;
@@ -45,10 +41,6 @@ begin
       {$REGION 'Init LParamLst'}
       for var I := 1 to ParamCount do
         LParamLst.Add(ParamStr(i));
-      {$ENDREGION}
-
-      {$REGION 'Init LNoInteraction'}
-      LNoInteraction := AlStrToBool(ALTrim(LParamLst.Values['-NoInteraction']));
       {$ENDREGION}
 
       {$REGION 'Init LRootDirectory'}
@@ -521,6 +513,10 @@ begin
         End;
         {$ENDREGION}
 
+        {$REGION 'Trim the Source'}
+        LSourceStr := ALTrim(LSourceStr);
+        {$ENDREGION}
+
         {$REGION 'Save the file'}
         if LOriginalSourceStr <> LSourceStr then begin
           if LCreateBackup then begin
@@ -543,13 +539,6 @@ begin
 
     end;
 
-    if not LNoInteraction then begin
-      Writeln('');
-      Writeln('Finished');
-      Writeln('Press <Enter> key to quit');
-      Readln;
-    end;
-
   except
     on E: Exception do begin
       ALWriteln(E.ClassName+': '+E.Message, TALConsoleColor.ccRed);
@@ -559,7 +548,6 @@ begin
       Writeln('    -Dir=The directory where all source files are located.');
       Writeln('    -FilesToIgnore=The list of filenames to ignore. Separate filename with '';''.');
       Writeln('    -CreateBackup=true or false.');
-      Writeln('    -NoInteraction=Non-interactive mode.');
       Writeln('');
       Writeln('Example:');
       Writeln('  UnitNormalizer.exe^');
@@ -575,7 +563,6 @@ begin
   end;
 
 end;
-
 
 begin
   kickoff;

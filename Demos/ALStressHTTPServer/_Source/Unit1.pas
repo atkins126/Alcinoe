@@ -3,73 +3,73 @@ unit Unit1;
 interface
 
 uses
-  Windows, winapi.winhttp, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, shellapi, ExtCtrls, ComCtrls, Alcinoe.HTTP.Client, Alcinoe.HTTP.Client.WinHTTP,
-  Alcinoe.StringList, cxStyles, cxCustomData, cxGraphics, cxFilter,
-  cxData, cxDataStorage, cxEdit, cxDropDownEdit, cxImageComboBox, cxSpinEdit,
-  cxGridLevel, cxGridCustomTableView, cxGridTableView, cxClasses, cxControls,
-  cxGridCustomView, cxGrid, Spin, dxSkinsCore, dxSkinFoggy, dxSkinscxPCPainter, cxPCdxBarPopupMenu,
-  cxLookAndFeels, cxLookAndFeelPainters, cxContainer, Menus, dxSkinsForm,
-  cxRadioGroup, cxGroupBox, cxButtons, cxTextEdit, cxMaskEdit, cxCheckBox,
-  cxMemo, cxLabel, cxPC, uiTypes, cxNavigator, dxBarBuiltInMenu, dxDateRanges, dxScrollbarAnnotations,
-  dxCore, dxUIAClasses;
-
-Const
-  WM_UpdateGUI = WM_User + 1;
+  Windows, winapi.winhttp, Messages, SysUtils, Variants, Classes, Graphics,
+  Controls, Forms, Dialogs, StdCtrls, shellapi, ExtCtrls, ComCtrls,
+  Alcinoe.HTTP.Client, Alcinoe.HTTP.Client.WinHTTP, Alcinoe.StringList,
+  cxStyles, cxCustomData, cxGraphics, cxFilter, cxData, cxDataStorage, cxEdit,
+  cxDropDownEdit, cxImageComboBox, cxSpinEdit, cxGridLevel,
+  cxGridCustomTableView, cxGridTableView, cxClasses, cxControls,
+  cxGridCustomView, cxGrid, Spin, dxSkinsCore, dxSkinFoggy, dxSkinscxPCPainter,
+  cxPCdxBarPopupMenu, cxLookAndFeels, cxLookAndFeelPainters, cxContainer, Menus,
+  dxSkinsForm, cxRadioGroup, cxGroupBox, cxButtons, cxTextEdit, cxMaskEdit,
+  cxCheckBox, cxMemo, cxLabel, cxPC, uiTypes, cxNavigator, dxBarBuiltInMenu,
+  dxDateRanges, dxScrollbarAnnotations, dxCore, dxUIAClasses, Alcinoe.HTTP,
+  system.Diagnostics, system.Generics.Collections, dxShellDialogs,
+  Alcinoe.StringUtils;
 
 type
+
+  THttpRequestMetrics = record
+  public
+    &On: Boolean;
+    Url: AnsiString;
+    RequestCount: Integer;
+    StatusCode: Integer;
+    TotalBytesSent: Int64;
+    TotalBytesRead: Int64;
+    AverageDNSTimeTaken: Double;
+    AverageConnectTimeTaken: Double;
+    TotalSendTimeTaken: Double;
+    AverageSendTimeTaken: Double;
+    AverageWaitTimeTaken: Double;
+    TotalReceiveTimeTaken: Double;
+    AverageReceiveTimeTaken: Double;
+  End;
+
+  TWorkerThread = Class(Tthread)
+  private
+    FBytesSent: Int64;
+    FBytesRead: Int64;
+    FDNSStopWatch: TStopWatch;
+    FConnectStopWatch: TStopWatch;
+    FSendStopWatch: TStopWatch;
+    FWaitStopWatch: TStopWatch;
+    FReceiveStopWatch: TStopWatch;
+    FStopOnError: Boolean;
+    FSimulateSlowClient: Integer;
+    FDelayBetweenEachCall: integer;
+    FUrls: TALStringListA;
+    FMaxHttpRequest: Integer;
+    FIndex: integer;
+    FBodyStream: TALStringStreamA;
+    procedure OnHttpDownloadProgress(sender: Tobject; Read: Int64; Total: Int64);
+    procedure OnHttpUploadProgress(Sender: Tobject; Sent: Int64; Total: Int64);
+    procedure OnHttpStatus(
+                sender: Tobject;
+                InternetStatus: DWord;
+                StatusInformation: Pointer;
+                StatusInformationLength: DWord);
+  protected
+    procedure Execute; override;
+  Public
+    constructor Create(CreateSuspended: Boolean; aIndex: integer);
+    destructor Destroy; override;
+  End;
 
   TForm1 = class(TForm)
     PageControl1: TcxPageControl;
     TabSheet1: TcxTabSheet;
     TabSheet2: TcxTabSheet;
-    GroupBox3: TcxGroupBox;
-    Label18: TcxLabel;
-    Label19: TcxLabel;
-    EditUserName: tcxtextedit;
-    EditPassword: tcxtextedit;
-    GroupBox4: TcxGroupBox;
-    Label14: TcxLabel;
-    Label17: TcxLabel;
-    Label20: TcxLabel;
-    EditSendTimeout: tcxtextedit;
-    EditReceiveTimeout: tcxtextedit;
-    EditConnectTimeout: tcxtextedit;
-    GroupBox6: TcxGroupBox;
-    GroupBox7: TcxGroupBox;
-    GroupBox2: TcxGroupBox;
-    RadioButtonAccessType_NAMED_PROXY: TcxRadioButton;
-    RadioButtonAccessType_NO_PROXY: TcxRadioButton;
-    RadioButtonAccessType_DEFAULT_PROXY: TcxRadioButton;
-    GroupBox1: TcxGroupBox;
-    Label15: TcxLabel;
-    Label12: TcxLabel;
-    Label11: TcxLabel;
-    Label16: TcxLabel;
-    Label13: TcxLabel;
-    EdProxyPort: tcxtextedit;
-    EdProxyUserName: tcxtextedit;
-    EdProxyServer: tcxtextedit;
-    EdProxyPassword: tcxtextedit;
-    EdProxyBypass: tcxtextedit;
-    GroupBox5: TcxGroupBox;
-    Label24: TcxLabel;
-    EditBufferUploadSize: tcxtextedit;
-    CheckBoxInternetOption_BYPASS_PROXY_CACHE: TcxCheckBox;
-    CheckBoxInternetOption_ESCAPE_DISABLE: TcxCheckBox;
-    CheckBoxInternetOption_REFRESH: TcxCheckBox;
-    CheckBoxInternetOption_SECURE: TcxCheckBox;
-    CheckBoxInternetOption_ESCAPE_PERCENT: TcxCheckBox;
-    CheckBoxInternetOption_NULL_CODEPAGE: TcxCheckBox;
-    CheckBoxInternetOption_ESCAPE_DISABLE_QUERY: TcxCheckBox;
-    GroupBox8: TcxGroupBox;
-    MemoRequestRawHeader: TcxMemo;
-    Label8: TcxLabel;
-    RadioButtonProtocolVersion1_0: TcxRadioButton;
-    RadioButtonProtocolVersion1_1: TcxRadioButton;
-    CheckBoxInternetOption_KEEP_CONNECTION: TcxCheckBox;
-    CheckBoxInternetOption_NO_COOKIES: TcxCheckBox;
-    CheckBoxInternetOption_NO_AUTO_REDIRECT: TcxCheckBox;
     Label4: TcxLabel;
     MemoLstUrl: TcxMemo;
     Label1: TcxLabel;
@@ -83,9 +83,8 @@ type
     TableViewThreadDownloadSpeed: TcxGridColumn;
     levelThread: TcxGridLevel;
     TableViewThreadRequestCount: TcxGridColumn;
-    CheckBoxDoLikeSpider: TcxCheckBox;
     CheckBoxStopOnError: TcxCheckBox;
-    StatusBar1: TStatusBar;
+    MainStatusBar: TStatusBar;
     EditMaxHttpRequest: TcxSpinEdit;
     EditNbThread: TcxSpinEdit;
     Label3: TcxLabel;
@@ -98,99 +97,87 @@ type
     TableViewThreadWait: TcxGridColumn;
     ButtonStart: TcxButton;
     dxSkinController1: TdxSkinController;
-    cxStyleRepository1: TcxStyleRepository;
-    cxStyle1: TcxStyle;
+    GroupBox3: TcxGroupBox;
+    Label18: TcxLabel;
+    Label19: TcxLabel;
+    EditUserName: TcxTextEdit;
+    EditPassword: TcxTextEdit;
+    GroupBox4: TcxGroupBox;
+    Label14: TcxLabel;
+    Label17: TcxLabel;
+    Label20: TcxLabel;
+    EditSendTimeout: TcxTextEdit;
+    EditReceiveTimeout: TcxTextEdit;
+    EditConnectTimeout: TcxTextEdit;
+    GroupBox6: TcxGroupBox;
+    RadioButtonProtocolVersion1_0: TcxRadioButton;
+    RadioButtonProtocolVersion1_1: TcxRadioButton;
+    RadioButtonProtocolVersion2: TcxRadioButton;
+    RadioButtonProtocolVersion3: TcxRadioButton;
+    GroupBox1: TcxGroupBox;
+    Label15: TcxLabel;
+    Label12: TcxLabel;
+    Label11: TcxLabel;
+    Label16: TcxLabel;
+    Label13: TcxLabel;
+    EdProxyPort: TcxTextEdit;
+    EdProxyUserName: TcxTextEdit;
+    EdProxyServer: TcxTextEdit;
+    EdProxyPassword: TcxTextEdit;
+    EdProxyBypass: TcxTextEdit;
+    GroupBox2: TcxGroupBox;
+    RadioButtonAccessType_NAMED_PROXY: TcxRadioButton;
+    RadioButtonAccessType_NO_PROXY: TcxRadioButton;
+    RadioButtonAccessType_DEFAULT_PROXY: TcxRadioButton;
+    GroupBox7: TcxGroupBox;
+    CheckBoxHttpOption_REFRESH: TcxCheckBox;
+    CheckBoxHttpOption_KEEP_CONNECTION: TcxCheckBox;
+    CheckBoxHttpOption_NO_COOKIES: TcxCheckBox;
+    CheckBoxHttpOption_NO_AUTO_REDIRECT: TcxCheckBox;
+    CheckBoxHttpOption_DECOMPRESSION: TcxCheckBox;
+    GroupBox8: TcxGroupBox;
+    Label8: TcxLabel;
+    MemoRequestRawHeader: TcxMemo;
+    UpdateGuiTimer: TTimer;
+    EditFileToUpload: TcxTextEdit;
+    cxLabel1: TcxLabel;
+    ButtonSelectFileToUpload: TcxButton;
+    MainFileOpenDialog: TFileOpenDialog;
+    TableViewThreadBytesSent: TcxGridColumn;
+    TableViewThreadUploadSpeed: TcxGridColumn;
+    ComboBoxSimulateSlowClient: TcxComboBox;
+    cxLabel2: TcxLabel;
+    cxLabel3: TcxLabel;
     procedure ButtonStartClick(Sender: TObject);
-    procedure FormCreate(Sender: TObject);
-    procedure TableViewThreadDownloadSpeedGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: String);
+    procedure TableViewThreadBytesGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: string);
+    procedure TableViewThreadSpeedGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: String);
     procedure TableViewThreadTimeTakenGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems1GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems2GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems6GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems4GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems5GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems3GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems0GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
+    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItemsSpeedGetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
+    procedure TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItemsBytesGetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: string);
+    procedure UpdateGuiTimerTimer(Sender: TObject);
+    procedure ButtonSelectFileToUploadClick(Sender: TObject);
+    procedure MainFileOpenDialogFileOkClick(Sender: TObject; var CanClose: Boolean);
   private
-    procedure WMUpdateGUI(var Msg: TMessage); message WM_UpdateGUI;
+    FHttpClientUserName: AnsiString;
+    FHttpClientPassword: AnsiString;
+    FHttpClientConnectTimeout: integer;
+    FHttpClientSendTimeout: integer;
+    FHttpClientReceiveTimeout: integer;
+    FHttpClientProtocolVersion: TALHTTPVersion;
+    FHttpClientProxyServer: AnsiString;
+    FHttpClientProxyPort: integer;
+    FHttpClientProxyUserName: AnsiString;
+    FHttpClientProxyPassword: AnsiString;
+    FHttpClientProxyBypass: AnsiString;
+    FHttpClientAccessType: TALWinHttpClient.TAccessType;
+    FHttpClientHttpOptions: TALWinHttpClient.THttpOptionSet;
+    FHttpClientRawHeaderText: ansiString;
+    FStartStopWatch: TStopWatch;
+    FHttpRequestMetrics: TArray<THttpRequestMetrics>;
+    FBodyString: AnsiString;
+    procedure UpdateGUI;
     procedure initHttpClientParams;
-  public
-    HttpClientUserName: AnsiString;
-    HttpClientPassword: AnsiString;
-    HttpClientConnectTimeout: integer;
-    HttpClientSendTimeout: integer;
-    HttpClientReceiveTimeout: integer;
-    HttpClientProtocolVersion: TALHTTPProtocolVersion;
-    HttpClientUploadBufferSize: integer;
-    HttpClientProxyServer: AnsiString;
-    HttpClientProxyPort: integer;
-    HttpClientProxyUserName: AnsiString;
-    HttpClientProxyPassword: AnsiString;
-    HttpClientProxyBypass: AnsiString;
-    HttpClientAccessType: TALWinHttpClientInternetOpenAccessType;
-    HttpClientInternetOptions: TALWinHttpClientInternetOptionSet;
-    HttpClientRawHeaderText: ansiString;
-    NBActiveThread: Integer;
-    LastUpdateStatusBar: Uint64;
-    StartTime: uint64;
-    ToTalBytesRead: Int64;
-    TotalDNScount: integer;
-    TotalDNSTimeTaken: Int64;
-    TotalConnectCount: integer;
-    TotalConnectTimeTaken: Int64;
-    TotalSendCount: integer;
-    TotalSendTimeTaken: Int64;
-    TotalWaitCount: integer;
-    TotalWaitTimeTaken: Int64;
-    TotalReceiveCount: int64;
-    TotalReceiveTimeTaken: int64;
   end;
-
-  TStressHttpThreadVarContainer = Class(TObject)
-    On: Boolean;
-    Rank: integer;
-    Url: AnsiString;
-    RequestCount: Integer;
-    RequestStatus: AnsiString;
-    BytesRead: Integer;
-    DNSTimeTaken: Integer;
-    ConnectTimeTaken: Integer;
-    SendTimeTaken: Integer;
-    WaitTimeTaken: Integer;
-    ReceiveTimeTaken: Integer;
-  End;
-
-  TStressHttpThread = Class(Tthread)
-  private
-    FBytesRead: Integer;
-    fUrl: AnsiString;
-    fRequestCount: Integer;
-    FRequestStatus: AnsiString;
-    FDNSTimeTaken: Integer;
-    FConnectTimeTaken: Integer;
-    FSendTimeTaken: Integer;
-    FWaitTimeTaken: Integer;
-    FReceiveTimeTaken: Integer;
-    FHttpStatusStartTime: uint64;
-  protected
-    StopOnError: Boolean;
-    DoLikeaSpider: Boolean;
-    DelayBetweenEachCall: integer;
-    LstUrl: TALHashedStringListA;
-    MaxHttpRequest: Integer;
-    Rank: integer;
-    procedure Execute; override;
-    procedure OnHttpDownloadProgress(sender: Tobject; Read: Integer; Total: Integer);
-    procedure OnHttpStatus(
-                sender: Tobject;
-                InternetStatus: DWord;
-                StatusInformation: Pointer;
-                StatusInformationLength: DWord);
-  Public
-    constructor Create(CreateSuspended: Boolean; aRank: integer);
-    destructor Destroy; override;
-  End;
-
 
 var
   Form1: TForm1;
@@ -201,59 +188,99 @@ Uses
   System.AnsiStrings,
   Math,
   DateUtils,
-  Alcinoe.MultiPartParser,
+  Alcinoe.Mime.Multipart,
   Alcinoe.Files,
   Alcinoe.Common,
-  Alcinoe.WinApi.Common,
+  Alcinoe.WinApi.windows,
   Alcinoe.HTML,
-  Alcinoe.StringUtils;
+  Alcinoe.Cipher,
+  Alcinoe.Localization;
 
 {$R *.dfm}
 
 {************************************}
 procedure TForm1.initHttpClientParams;
 Begin
-  HttpClientUserName := AnsiString(EditUserName.Text);
-  HttpClientPassword := AnsiString(EditPassword.Text);
+  FHttpClientUserName := AnsiString(EditUserName.Text);
+  FHttpClientPassword := AnsiString(EditPassword.Text);
 
-  HttpClientConnectTimeout := StrToInt(EditConnectTimeout.Text);
-  HttpClientSendTimeout := StrToInt(EditSendTimeout.Text);
-  HttpClientReceiveTimeout := StrToInt(EditReceiveTimeout.Text);
+  FHttpClientConnectTimeout := ALStrToInt(EditConnectTimeout.Text);
+  FHttpClientSendTimeout := ALStrToInt(EditSendTimeout.Text);
+  FHttpClientReceiveTimeout := ALStrToInt(EditReceiveTimeout.Text);
 
-  if RadioButtonProtocolVersion1_0.Checked then HttpClientProtocolVersion := TALHTTPProtocolVersion.v1_0
-  else HttpClientProtocolVersion := TALHTTPProtocolVersion.v1_1;
+  if RadioButtonProtocolVersion1_0.Checked then FHttpClientProtocolVersion := TALHttpVersion.v1_0
+  else if RadioButtonProtocolVersion2.Checked then FHttpClientProtocolVersion := TALHttpVersion.v2
+  else if RadioButtonProtocolVersion3.Checked then FHttpClientProtocolVersion := TALHttpVersion.v3
+  else FHttpClientProtocolVersion := TALHttpVersion.v1_1;
 
-  HttpClientUploadBufferSize := StrToInt(EditBufferUploadSize.Text);
+  FHttpClientProxyServer := AnsiString(EdProxyServer.Text);
+  FHttpClientProxyPort := ALStrToInt(EdProxyPort.Text);
+  FHttpClientProxyUserName := AnsiString(EdProxyUserName.Text);
+  FHttpClientProxyPassword := AnsiString(EdProxyPassword.Text);
+  FHttpClientProxyBypass := AnsiString(EdProxyBypass.Text);
 
-  HttpClientProxyServer := AnsiString(EdProxyServer.Text);
-  HttpClientProxyPort := StrToInt(EdProxyPort.Text);
-  HttpClientProxyUserName := AnsiString(EdProxyUserName.Text);
-  HttpClientProxyPassword := AnsiString(EdProxyPassword.Text);
-  HttpClientProxyBypass := AnsiString(EdProxyBypass.Text);
+  if RadioButtonAccessType_NO_PROXY.Checked then FHttpClientAccessType := TALWinHttpClient.TAccessType.NO_PROXY
+  else if RadioButtonAccessType_NAMED_PROXY.Checked then FHttpClientAccessType := TALWinHttpClient.TAccessType.NAMED_PROXY
+  else if RadioButtonAccessType_DEFAULT_PROXY.Checked then FHttpClientAccessType := TALWinHttpClient.TAccessType.DEFAULT_PROXY;
 
-  if RadioButtonAccessType_NO_PROXY.Checked then HttpClientAccessType := wHttpAt_NO_PROXY
-  else if RadioButtonAccessType_NAMED_PROXY.Checked then HttpClientAccessType := wHttpAt_NAMED_PROXY
-  else if RadioButtonAccessType_DEFAULT_PROXY.Checked then HttpClientAccessType := wHttpAt_DEFAULT_PROXY;
+  FHttpClientHttpOptions := [];
+  If CheckBoxHttpOption_REFRESH.checked then FHttpClientHttpOptions := FHttpClientHttpOptions + [TALWinHttpClient.THttpOption.Refresh];
+  If CheckBoxHttpOption_NO_COOKIES.checked then FHttpClientHttpOptions := FHttpClientHttpOptions + [TALWinHttpClient.THttpOption.NO_COOKIES];
+  If CheckBoxHttpOption_KEEP_CONNECTION.checked then FHttpClientHttpOptions := FHttpClientHttpOptions + [TALWinHttpClient.THttpOption.KEEP_CONNECTION];
+  If CheckBoxHttpOption_NO_AUTO_REDIRECT.checked then FHttpClientHttpOptions := FHttpClientHttpOptions + [TALWinHttpClient.THttpOption.NO_AUTO_REDIRECT];
+  If CheckBoxHttpOption_DECOMPRESSION.checked then FHttpClientHttpOptions := FHttpClientHttpOptions + [TALWinHttpClient.THttpOption.DECOMPRESSION];
 
-  HttpClientInternetOptions := [];
-  If CheckBoxInternetOption_BYPASS_PROXY_CACHE.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_BYPASS_PROXY_CACHE];
-  If CheckBoxInternetOption_ESCAPE_DISABLE.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_ESCAPE_DISABLE];
-  If CheckBoxInternetOption_ESCAPE_DISABLE_QUERY.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_ESCAPE_DISABLE_QUERY];
-  If CheckBoxInternetOption_ESCAPE_PERCENT.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_ESCAPE_PERCENT];
-  If CheckBoxInternetOption_NULL_CODEPAGE.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_NULL_CODEPAGE];
-  If CheckBoxInternetOption_REFRESH.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_REFRESH];
-  If CheckBoxInternetOption_SECURE.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_SECURE];
-  If CheckBoxInternetOption_NO_COOKIES.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_NO_COOKIES];
-  If CheckBoxInternetOption_KEEP_CONNECTION.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_KEEP_CONNECTION];
-  If CheckBoxInternetOption_NO_AUTO_REDIRECT.checked then HttpClientInternetOptions := HttpClientInternetOptions + [wHttpIo_NO_AUTO_REDIRECT];
-
-  HttpClientRawHeaderText := AnsiString(MemoRequestRawHeader.Text);
+  FHttpClientRawHeaderText := AnsiString(MemoRequestRawHeader.Text);
 end;
 
-{*******************************************************************************************************************************************}
-procedure TForm1.TableViewThreadDownloadSpeedGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: String);
+{*************************************************************************************}
+procedure TForm1.MainFileOpenDialogFileOkClick(Sender: TObject; var CanClose: Boolean);
 begin
-  if AText <> '' then AText := AText + ' KB/s';
+  EditFileToUpload.Text := MainFileOpenDialog.FileName;
+end;
+
+{******************************************************************************************************************************************************************************************}
+procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItemsSpeedGetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
+begin
+  var LBytes: Int64;
+  If Not ALTryStrToInt64(aText, LBytes) then LBytes := 0;
+  if LBytes > 1_000_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000_000, -2)) + ' GB/s'
+  else if LBytes > 1_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000, -2)) + ' MB/s'
+  else if LBytes > 1000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1000, -2)) + ' KB/s'
+  else aText := ALIntToStrW(LBytes) + ' B/s';
+end;
+
+{******************************************************************************************************************************************************************************************}
+procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItemsBytesGetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: string);
+begin
+  var LBytes: Int64;
+  If Not ALTryStrToInt64(aText, LBytes) then LBytes := 0;
+  if LBytes > 1_000_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000_000, -2)) + ' GB'
+  else if LBytes > 1_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000, -2)) + ' MB'
+  else if LBytes > 1000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1000, -2)) + ' KB'
+  else aText := ALIntToStrW(LBytes) + ' B';
+end;
+
+{***********************************************************************************************************************************}
+procedure TForm1.TableViewThreadBytesGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: string);
+begin
+  var LBytes: Int64;
+  If Not ALTryStrToInt64(aText, LBytes) then LBytes := 0;
+  if LBytes > 1_000_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000_000, -2)) + ' GB'
+  else if LBytes > 1_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000, -2)) + ' MB'
+  else if LBytes > 1000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1000, -2)) + ' KB'
+  else aText := ALIntToStrW(LBytes) + ' B';
+end;
+
+{***********************************************************************************************************************************}
+procedure TForm1.TableViewThreadSpeedGetDisplayText(Sender: TcxCustomGridTableItem; ARecord: TcxCustomGridRecord; var AText: String);
+begin
+  var LBytes: Int64;
+  If Not ALTryStrToInt64(aText, LBytes) then LBytes := 0;
+  if LBytes > 1_000_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000_000, -2)) + ' GB/s'
+  else if LBytes > 1_000_000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1_000_000, -2)) + ' MB/s'
+  else if LBytes > 1000 then aText := ALFloatToStrW(SimpleRoundTo(LBytes / 1000, -2)) + ' KB/s'
+  else aText := ALIntToStrW(LBytes) + ' B/s';
 end;
 
 {***************************************************************************************************************************************}
@@ -262,151 +289,84 @@ begin
   if AText <> '' then AText := AText + ' ms';
 end;
 
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems0GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
+{****************************************************}
+procedure TForm1.UpdateGuiTimerTimer(Sender: TObject);
 begin
-  if ToTalBytesRead > 107374182400 then aText := IntToStr(round(ToTalBytesRead / 107374182400)) + ' GB'
-  else if ToTalBytesRead > 1048576 then aText := IntToStr(round(ToTalBytesRead / 1048576)) + ' MB'
-  else if ToTalBytesRead > 1024 then aText := IntToStr(round(ToTalBytesRead / 1024)) + ' KB';
+  UpdateGUI;
 end;
 
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems1GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
+{*************************}
+procedure TForm1.UpdateGUI;
 begin
-  if (TotalReceiveCount > 0) and (TotalReceiveTimeTaken > 0) then AText := IntToStr(Round((totalBytesRead / 1024) /  ((TotalReceiveTimeTaken / 1000)))) + ' KB/s'
-  else aText := '';
-end;
 
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems2GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-begin
-  if TotalDNSCount > 0 then AText := IntToStr(Round(TotalDNSTimeTaken / TotalDNSCount)) + ' ms'
-  else AText := '';
-end;
+  var LNBActiveThread := length(FHttpRequestMetrics);
+  TableViewThread.BeginUpdate;
+  try
 
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems3GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-begin
-  if TotalReceiveCount > 0 then AText := IntToStr(Round(TotalReceiveTimeTaken / TotalReceiveCount)) + ' ms'
-  else AText := '';
-end;
-
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems4GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-begin
-  if TotalSendCount > 0 then AText := IntToStr(Round(TotalSendTimeTaken / TotalSendCount)) + ' ms'
-  else AText := '';
-end;
-
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems5GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-begin
-  if TotalWaitCount > 0 then AText := IntToStr(Round(TotalWaitTimeTaken / TotalWaitCount)) + ' ms'
-  else AText := '';
-end;
-
-{**************************************************************************************************************************************************************************************}
-procedure TForm1.TableViewThreadTcxGridDataControllerTcxDataSummaryFooterSummaryItems6GetText(Sender: TcxDataSummaryItem; const AValue: Variant; AIsFooter: Boolean; var AText: String);
-begin
-  if TotalConnectCount > 0 then AText := IntToStr(Round(TotalConnectTimeTaken / TotalConnectCount)) + ' ms'
-  else AText := '';
-end;
-
-{**********************************************}
-procedure TForm1.WMUpdateGUI(var Msg: TMessage);
-
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  function internalInttoVariant(aInt: Integer): Variant;
-  begin
-    if aInt >= 0 then result := aint
-    else result := null;
-  end;
-
-Var LTimeElapsed: int64;
-    LTotalRequestCount: Integer;
-    I: integer;
-
-begin
-  with TStressHttpThreadVarContainer(pointer(Msg.WParam)) do begin
-
-    TableViewThread.BeginUpdate;
-    try
-
-      if RequestCount - TableViewThread.DataController.GetValue(Rank-1,TableViewThreadRequestCount.Index) = 1 then begin
-
-        if DNSTimeTaken >= 0 then begin
-          inc(TotalDNSCount);
-          TotalDNSTimeTaken := TotalDNSTimeTaken + int64(DNSTimeTaken);
+    For var I := low(FHttpRequestMetrics) to high(FHttpRequestMetrics) do begin
+      with FHttpRequestMetrics[i] do begin
+        if not On then begin
+          dec(LNBActiveThread);
+          TableViewThread.DataController.SetValue(I, TableViewThreadNumber.Index, ALIntToStrW(I+1) + ' (off)');
         end;
-        if ConnectTimeTaken >= 0 then begin
-          inc(TotalConnectCount);
-          TotalConnectTimeTaken := TotalConnectTimeTaken + int64(ConnectTimeTaken);
-        end;
-        if SendTimeTaken >= 0 then begin
-          inc(TotalSendCount);
-          TotalSendTimeTaken := TotalSendTimeTaken + int64(SendTimeTaken);
-        end;
-        if WaitTimeTaken >= 0 then begin
-          inc(TotalWaitCount);
-          TotalWaitTimeTaken := TotalWaitTimeTaken + int64(WaitTimeTaken);
-        end;
-        if (BytesRead >= 0) and (ReceiveTimeTaken >= 0) then begin
-          inc(TotalReceiveCount);
-          TotalReceiveTimeTaken := TotalReceiveTimeTaken + int64(ReceiveTimeTaken);
-          ToTalBytesRead := ToTalBytesRead + int64(BytesRead);
-        end;
-
+        TableViewThread.DataController.SetValue(I, TableViewThreadRequestCount.Index, RequestCount);
+        TableViewThread.DataController.SetValue(I, TableViewThreadUrl.Index, Url);
+        if StatusCode >= 0 then TableViewThread.DataController.SetValue(I, TableViewThreadHttpStatus.Index, StatusCode)
+        else TableViewThread.DataController.SetValue(I, TableViewThreadHttpStatus.Index, null);
+        TableViewThread.DataController.SetValue(I, TableViewThreadDNS.Index, SimpleRoundTo(AverageDNSTimeTaken, -2));
+        TableViewThread.DataController.SetValue(I, TableViewThreadConnect.Index, SimpleRoundTo(AverageConnectTimeTaken, -2));
+        TableViewThread.DataController.SetValue(I, TableViewThreadSend.Index, SimpleRoundTo(AverageSendTimeTaken, -2));
+        TableViewThread.DataController.SetValue(I, TableViewThreadWait.Index, SimpleRoundTo(AverageWaitTimeTaken, -2));
+        TableViewThread.DataController.SetValue(I, TableViewThreadReceive.Index, SimpleRoundTo(AverageReceiveTimeTaken, -2));
+        TableViewThread.DataController.SetValue(I, TableViewThreadBytesSent.Index, TotalBytesSent);
+        TableViewThread.DataController.SetValue(I, TableViewThreadBytesReceived.Index, TotalBytesRead);
+        if (TotalBytesSent > 0) and (TotalSendTimeTaken > 0) then
+          TableViewThread.DataController.SetValue(I, TableViewThreadUploadSpeed.Index, Round(TotalBytesSent / (TotalSendTimeTaken / 1000)))
+        else
+          TableViewThread.DataController.SetValue(I, TableViewThreadUploadSpeed.Index, null);
+        if (TotalBytesRead > 0) and (TotalReceiveTimeTaken > 0) then
+          TableViewThread.DataController.SetValue(I, TableViewThreadDownloadSpeed.Index, Round(TotalBytesRead / (TotalReceiveTimeTaken / 1000)))
+        else
+          TableViewThread.DataController.SetValue(I, TableViewThreadDownloadSpeed.Index, null);
       end;
-
-      if not On then begin
-        dec(NBActiveThread);
-        StatusBar1.Panels[0].Text := '# Threads: ' + IntToStr(NBActiveThread);
-        TableViewThread.DataController.SetValue(rank-1,TableViewThreadNumber.Index,ALIntToStrA(rank) + ' (off)');
-        if NBActiveThread = 0 then begin
-          ButtonStart.Tag := 0;
-          ButtonStart.Caption := 'Start';
-        end;
-      end;
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadUrl.Index,Url);
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadRequestCount.Index,RequestCount);
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadHttpStatus.Index,RequestStatus);
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadBytesReceived.Index,internalInttoVariant(BytesRead));
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadDNS.Index,internalInttoVariant(DNSTimeTaken));
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadConnect.Index,internalInttoVariant(ConnectTimeTaken));
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadSend.Index,internalInttoVariant(SendTimeTaken));
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadWait.Index,internalInttoVariant(WaitTimeTaken));
-      TableViewThread.DataController.SetValue(Rank-1,TableViewThreadReceive.Index,internalInttoVariant(ReceiveTimeTaken));
-      if (BytesRead > 0) and (ReceiveTimeTaken > 0) then TableViewThread.DataController.SetValue(Rank-1,TableViewThreadDownloadSpeed.Index,Round((BytesRead / 1024) /  (ReceiveTimeTaken / 1000)))
-      else  TableViewThread.DataController.SetValue(Rank-1,TableViewThreadDownloadSpeed.Index,null);
-
-      if GetTickCount64 - LastUpdateStatusBar > 1000  then begin
-        LastUpdateStatusBar := GetTickCount64;
-        LTimeElapsed := GetTickCount64 - StartTime;
-        LTotalRequestCount := 0;
-        for I := 0 to TableViewThread.DataController.RecordCount - 1 do
-          LTotalRequestCount := LTotalRequestCount + TableViewThread.DataController.GetValue(I,TableViewThreadRequestCount.Index);
-          StatusBar1.Panels[1].Text := IntToStr(LTotalRequestCount) + ' Requests in ' + IntToStr(round(LTimeElapsed / 1000)) + ' seconds (' + FormatFloat('0.##',LTotalRequestCount / (Max(LTimeElapsed,1) / 1000)) + ' Request/s | '+
-                                       FormatFloat('0.##',((ToTalBytesRead / 1024) / (max(1,LTimeElapsed) / 1000)))+' KB/s)';
-      end;
-
-    finally
-      TableViewThread.EndUpdate;
     end;
 
-    free;
-
+  finally
+    TableViewThread.EndUpdate;
   end;
 
+  MainStatusBar.Panels[0].Text := '# Threads: ' + ALIntToStrW(LNBActiveThread);
+  if LNBActiveThread = 0 then begin
+    ButtonStart.Tag := 0;
+    ButtonStart.Caption := 'Start';
+    UpdateGuiTimer.Enabled := False;
+    FStartStopWatch.Stop;
+    Setlength(FHttpRequestMetrics, 0);
+  end;
+
+  var LTotalRequestCount: Integer := 0;
+  for var I := 0 to TableViewThread.DataController.RecordCount - 1 do
+    LTotalRequestCount := LTotalRequestCount + TableViewThread.DataController.GetValue(I, TableViewThreadRequestCount.Index);
+  MainStatusBar.Panels[1].Text := ALIntToStrW(LTotalRequestCount) +
+                               ' Requests in ' +
+                               ALFormatFloatW('0.##', FStartStopWatch.Elapsed.TotalMilliseconds / 1000) +
+                               ' seconds (' +
+                               ALFormatFloatW('0.##', LTotalRequestCount / (Max(FStartStopWatch.Elapsed.TotalMilliseconds, 1) / 1000)) +
+                               ' Request/s)';
+
+end;
+
+{**************************************************************}
+procedure TForm1.ButtonSelectFileToUploadClick(Sender: TObject);
+begin
+  MainFileOpenDialog.Execute;
 end;
 
 {*************************************************}
 procedure TForm1.ButtonStartClick(Sender: TObject);
-Var I: integer;
-    J: integer;
-    LStressHttpThread: TStressHttpThread;
 begin
   If ButtonStart.tag = 0 then begin
-    if NBActiveThread > 0 then begin
+    if length(FHttpRequestMetrics) > 0 then begin
       messageDlg('Busy! Please wait a moment.',mtError,[mbok],0);
       exit;
     end;
@@ -423,293 +383,288 @@ begin
     exit;
   end;
 
-  TableViewThread.DataController.RecordCount := StrToInt(EditNbThread.Text);
   initHttpClientParams;
-  NBActiveThread := 0;
-  LastUpdateStatusBar := GetTickCount64;
-  StartTime := GetTickCount64;
-  ToTalBytesRead := 0;
-  TotalDNScount := 0;
-  TotalDNSTimeTaken := 0;
-  TotalConnectCount := 0;
-  TotalConnectTimeTaken := 0;
-  TotalSendCount := 0;
-  TotalSendTimeTaken := 0;
-  TotalWaitCount := 0;
-  TotalWaitTimeTaken := 0;
-  TotalReceiveCount := 0;
-  TotalReceiveTimeTaken := 0;
-
-  StatusBar1.Panels[1].Text := '';
-  for I := 1 to StrToInt(EditNbThread.Text) do begin
-    TableViewThread.DataController.SetValue(I-1,TableViewThreadNumber.Index,ALIntToStrA(I) + ' (on)');
-    TableViewThread.DataController.SetValue(I-1,TableViewThreadRequestCount.Index,0);
-    LStressHttpThread := TStressHttpThread.Create(True, I);
-    LStressHttpThread.lstUrl.NameValueSeparator := #1;
-    for J := 0 to MemoLstUrl.Lines.Count - 1 do
-      if Trim(MemoLstUrl.Lines[J]) <> '' then
-        LStressHttpThread.LstUrl.Add(AnsiString(MemoLstUrl.Lines[J]));
-    LStressHttpThread.MaxHttpRequest := StrToInt(EditMaxHttpRequest.Text);
-    LStressHttpThread.FreeOnTerminate := True;
-    LStressHttpThread.DoLikeaSpider := CheckBoxDoLikeSpider.Checked;
-    LStressHttpThread.DelayBetweenEachCall := StrToInt(EditSendDelayBetweenEachSend.text);
-    LStressHttpThread.StopOnError := CheckBoxStopOnError.Checked;
-    inc(NBActiveThread);
-    StatusBar1.Panels[0].Text := '# Threads: ' + IntToStr(NBActiveThread);
-    StatusBar1.Repaint;
-    {$IF CompilerVersion >= 23} {Delphi XE2}
-    LStressHttpThread.Start;
-    {$ELSE}
-    aStressHttpThread.Resume;
-    {$ENDIF}
+  if EditFileToUpload.Text <> '' then FBodyString := ALGetStringFromFile(EditFileToUpload.Text)
+  else FBodyString := '';
+  Setlength(FHttpRequestMetrics, ALStrToInt(EditNbThread.Text));
+  For var I := low(FHttpRequestMetrics) to high(FHttpRequestMetrics) do begin
+    FHttpRequestMetrics[I].&On := True;
+    FHttpRequestMetrics[I].Url := '';
+    FHttpRequestMetrics[I].RequestCount := 0;
+    FHttpRequestMetrics[I].StatusCode := -1;
+    FHttpRequestMetrics[I].TotalBytesSent := 0;
+    FHttpRequestMetrics[I].TotalBytesRead := 0;
+    FHttpRequestMetrics[I].AverageDNSTimeTaken := 0;
+    FHttpRequestMetrics[I].AverageConnectTimeTaken := 0;
+    FHttpRequestMetrics[I].totalSendTimeTaken := 0;
+    FHttpRequestMetrics[I].AverageSendTimeTaken := 0;
+    FHttpRequestMetrics[I].AverageWaitTimeTaken := 0;
+    FHttpRequestMetrics[I].totalReceiveTimeTaken := 0;
+    FHttpRequestMetrics[I].AverageReceiveTimeTaken := 0;
   end;
+  TableViewThread.DataController.RecordCount := length(FHttpRequestMetrics);
+  FStartStopWatch := TStopWatch.StartNew;
+
+  MainStatusBar.Panels[1].Text := '';
+  for var I := 0 to ALStrToInt(EditNbThread.Text) - 1 do begin
+    TableViewThread.DataController.SetValue(I,TableViewThreadNumber.Index,ALIntToStrW(I+1) + ' (on)');
+    TableViewThread.DataController.SetValue(I,TableViewThreadRequestCount.Index,0);
+    var LWorkerThread := TWorkerThread.Create(True, I);
+    for var J := 0 to MemoLstUrl.Lines.Count - 1 do
+      if Trim(MemoLstUrl.Lines[J]) <> '' then
+        LWorkerThread.FUrls.Add(AnsiString(MemoLstUrl.Lines[J]));
+    LWorkerThread.FMaxHttpRequest := ALStrToInt(EditMaxHttpRequest.Text);
+    LWorkerThread.FDelayBetweenEachCall := ALStrToInt(EditSendDelayBetweenEachSend.text);
+    LWorkerThread.FStopOnError := CheckBoxStopOnError.Checked;
+    LWorkerThread.FSimulateSlowClient := ALStrToIntDef(ComboBoxSimulateSlowClient.Text, 0);
+    if FBodyString <> '' then LWorkerThread.FBodyStream.DataString := FBodyString;
+    MainStatusBar.Panels[0].Text := '# Threads: ' + ALIntToStrW(length(FHttpRequestMetrics));
+    LWorkerThread.FreeOnTerminate := True;
+    LWorkerThread.Start;
+  end;
+  UpdateGuiTimer.Enabled := True;
 end;
 
-{*****************************************************************************}
-constructor TStressHttpThread.Create(CreateSuspended: Boolean; aRank: integer);
+{**************************************************************************}
+constructor TWorkerThread.Create(CreateSuspended: Boolean; AIndex: integer);
 begin
   inherited Create(CreateSuspended);
-  doLikeASpider := False;
-  StopOnError := False;
-  DelayBetweenEachCall := 0;
-  LstUrl := TALHashedStringListA.Create;
-  LstUrl.Duplicates := DupIgnore;
-  lstUrl.NameValueSeparator := #1;
-  MaxHttpRequest := 0;
-  Rank := aRank;
-  fUrl := '';
-  fRequestCount := 0;
-  FRequestStatus := '';
+  FBytesSent := 0;
   FBytesRead := 0;
-  FDNSTimeTaken := 0;
-  FConnectTimeTaken := 0;
-  FSendTimeTaken := 0;
-  FWaitTimeTaken := 0;
-  FReceiveTimeTaken := 0;
-  FHttpStatusStartTime := GetTickCount64;
+  //FDNSStopWatch
+  //FConnectStopWatch
+  //FSendStopWatch
+  //FWaitStopWatch
+  //FReceiveStopWatch
+  FStopOnError := False;
+  FSimulateSlowClient := 0;
+  FDelayBetweenEachCall := 0;
+  FUrls := TALStringListA.Create;
+  FMaxHttpRequest := 0;
+  FIndex := AIndex;
+  FBodyStream := TALStringStreamA.Create('');
 end;
 
-{***********************************}
-destructor TStressHttpThread.Destroy;
-var LVarContainer: TStressHttpThreadVarContainer;
+{*******************************}
+destructor TWorkerThread.Destroy;
 begin
-  LVarContainer := TStressHttpThreadVarContainer.Create;
-  With LVarContainer do begin
-    On := False;
-    Rank := Self.Rank;
-    Url := fUrl;
-    RequestCount := fRequestCount;
-    RequestStatus := fRequestStatus;
-    BytesRead := fBytesRead;
-    DNSTimeTaken := fDNSTimeTaken;
-    ConnectTimeTaken := fConnectTimeTaken;
-    SendTimeTaken := fSendTimeTaken;
-    WaitTimeTaken := fWaitTimeTaken;
-    ReceiveTimeTaken := fReceiveTimeTaken;
-  end;
-  PostMessage(Form1.Handle,WM_UpdateGUI, integer(LVarContainer), 0);
-  LstUrl.free;
+  ALFreeAndNil(FUrls);
+  ALFreeAndNil(FBodyStream);
   inherited;
 end;
 
-{**********************************}
-procedure TStressHttpThread.Execute;
-
-Var LtmpUrl: AnsiString;
-    LBody: AnsiString;
-    LHostName: AnsiString;
-    LLowerCaseBody: AnsiString;
-    LResponseContentStream: TStream;
-    LResponseContentHeader: TALHTTPResponseHeader;
-    LHttpClient: TALWinHttpClient;
-    LVarContainer: TStressHttpThreadVarContainer;
-    P1, P2: integer;
-    I: integer;
-
+{******************************}
+procedure TWorkerThread.Execute;
 begin
 
-  for I := 1 to MaxHttpRequest do begin
-    if LstUrl.Count = 0 then break;
-    fUrl := LstUrl[random(LstUrl.Count)];
-    inc(FRequestCount);
-    FRequestStatus := '';
-    FBytesRead := -1;
-    FDNSTimeTaken := -1;
-    FConnectTimeTaken := -1;
-    FSendTimeTaken := -1;
-    FWaitTimeTaken := -1;
-    FReceiveTimeTaken := -1;
-    FHttpStatusStartTime := GetTickCount64;
-    try
+  var LUrl: AnsiString := '';
+  var LStatusCode: Integer := 0;
+  var LRequestCount: Integer := 0;
+  var LTotalBytesSent: Int64 := 0;
+  var LTotalBytesRead: Int64 := 0;
+  var LDNSCount: Integer := 0;
+  var LDNSTimeTaken: Double := 0;
+  var LConnectCount: Integer := 0;
+  var LConnectTimeTaken: Double := 0;
+  var LSendCount: Integer := 0;
+  var LSendTimeTaken: Double := 0;
+  var LWaitCount: Integer := 0;
+  var LWaitTimeTaken: Double := 0;
+  var LReceiveCount: Integer := 0;
+  var LReceiveTimeTaken: Double := 0;
 
-      LHttpClient := TaLWinHttpClient.Create;
+  var LHttpClient := TaLWinHttpClient.Create;
+  try
+
+    with LHttpClient do begin
+      OnUploadProgress := OnHttpUploadProgress;
+      OnDownloadProgress := OnHttpDownloadProgress;
+      OnStatus := OnHttpStatus;
+      UserName := Form1.FHttpClientUserName;
+      Password := Form1.FHttpClientPassword;
+      ConnectTimeout := Form1.FHttpClientConnectTimeout;
+      SendTimeout := Form1.FHttpClientSendTimeout;
+      ReceiveTimeout := Form1.FHttpClientReceiveTimeout;
+      ProtocolVersion := Form1.FHttpClientProtocolVersion;
+      ProxyParams.ProxyServer := Form1.FHttpClientProxyServer;
+      ProxyParams.ProxyPort := Form1.FHttpClientProxyPort;
+      ProxyParams.ProxyUserName := Form1.FHttpClientProxyUserName;
+      ProxyParams.ProxyPassword := Form1.FHttpClientProxyPassword;
+      ProxyParams.ProxyBypass := Form1.FHttpClientProxyBypass;
+      AccessType := Form1.FHttpClientAccessType;
+      HttpOptions := Form1.FHttpClientHttpOptions;
+      RequestHeaders.RawHeaderText := Form1.FHttpClientRawHeaderText;
+    end;
+
+    for var I := 1 to FMaxHttpRequest do begin
       try
 
-        with LHttpClient do begin
-          OnDownloadProgress := OnHttpDownloadProgress;
-          OnStatus := OnHttpStatus;
-          UserName := Form1.HttpClientUserName;
-          Password := Form1.HttpClientPassword;
-          ConnectTimeout := Form1.HttpClientConnectTimeout;
-          SendTimeout := Form1.HttpClientSendTimeout;
-          ReceiveTimeout := Form1.HttpClientReceiveTimeout;
-          ProtocolVersion := Form1.HttpClientProtocolVersion;
-          UploadBufferSize := Form1.HttpClientUploadBufferSize;
-          ProxyParams.ProxyServer := Form1.HttpClientProxyServer;
-          ProxyParams.ProxyPort := Form1.HttpClientProxyPort;
-          ProxyParams.ProxyUserName := Form1.HttpClientProxyUserName;
-          ProxyParams.ProxyPassword := Form1.HttpClientProxyPassword;
-          ProxyParams.ProxyBypass := Form1.HttpClientProxyBypass;
-          AccessType := Form1.HttpClientAccessType;
-          InternetOptions := Form1.HttpClientInternetOptions;
-          RequestHeader.RawHeaderText := Form1.HttpClientRawHeaderText;
-        end;
-
-        LResponseContentStream:= TALStringStreamA.create('');
-        LResponseContentHeader := TALHTTPResponseHeader.Create;
+        if FUrls.Count = 0 then break;
+        LUrl := FUrls[AlRandom32(FUrls.Count)];
+        FBytesSent := 0;
+        FBytesRead := 0;
+        FDNSStopWatch := TStopWatch.Create;
+        FConnectStopWatch := TStopWatch.Create;
+        FSendStopWatch := TStopWatch.Create;
+        FWaitStopWatch := TStopWatch.Create;
+        FReceiveStopWatch := TStopWatch.Create;
+        var LHttpclientResponse: TALHttpClientResponseA;
+        if FBodyStream.Size > 0 then begin
+          FBytesSent := FBodyStream.Size;
+          LHttpclientResponse := LHttpClient.Post(LUrl, FBodyStream)
+        end
+        else LHttpclientResponse := LHttpClient.Get(LUrl);
         try
-          LHttpClient.Get(fUrl, LResponseContentStream, LResponseContentHeader);
-          LBody := TALStringStreamA(LResponseContentStream).datastring;
-          FRequestStatus := LResponseContentHeader.StatusCode;
+          LStatusCode := LHttpclientResponse.StatusCode;
+          if (LStatusCode >= 400) and FStopOnError then break;
+
+          inc(LRequestCount);
+          LTotalBytesSent := LTotalBytesSent + FBytesSent;
+          LTotalBytesRead := LTotalBytesRead + FBytesRead;
+          if FDNSStopWatch.Elapsed.TotalMilliseconds > 0 then begin
+            inc(LDNSCount);
+            LDNSTimeTaken := LDNSTimeTaken + FDNSStopWatch.Elapsed.TotalMilliseconds;
+          end;
+          if FConnectStopWatch.Elapsed.TotalMilliseconds > 0 then begin
+            inc(LConnectCount);
+            LConnectTimeTaken := LConnectTimeTaken + FConnectStopWatch.Elapsed.TotalMilliseconds;
+          end;
+          if FSendStopWatch.Elapsed.TotalMilliseconds > 0 then begin
+            inc(LSendCount);
+            LSendTimeTaken := LSendTimeTaken + FSendStopWatch.Elapsed.TotalMilliseconds;
+          end;
+          if FWaitStopWatch.Elapsed.TotalMilliseconds > 0 then begin
+            inc(LWaitCount);
+            LWaitTimeTaken := LWaitTimeTaken + FWaitStopWatch.Elapsed.TotalMilliseconds;
+          end;
+          if FReceiveStopWatch.Elapsed.TotalMilliseconds > 0 then begin
+            inc(LReceiveCount);
+            LReceiveTimeTaken := LReceiveTimeTaken + FReceiveStopWatch.Elapsed.TotalMilliseconds;
+          end;
+
+          If Form1.ButtonStart.tag = 0 then Break;
+
+          Form1.FHttpRequestMetrics[FIndex].RequestCount := LRequestCount;
+          Form1.FHttpRequestMetrics[FIndex].TotalBytesSent := LTotalBytesSent;
+          Form1.FHttpRequestMetrics[FIndex].TotalBytesRead := LTotalBytesRead;
+          Form1.FHttpRequestMetrics[FIndex].AverageDNSTimeTaken := LDNSTimeTaken / Max(1, LDNSCount);
+          Form1.FHttpRequestMetrics[FIndex].AverageConnectTimeTaken := LConnectTimeTaken / Max(1, LConnectCount);
+          Form1.FHttpRequestMetrics[FIndex].TotalSendTimeTaken := LSendTimeTaken;
+          Form1.FHttpRequestMetrics[FIndex].AverageSendTimeTaken := LSendTimeTaken / Max(1, LSendCount);
+          Form1.FHttpRequestMetrics[FIndex].AverageWaitTimeTaken := LWaitTimeTaken / Max(1, LWaitCount);
+          Form1.FHttpRequestMetrics[FIndex].totalReceiveTimeTaken := LReceiveTimeTaken;
+          Form1.FHttpRequestMetrics[FIndex].AverageReceiveTimeTaken := LReceiveTimeTaken / Max(1, LReceiveCount);
+
         finally
-          LResponseContentStream.free;
-          LResponseContentHeader.free;
+          AlFreeAndNil(LHttpclientResponse);
         end;
-
-        if DelayBetweenEachCall > 0 then sleep(DelayBetweenEachCall);
-
-        if dolikeaspider then begin
-          LLowerCaseBody := AlLowerCase(LBody);
-          LHostName := 'http://' + AlLowerCase(AlExtractHostNameFromUrl(fUrl));
-
-          P1 := ALPosA('href=''http://',LLowerCaseBody);
-          while P1 > 0 do begin
-            inc(p1,5);
-            P2 := ALPosA('''',LLowerCaseBody, P1 + 1);
-            if P2 > P1 then LtmpUrl := ALHTMLDecode(AlCopyStr(LBody, P1+1, P2 - P1 - 1))
-            else break;
-            if (ALPosA(LHostName, alLowerCase(LtmpUrl))=1) then LstUrl.Add(LtmpUrl);
-            P1 := ALPosA('href=''http://',LLowerCaseBody, P2+ 1);
-          end;
-
-          P1 := ALPosA('href="http://',LLowerCaseBody);
-          while P1 > 0 do begin
-            inc(p1,5);
-            P2 := ALPosA('"',LLowerCaseBody, P1 + 1);
-            if P2 > P1 then LtmpUrl := ALHTMLDecode(AlCopyStr(LBody, P1+1, P2 - P1 - 1))
-            else break;
-            if (ALPosA(LHostName, alLowerCase(LtmpUrl))=1) then LstUrl.Add(LtmpUrl);
-            P1 := ALPosA('href="http://',LLowerCaseBody, P2+ 1);
-          end;
-
-          P1 := ALPosA('href=''/',LLowerCaseBody);
-          while P1 > 0 do begin
-            inc(p1,5);
-            P2 := ALPosA('''',LLowerCaseBody, P1 + 1);
-            if P2 > P1+2 then LtmpUrl := LHostName + ALHTMLDecode(AlCopyStr(LBody, P1+1, P2 - P1 - 1))
-            else break;
-            if (ALPosA(LHostName, alLowerCase(LtmpUrl))=1) then LstUrl.Add(LtmpUrl);
-            P1 := ALPosA('href=''/',LLowerCaseBody, P2+ 1);
-          end;
-
-          P1 := ALPosA('href="/',LLowerCaseBody);
-          while P1 > 0 do begin
-            inc(p1,5);
-            P2 := ALPosA('"',LLowerCaseBody, P1 + 1);
-            if P2 > P1+2 then LtmpUrl := LHostName + ALHTMLDecode(AlCopyStr(LBody, P1+1, P2 - P1 - 1))
-            else break;
-            if (ALPosA(LHostName, alLowerCase(LtmpUrl))=1) then LstUrl.Add(LtmpUrl);
-            P1 := ALPosA('href="/',LLowerCaseBody, P2+ 1);
-          end;
-
+        if FDelayBetweenEachCall > 0 then sleep(FDelayBetweenEachCall);
+      Except
+        on e: Exception do begin
+          LStatusCode := 0;
+          if FStopOnError then Break;
         end;
-
-      finally
-        LHttpClient.free;
-      end;
-
-    Except
-      on e: Exception do begin
-        FRequestStatus := AnsiString(E.message);
-        if StopOnError then Exit;
       end;
     end;
 
-    if (fRequestStatus <> '200') then begin
-      FBytesRead := -1;
-      FDNSTimeTaken := -1;
-      FConnectTimeTaken := -1;
-      FSendTimeTaken := -1;
-      FWaitTimeTaken := -1;
-      FReceiveTimeTaken := -1;
-    end;
+    TThread.Synchronize(nil,
+      procedure
+      begin
+        Form1.FHttpRequestMetrics[FIndex].&On := False;
+        Form1.FHttpRequestMetrics[FIndex].Url := LUrl;
+        Form1.FHttpRequestMetrics[FIndex].RequestCount := LRequestCount;
+        Form1.FHttpRequestMetrics[FIndex].StatusCode := LStatusCode;
+        Form1.FHttpRequestMetrics[FIndex].TotalBytesSent := LTotalBytesSent;
+        Form1.FHttpRequestMetrics[FIndex].TotalBytesRead := LTotalBytesRead;
+        Form1.FHttpRequestMetrics[FIndex].AverageDNSTimeTaken := LDNSTimeTaken / Max(1, LDNSCount);
+        Form1.FHttpRequestMetrics[FIndex].AverageConnectTimeTaken := LConnectTimeTaken / Max(1, LConnectCount);
+        Form1.FHttpRequestMetrics[FIndex].TotalSendTimeTaken := LSendTimeTaken;
+        Form1.FHttpRequestMetrics[FIndex].AverageSendTimeTaken := LSendTimeTaken / Max(1, LSendCount);
+        Form1.FHttpRequestMetrics[FIndex].AverageWaitTimeTaken := LWaitTimeTaken / Max(1, LWaitCount);
+        Form1.FHttpRequestMetrics[FIndex].totalReceiveTimeTaken := LReceiveTimeTaken;
+        Form1.FHttpRequestMetrics[FIndex].AverageReceiveTimeTaken := LReceiveTimeTaken / Max(1, LReceiveCount);
+      end);
 
-    LVarContainer := TStressHttpThreadVarContainer.Create;
-    With LVarContainer do begin
-      On := True;
-      Rank := Self.Rank;
-      Url := fUrl;
-      RequestCount := fRequestCount;
-      RequestStatus := fRequestStatus;
-      BytesRead := fBytesRead;
-      DNSTimeTaken := fDNSTimeTaken;
-      ConnectTimeTaken := fConnectTimeTaken;
-      SendTimeTaken := fSendTimeTaken;
-      WaitTimeTaken := fWaitTimeTaken;
-      ReceiveTimeTaken := fReceiveTimeTaken;
-    end;
-    PostMessage(Form1.Handle,WM_UpdateGUI, Integer(LVarContainer), 0);
-    If Form1.ButtonStart.tag = 0 then Break;
+  finally
+    ALFreeAndNil(LHttpClient);
   end;
 
 end;
 
-{****************************************************************************************}
-procedure TStressHttpThread.OnHttpDownloadProgress(sender: Tobject; Read, Total: Integer);
+{*****************************************************************************************}
+procedure TWorkerThread.OnHttpDownloadProgress(sender: Tobject; Read: Int64; Total: Int64);
 begin
   FBytesRead := Read;
+  if FSimulateSlowClient > 0 then begin
+    // How long we *should* have spent to read `Read` bytes at TARGET_BPS
+    var LTargetS := Read / (FSimulateSlowClient * 1000);
+
+    // How long we've actually spent so far
+    var LActualS := FReceiveStopWatch.Elapsed.TotalSeconds;
+
+    // If we're ahead of schedule, pause to let time catch up
+    if LTargetS > LActualS then begin
+      var LBehindMs := (LTargetS - LActualS) * 1000.0;
+
+      // Avoid very long sleeps in a single callback; let subsequent callbacks refine it
+      if LBehindMs > 250 then LBehindMs := 250;
+
+      var LSleepMs := Ceil(LBehindMs);
+      if LSleepMs > 0 then Sleep(LSleepMs);
+    end;
+  end;
 end;
 
-{***************************************}
-procedure TStressHttpThread.OnHttpStatus(
+{***************************************************************************************}
+procedure TWorkerThread.OnHttpUploadProgress(Sender: Tobject; Sent: Int64; Total: Int64);
+begin
+  FBytesSent := Sent;
+  if FSimulateSlowClient > 0 then begin
+    // How long we *should* have spent to send `Sent` bytes at TARGET_BPS
+    var LTargetS := Sent / (FSimulateSlowClient * 1000);
+
+    // How long we've actually spent so far
+    var LActualS := FSendStopWatch.Elapsed.TotalSeconds;
+
+    // If we're ahead of schedule, pause to let time catch up
+    if LTargetS > LActualS then begin
+      var LBehindMs := (LTargetS - LActualS) * 1000.0;
+
+      // Avoid very long sleeps in a single callback; let subsequent callbacks refine it
+      if LBehindMs > 250 then LBehindMs := 250;
+
+      var LSleepMs := Ceil(LBehindMs);
+      if LSleepMs > 0 then Sleep(LSleepMs);
+    end;
+  end;
+end;
+
+{***********************************}
+procedure TWorkerThread.OnHttpStatus(
             sender: Tobject;
             InternetStatus: DWord;
             StatusInformation: Pointer;
             StatusInformationLength: DWord);
 begin
-  if InternetStatus = WINHTTP_CALLBACK_STATUS_RESOLVING_NAME then FHttpStatusStartTime := GettickCount64
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_NAME_RESOLVED then begin
-    FDNSTimeTaken := GettickCount64 - FHttpStatusStartTime;
-    FHttpStatusStartTime := GettickCount64;
-  end
+       if InternetStatus = WINHTTP_CALLBACK_STATUS_RESOLVING_NAME then FDNSStopWatch.Start
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_NAME_RESOLVED then FDNSStopWatch.Stop
 
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_CONNECTING_TO_SERVER then FHttpStatusStartTime := GettickCount64
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_CONNECTED_TO_SERVER then begin
-    FConnectTimeTaken := GettickCount64 - FHttpStatusStartTime;
-    FHttpStatusStartTime := GettickCount64;
-  end
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_CONNECTING_TO_SERVER then FConnectStopWatch.Start
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_CONNECTED_TO_SERVER then FConnectStopWatch.Stop
 
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_SENDING_REQUEST then FHttpStatusStartTime := GettickCount64
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_REQUEST_SENT then begin
-    FSendTimeTaken := GettickCount64 - FHttpStatusStartTime;
-    FHttpStatusStartTime := GettickCount64;
-  end
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_SENDING_REQUEST then FSendStopWatch.Start
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_REQUEST_SENT then FSendStopWatch.Stop
 
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_RECEIVING_RESPONSE then FHttpStatusStartTime := GettickCount64
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_RECEIVING_RESPONSE then FWaitStopWatch.Start
   else if InternetStatus = WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED then begin
-    FWaitTimeTaken := GettickCount64 - FHttpStatusStartTime;
-    FHttpStatusStartTime := GettickCount64;
+    FWaitStopWatch.Stop;
+    FReceiveStopWatch.Start;
   end
 
-  else if InternetStatus = WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING then FReceiveTimeTaken := GettickCount64 - FHttpStatusStartTime;
+  else if InternetStatus = WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING then FReceiveStopWatch.Stop;
 end;
 
-{*******************************************}
-procedure TForm1.FormCreate(Sender: TObject);
-begin
-  NBActiveThread := 0;
-end;
-
+{************}
 initialization
   {$IFDEF DEBUG}
   ReportMemoryleaksOnSHutdown := True;

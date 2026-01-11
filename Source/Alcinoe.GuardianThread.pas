@@ -1,14 +1,14 @@
 unit Alcinoe.GuardianThread;
 
-{$I Alcinoe.inc}
-
 interface
+
+{$I Alcinoe.inc}
 
 uses
   system.classes,
   system.SyncObjs,
   system.Generics.Collections,
-  ALcinoe.fmx.Common;
+  Alcinoe.FMX.Common;
 
 type
 
@@ -105,9 +105,9 @@ uses
   Fmx.Types3D,
   Fmx.Graphics,
   Alcinoe.Common,
-  Alcinoe.fmx.Controls,
-  ALcinoe.fmx.Graphics,
-  Alcinoe.FMX.DynamicListBox;
+  Alcinoe.FMX.Controls,
+  Alcinoe.FMX.Graphics,
+  Alcinoe.FMX.Dynamic.Controls;
 
 {***********************************}
 constructor TALRefCountObject.Create;
@@ -125,13 +125,13 @@ begin
   inherited;
 end;
 
-{***********************************}
+{**********************************************}
 function TALRefCountObject.GetRefCount: Integer;
 begin
   Result := AtomicCmpExchange(FRefCount, -1{NewValue}, -1{Comparand});
 end;
 
-{***********************************}
+{*************************************************************}
 function TALRefCountObject.IncreaseRefCount: TALRefCountObject;
 begin
   // When calling IncreaseRefCount, it means that we already have
@@ -140,7 +140,7 @@ begin
   Result := Self;
 end;
 
-{***********************************}
+{*******************************************}
 procedure TALRefCountObject.DecreaseRefCount;
 begin
   AtomicDecrement(FRefCount);
@@ -177,6 +177,7 @@ end;
 destructor TALGuardianThread.Destroy;
 begin
   Terminate;
+  If Suspended then start;
   FSignal.setevent;
   WaitFor;
   ALfreeandNil(FSignal);
@@ -307,19 +308,38 @@ end;
 
 {**************************************}
 procedure TALGuardianThread.FreeObjects;
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  procedure _FreeInMainThread(const AObj: Tobject);
+  begin
+    TThread.Queue(nil,
+      procedure
+      begin
+        Try
+          AObj.free;
+        except
+          on e: Exception do begin
+            // Object could not be freed. Logging the
+            // exception and continuing execution.
+            ALLog('TALGuardianThread.FreeObjects._FreeInMainThread', E)
+          end;
+        end;
+      end);
+  end;
+
 begin
 
   // Temporary list to store objects to be freed
   var LFreeObjectsWorkList: TObjectList<Tobject>;
 
   // Swap the current list with an empty list to process the objects safely
-  TMonitor.Enter(FFreeObjectsLock);
+  ALMonitorEnter(FFreeObjectsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeObjects'{$ENDIF});
   try
     LFreeObjectsWorkList := FFreeObjectsCurrList;
     fFreeObjectsCurrList := fFreeObjectsEmptyList;
     fFreeObjectsEmptyList := LFreeObjectsWorkList;
   finally
-    TMonitor.Exit(FFreeObjectsLock);
+    ALMonitorExit(FFreeObjectsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeObjects'{$ENDIF});
   end;
 
   // Iterate through the objects in reverse order and free them
@@ -331,55 +351,40 @@ begin
 
       var LObj := LFreeObjectsWorkList[I];
       LFreeObjectsWorkList.delete(I);
-      if LObj is TComponent then begin
-        tthread.Queue(nil,
-          procedure
-          begin
-            Try
-              // Unfortunately, TFmxObject.BeforeDestruction is not thread-safe
-              // because it sends notifications to linked controls.
-              //
-              //procedure TFmxObject.BeforeDestruction;
-              //var
-              //  I: Integer;
-              //  L2: TList<Pointer>;
-              //begin
-              //  { NotifyList }
-              //  if FNotifyList <> nil then
-              //  begin
-              //    ...
-              //    IFreeNotification(L2[I]).FreeNotification(Self);
-              //    ...
-              //  end;
-              //  inherited;
-              //end;
-              //
-              // Additionally, TControl.Destroy is also not thread-safe
-              // as it accesses the global variable TStyleCache.Current
-              // without any synchronization mechanism.
-              //
-              //destructor TControl.Destroy;
-              //begin
-              // ...
-              //  if TStyleCache.Initialized then
-              //    TStyleCache.Current.Remove(Self);
-              // ...
-              //end;
-              //
-              // Due to these limitations, we must ensure that components
-              // are freed in the main thread.
-              AlFreeAndNil(LObj);
-            except
-              on e: Exception do begin
-                // Object could not be freed. Logging the
-                // exception and continuing execution.
-                ALLog('TALGuardianThread.FreeObjects.Queue', E)
-              end;
-            end;
-          end);
-      end
-      else
-        AlFreeAndNil(LObj);
+      // Unfortunately, TFmxObject.BeforeDestruction is not thread-safe
+      // because it sends notifications to linked controls.
+      //
+      //procedure TFmxObject.BeforeDestruction;
+      //var
+      //  I: Integer;
+      //  L2: TList<Pointer>;
+      //begin
+      //  { NotifyList }
+      //  if FNotifyList <> nil then
+      //  begin
+      //    ...
+      //    IFreeNotification(L2[I]).FreeNotification(Self);
+      //    ...
+      //  end;
+      //  inherited;
+      //end;
+      //
+      // Additionally, TControl.Destroy is also not thread-safe
+      // as it accesses the global variable TStyleCache.Current
+      // without any synchronization mechanism.
+      //
+      //destructor TControl.Destroy;
+      //begin
+      // ...
+      //  if TStyleCache.Initialized then
+      //    TStyleCache.Current.Remove(Self);
+      // ...
+      //end;
+      //
+      // Due to these limitations, we must ensure that components
+      // are freed in the main thread.
+      if LObj is TComponent then _FreeInMainThread(LObj)
+      else LObj.free;
 
     except
       on e: Exception do begin
@@ -405,13 +410,13 @@ begin
       if assigned(TComponent(aObject).Owner) then TComponent(aObject).Owner.RemoveComponent(TComponent(aObject));
       If aObject is TALControl then aObject.BeforeDestruction;
     end
-    else if (aObject is TALDynamicListBoxControl) then begin
+    else if (aObject is TALDynamicControl) then begin
       aObject.BeforeDestruction;
-      TALDynamicListBoxControl(aObject).OwnerControl := nil;
+      TALDynamicControl(aObject).Owner := nil;
     end;
 
     // Add the object to the queue
-    TMonitor.Enter(FFreeObjectsLock);
+    ALMonitorEnter(FFreeObjectsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeObject'{$ENDIF});
     try
       fFreeObjectsCurrList.Add(aObject);
       {$IFDEF DEBUG}
@@ -419,7 +424,7 @@ begin
       {$ENDIF}
       aObject := nil;
     finally
-      TMonitor.exit(FFreeObjectsLock);
+      ALMonitorExit(FFreeObjectsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeObject'{$ENDIF});
     end;
 
     // Signal the event
@@ -428,7 +433,7 @@ begin
   end;
 end;
 
-{**************************************}
+{****************************************}
 procedure TALGuardianThread.FreeDrawables;
 begin
 
@@ -436,13 +441,13 @@ begin
   var LFreeDrawablesWorkList: TList<TALDrawable>;
 
   // Swap the current list with an empty list to process the drawables safely
-  TMonitor.Enter(FFreeDrawablesLock);
+  ALMonitorEnter(FFreeDrawablesLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeDrawables'{$ENDIF});
   try
     LFreeDrawablesWorkList := FFreeDrawablesCurrList;
     fFreeDrawablesCurrList := fFreeDrawablesEmptyList;
     fFreeDrawablesEmptyList := LFreeDrawablesWorkList;
   finally
-    TMonitor.Exit(FFreeDrawablesLock);
+    ALMonitorExit(FFreeDrawablesLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeDrawables'{$ENDIF});
   end;
 
   // Iterate through the drawables in reverse order and free them
@@ -468,19 +473,19 @@ begin
 
 end;
 
-{***********************************************************}
+{*******************************************************************}
 procedure TALGuardianThread.FreeDrawable(var aDrawable: TALDrawable);
 begin
   if terminated then ALFreeAndNilDrawable(aDrawable)
   else begin
 
     // Add the drawable to the queue
-    TMonitor.Enter(FFreeDrawablesLock);
+    ALMonitorEnter(FFreeDrawablesLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeDrawable'{$ENDIF});
     try
       fFreeDrawablesCurrList.Add(aDrawable);
       aDrawable := ALNullDrawable;
     finally
-      TMonitor.exit(FFreeDrawablesLock);
+      ALMonitorExit(FFreeDrawablesLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeDrawable'{$ENDIF});
     end;
 
     // Signal the event
@@ -497,13 +502,13 @@ begin
   var LFreeBitmapsWorkList: TList<TALBitmap>;
 
   // Swap the current list with an empty list to process the bitmaps safely
-  TMonitor.Enter(FFreeBitmapsLock);
+  ALMonitorEnter(FFreeBitmapsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeBitmaps'{$ENDIF});
   try
     LFreeBitmapsWorkList := FFreeBitmapsCurrList;
     fFreeBitmapsCurrList := fFreeBitmapsEmptyList;
     fFreeBitmapsEmptyList := LFreeBitmapsWorkList;
   finally
-    TMonitor.Exit(FFreeBitmapsLock);
+    ALMonitorExit(FFreeBitmapsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeBitmaps'{$ENDIF});
   end;
 
   // Iterate through the bitmaps in reverse order and free them
@@ -529,19 +534,19 @@ begin
 
 end;
 
-{***********************************************************}
+{*************************************************************}
 procedure TALGuardianThread.FreeBitmap(var aBitmap: TALBitmap);
 begin
   if terminated then ALFreeAndNilBitmap(aBitmap)
   else begin
 
     // Add the bitmap to the queue
-    TMonitor.Enter(FFreeBitmapsLock);
+    ALMonitorEnter(FFreeBitmapsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeBitmap'{$ENDIF});
     try
       fFreeBitmapsCurrList.Add(aBitmap);
       aBitmap := ALNullBitmap;
     finally
-      TMonitor.exit(FFreeBitmapsLock);
+      ALMonitorExit(FFreeBitmapsLock{$IF defined(DEBUG)}, 'TALGuardianThread.FreeBitmap'{$ENDIF});
     end;
 
     // Signal the event
@@ -553,7 +558,7 @@ end;
 {***************************************************}
 procedure TALGuardianThread.PurgeRefCountObjectsList;
 begin
-  TMonitor.Enter(FRefCountObjectsList);
+  ALMonitorEnter(FRefCountObjectsList{$IF defined(DEBUG)}, 'TALGuardianThread.PurgeRefCountObjectsList'{$ENDIF});
   try
     For var I := FRefCountObjectsList.Count - 1 downto 0 do
       if FRefCountObjectsList[I].GetRefCount <= 0 then begin
@@ -561,18 +566,18 @@ begin
         FreeObject(LRefCountObject);
       end;
   finally
-    TMonitor.exit(FRefCountObjectsList);
+    ALMonitorExit(FRefCountObjectsList{$IF defined(DEBUG)}, 'TALGuardianThread.PurgeRefCountObjectsList'{$ENDIF});
   end;
 end;
 
-{*****************************************************************}
+{**************************************************************************************}
 procedure TALGuardianThread.AddRefCountObject(const ARefCountObject: TALRefCountObject);
 begin
-  TMonitor.Enter(FRefCountObjectsList);
+  ALMonitorEnter(FRefCountObjectsList{$IF defined(DEBUG)}, 'TALGuardianThread.AddRefCountObject'{$ENDIF});
   try
     fRefCountObjectsList.Add(ARefCountObject);
   finally
-    TMonitor.exit(FRefCountObjectsList);
+    ALMonitorExit(FRefCountObjectsList{$IF defined(DEBUG)}, 'TALGuardianThread.AddRefCountObject'{$ENDIF});
   end;
 end;
 
@@ -585,10 +590,16 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.GuardianThread','initialization');
+  {$ENDIF}
   TALGuardianThread.FInstance := nil;
   TALGuardianThread.CreateInstanceFunc := @TALGuardianThread.CreateInstance;
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.GuardianThread','finalization');
+  {$ENDIF}
   if TALGuardianThread.HasInstance then begin
     ALCustomDelayedFreeObjectProc := nil;
     ALCustomDelayedFreeDrawableProc := nil;

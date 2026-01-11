@@ -2,6 +2,8 @@ unit Alcinoe.Execute;
 
 interface
 
+{$I Alcinoe.inc}
+
 uses
   winapi.windows,
   system.classes;
@@ -95,7 +97,7 @@ uses
   winapi.messages,
   winapi.winsvc,
   System.Diagnostics,
-  Alcinoe.WinApi.Common,
+  Alcinoe.WinApi.Windows,
   Alcinoe.Common;
 
 {*******************************************}

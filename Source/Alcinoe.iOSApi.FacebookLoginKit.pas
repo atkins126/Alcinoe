@@ -1,5 +1,5 @@
 //
-// Made from Facebook SDK version 15.1.0
+// Made from Facebook SDK version 18.0.0
 //
 unit Alcinoe.iOSApi.FacebookLoginKit;
 
@@ -7,7 +7,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   //Pleast update <Alcinoe>\Libraries\ios\facebook\ to the last one and then run
   //<Alcinoe>\Tools\NativeBridgeFileGenerator\NativeBridgeFileGeneratorIOS.bat
   //and gave the path to <Alcinoe>\Source\Alcinoe.iOSApi.FacebookLoginKit.pas to build

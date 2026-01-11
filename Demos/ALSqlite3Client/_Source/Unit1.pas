@@ -51,7 +51,8 @@ uses
   Alcinoe.StringList,
   Alcinoe.HTML,
   Alcinoe.XMLDoc,
-  Alcinoe.WinApi.Common,
+  Alcinoe.WinApi.Windows,
+  Alcinoe.Localization,
   Alcinoe.StringUtils;
 
 {$R *.dfm}

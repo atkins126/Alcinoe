@@ -83,6 +83,8 @@ unit Alcinoe.MongoDB.Client;
 
 interface
 
+{$I Alcinoe.inc}
+
 uses
   winapi.WinSock2,
   system.Contnrs,
@@ -997,7 +999,7 @@ uses
   System.math,
   Alcinoe.Cipher,
   Alcinoe.WinSock,
-  Alcinoe.WinApi.Common,
+  Alcinoe.WinApi.Windows,
   Alcinoe.StringUtils;
 
 {***************************************************************************************************************************************}
@@ -5609,6 +5611,7 @@ end;
 destructor TAlMongoDBTailMonitoringThread.Destroy;
 begin
   Terminate;
+  If Suspended then start;
   fMongoDBClient.StopTailMonitoring := True;
   WaitFor;
   fMongoDBClient.Free;
@@ -5630,8 +5633,6 @@ end;
 {***********************************************}
 procedure TAlMongoDBTailMonitoringThread.Execute;
 begin
-
-  //loop still not terminated
   while not Terminated do begin
     Try
 

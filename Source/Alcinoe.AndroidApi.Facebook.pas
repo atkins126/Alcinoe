@@ -1,5 +1,5 @@
 //
-// Made from Facebook SDK version 15.2.0
+// Made from Facebook SDK version 18.0.3
 //
 unit Alcinoe.AndroidApi.Facebook;
 
@@ -7,7 +7,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   //Please run <Alcinoe>\Tools\NativeBridgeFileGenerator\NativeBridgeFileGeneratorAndroid.bat
   //with the library identifiers com.facebook.android:facebook-android-sdk:xx.xx.xx where xx.xx.xx
   //is the last version of the facebook-android-sdk (You can find this version at
@@ -24,8 +24,7 @@ uses
   Androidapi.JNI.JavaTypes,
   Androidapi.JNI.Os,
   Androidapi.JNI.Net,
-  Androidapi.JNI.App,
-  Alcinoe.AndroidApi.Common;
+  Androidapi.JNI.App;
 
 type
 
@@ -235,6 +234,9 @@ type
 
 implementation
 
+uses
+  Alcinoe.Common;
+
 {**********************}
 procedure RegisterTypes;
 begin
@@ -256,6 +258,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.AndroidApi.Facebook','initialization');
+  {$ENDIF}
   RegisterTypes;
 
 end.

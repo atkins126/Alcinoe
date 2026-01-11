@@ -14,65 +14,53 @@ uses
   FMX.Skia,
   {$ENDIF}
   {$IFDEF MSWINDOWS}
-    {$IFDEF TESTINSIGHT}
-    TestInsight.DUnitX,
-    {$ELSE}
-    DUnitX.Loggers.Console,
-    DUnitX.Loggers.Xml.NUnit,
-    {$ENDIF}
-    DUnitX.TestFramework,
+  {$IFDEF TESTINSIGHT}
+  TestInsight.DUnitX,
+  {$ELSE}
+  DUnitX.Loggers.Console,
+  DUnitX.Loggers.Xml.NUnit,
   {$ENDIF}
-  //---------------------
-  //include all units to be sure
-  //that everything compile well
+  DUnitX.TestFramework,
+  {$ENDIF}
   {$IFDEF MSWINDOWS}
-  Alcinoe.CGI,
   Alcinoe.Execute,
   Alcinoe.FMX.NativeView.Win,
   Alcinoe.FMX.Trayicon,
-  Alcinoe.FTP.Client,
-  Alcinoe.FTP.Client.WinINet,
-  Alcinoe.GSMComm,
   Alcinoe.HTTP.Client.WinHTTP,
-  Alcinoe.HTTP.Client.WinINet,
+  Alcinoe.HTTP.Server.HttpSys,
   Alcinoe.ImageMagick,
   Alcinoe.IniFiles,
-  Alcinoe.IsapiHTTP,
-  Alcinoe.LibPhoneNumber,
   Alcinoe.MemCached.Client,
   Alcinoe.MongoDB.Client,
-  Alcinoe.MySql.Client,
-  Alcinoe.MySql.Wrapper,
-  Alcinoe.NNTP.Client,
   Alcinoe.POP3.Client,
-  Alcinoe.PhpRunner,
   Alcinoe.SMTP.Client,
-  Alcinoe.SphinxQL.Client,
   Alcinoe.Sqlite3.Client,
   Alcinoe.Sqlite3.Wrapper,
   //Alcinoe.TbbMM,
-  Alcinoe.WebSocket.Client.WinHTTP,
-  Alcinoe.WinApi.Common,
+  Alcinoe.WinApi.Windows,
+  Alcinoe.WinApi.HttpApi,
   Alcinoe.WinSock,
-  Alcinoe.ZLibEx,
-  Alcinoe.ZLibExGZ,
-  ZLibEx,
-  ZLibExApi,
-  ZLibExGZ,
   {$ENDIF}
   {$IFDEF ANDROID}
   Alcinoe.AndroidApi.AndroidX,
-  Alcinoe.AndroidApi.BillingClient,
-  Alcinoe.AndroidApi.Common,
   Alcinoe.AndroidApi.AndroidX.Media3,
+  Alcinoe.AndroidApi.App,
+  Alcinoe.AndroidApi.AppCompat,
+  Alcinoe.AndroidApi.BillingClient,
+  Alcinoe.AndroidApi.Crypto,
   Alcinoe.AndroidApi.Facebook,
-  Alcinoe.AndroidApi.Firebase,
+  Alcinoe.AndroidApi.Firebase.Analytics,
+  Alcinoe.AndroidApi.Firebase.Messaging,
   Alcinoe.AndroidApi.Google,
   Alcinoe.AndroidApi.InstallReferrer,
+  Alcinoe.AndroidApi.JavaTypes,
+  Alcinoe.AndroidApi.Os,
+  Alcinoe.AndroidApi.RenderScript,
+  Alcinoe.AndroidApi.Security,
   Alcinoe.AndroidApi.VKontakte,
-  Alcinoe.AndroidApi.WebRTC,
-  Alcinoe.Androidapi.JNI.App,
-  Alcinoe.Androidapi.JNI.GraphicsContentViewText,
+  Alcinoe.AndroidApi.WebKit,
+  Alcinoe.AndroidApi.Widget,
+  Alcinoe.Androidapi.GraphicsContentViewText,
   Alcinoe.FMX.NativeView.Android,
   {$ENDIF}
   {$IFDEF iOS}
@@ -88,46 +76,25 @@ uses
   Alcinoe.iOSApi.FirebaseMessaging,
   Alcinoe.iOSApi.MessageUI,
   Alcinoe.iOSApi.Photos,
-  Alcinoe.iOSapi.ImageIO,
-  Alcinoe.iOSapi.Foundation,
-  Alcinoe.iOSapi.AVFoundation,
-  Alcinoe.iOSapi.CoreImage,
-  Alcinoe.iOSapi.CoreLocation,
-  Alcinoe.iOSapi.CoreText,
-  Alcinoe.iOSapi.CoreVideo,
-  Alcinoe.iOSapi.UIKit,
+  Alcinoe.iOSapi.PhotosUI,
   {$IFNDEF IOSSIMULATOR}
-  //[DCC Error] E2597 ld: building for iOS Simulator, but linking in dylib built for iOS, for architecture arm64
-  //https://stackoverflow.com/questions/63607158/xcode-building-for-ios-simulator-but-linking-in-an-object-file-built-for-ios-f
-  {$IFNDEF ALCompilerVersionSupported123}
-    {$MESSAGE WARN 'Check if a new version of VKontakte/WebRTC are available with a support for IOSSIMULATOR and adjust the IFDEF'}
-  {$ENDIF}
   Alcinoe.iOSApi.VKontakte,
-  Alcinoe.iOSApi.WebRTC,
   {$ENDIF}
+  Alcinoe.iOSapi.CoreFoundation,
+  Alcinoe.iOSapi.CoreVideo,
   {$ENDIF}
   {$IFNDEF IOSSIMULATOR}
-  //[DCC Error] E2597 ld: building for iOS Simulator, but linking in dylib built for iOS, for architecture arm64
-  //https://stackoverflow.com/questions/63607158/xcode-building-for-ios-simulator-but-linking-in-an-object-file-built-for-ios-f
-  {$IFNDEF ALCompilerVersionSupported123}
-    {$MESSAGE WARN 'Check if a new version of VKontakte/WebRTC are available with a support for IOSSIMULATOR and adjust the IFDEF'}
-  {$ENDIF}
   Alcinoe.FMX.VKontakte,
-  Alcinoe.FMX.WebRTC,
   {$ENDIF}
   {$IFDEF ALMacOS}
   Alcinoe.Macapi.AppKit,
-  Alcinoe.Macapi.CoreText,
-  Alcinoe.Macapi.Foundation,
   Alcinoe.Macapi.QuartzCore,
   Alcinoe.FMX.NativeView.Mac,
   {$ENDIF}
-  Alcinoe.ExprEval,
   Alcinoe.InternetMessages,
-  Alcinoe.Mime,
-  Alcinoe.MultiPartParser,
+  Alcinoe.Mime.ContentTypes,
+  Alcinoe.Mime.Multipart,
   Alcinoe.RTTI,
-  Alcinoe.WebSocket.Client,
   Alcinoe.Cipher,
   //Alcinoe.CodeProfiler,
   Alcinoe.Common,
@@ -137,10 +104,18 @@ uses
   Alcinoe.FMX.Common,
   Alcinoe.FMX.Confetti,
   Alcinoe.FMX.Controls,
-  Alcinoe.FMX.CustomThemes,
+  Alcinoe.FMX.CustomStyles,
   Alcinoe.FMX.DatePickerDialog,
   //Alcinoe.FMX.DesignEditors,
-  Alcinoe.FMX.DynamicListBox,
+  Alcinoe.FMX.Dialogs,
+  Alcinoe.FMX.Dynamic.Common,
+  Alcinoe.FMX.Dynamic.Controls,
+  Alcinoe.FMX.Dynamic.Layouts,
+  Alcinoe.FMX.Dynamic.ListBox,
+  Alcinoe.FMX.Dynamic.Objects,
+  Alcinoe.FMX.Dynamic.PageController,
+  Alcinoe.FMX.Dynamic.StdCtrls,
+  Alcinoe.FMX.Dynamic.VideoPlayer,
   Alcinoe.FMX.Edit,
   Alcinoe.FMX.ErrorReporting,
   Alcinoe.FMX.Facebook.Core,
@@ -149,39 +124,56 @@ uses
   Alcinoe.FMX.FilterEffects,
   Alcinoe.FMX.Firebase.Core,
   Alcinoe.FMX.Firebase.Messaging,
+  Alcinoe.FMX.Forms,
   Alcinoe.FMX.Graphics,
   Alcinoe.FMX.ScrollEngine,
   Alcinoe.FMX.Layouts,
+  Alcinoe.FMX.LoadingOverlay,
   Alcinoe.FMX.Materials.Canvas,
-  Alcinoe.FMX.GeoPosition.Sensor,
+  Alcinoe.FMX.MediaPicker,
+  Alcinoe.FMX.GeoLocation.Sensor,
   Alcinoe.FMX.Memo,
+  Alcinoe.FMX.NativeControl,
   Alcinoe.FMX.NotificationService,
   Alcinoe.FMX.Objects,
   Alcinoe.FMX.StdCtrls,
-  Alcinoe.FMX.TabControl,
-  Alcinoe.FMX.Themes,
+  Alcinoe.FMX.PageController,
+  Alcinoe.FMX.Sheets,
+  Alcinoe.FMX.Snackbar,
+  Alcinoe.FMX.Styles,
   Alcinoe.FMX.Types3D,
+  Alcinoe.FMX.UserPreferences,
   Alcinoe.FMX.VideoPlayer,
+  Alcinoe.FMX.WebBrowser,
   Alcinoe.Files,
   Alcinoe.GuardianThread,
   Alcinoe.HTML,
+  Alcinoe.HTTP,
   Alcinoe.HTTP.Client,
   Alcinoe.HTTP.Client.Net,
   Alcinoe.HTTP.Client.Net.Pool,
+  Alcinoe.HTTP.Server,
+  Alcinoe.HTTP.Worker,
+  Alcinoe.BroadcastReceiver,
   Alcinoe.JSONDoc,
-  Alcinoe.QuickSortList,
+  Alcinoe.Localization,
+  Alcinoe.Net,
   Alcinoe.StringList,
   Alcinoe.StringUtils,
+  Alcinoe.Url,
   Alcinoe.XMLDoc,
   Grijjy.ErrorReporting,
   Grijjy.SymbolTranslator,
-  //---------------------
   {$IFDEF MSWINDOWS}
-  ALDUnitXTestStrings in 'ALDUnitXTestStrings.pas',
+  ALDUnitXTestStringUtils in 'ALDUnitXTestStringUtils.pas',
   ALDUnitXTestCipher in 'ALDUnitXTestCipher.pas',
-  ALDUnitXTestRtti in 'ALDUnitXTestRtti.pas',
+  ALDUnitXTestHtml in 'ALDUnitXTestHtml.pas',
   {$ENDIF}
-  System.SysUtils;
+  System.SysUtils,
+  ALDUnitXTestHttp in 'ALDUnitXTestHttp.pas',
+  ALDUnitXTestXmlDoc in 'ALDUnitXTestXmlDoc.pas',
+  ALDUnitXTestNet in 'ALDUnitXTestNet.pas',
+  ALDUnitXTestUrl in 'ALDUnitXTestUrl.pas';
 
 {$IFDEF MSWINDOWS}
   {$IFNDEF TESTINSIGHT}
@@ -230,6 +222,16 @@ begin
       //Generate an NUnit compatible XML File
       nunitLogger := TDUnitXXMLNUnitFileLogger.Create(TDUnitX.Options.XMLOutputFile);
       runner.AddLogger(nunitLogger);
+
+      // When the test executable is started under the Delphi debugger,
+      // DebugHook is non-zero. In that case we enable the Pause exit behavior
+      // so the console window stays open and the results remain visible.
+      {$IF defined(WIN32) or defined(WIN64)}
+      {$WARN SYMBOL_PLATFORM OFF}
+      if DebugHook <> 0 then
+        TDUnitX.Options.ExitBehavior := TDUnitXExitBehavior.Pause;
+      {$WARN SYMBOL_PLATFORM ON}
+      {$ENDIF}
 
       //Run tests
       results := runner.Execute;

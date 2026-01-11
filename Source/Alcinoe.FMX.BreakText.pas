@@ -5,10 +5,15 @@ interface
 {$I Alcinoe.inc}
 
 uses
+  {$IF defined(MSWINDOWS)}
+  Winapi.Windows,
+  {$ENDIF}
+  System.Classes,
   System.UITypes,
   System.Types,
   Fmx.types,
   FMX.graphics,
+  Alcinoe.fmx.Controls,
   Alcinoe.FMX.Common,
   Alcinoe.FMX.Graphics;
 
@@ -68,15 +73,20 @@ type
     EllipsisDecorationThicknessMultiplier: Single; // default = 1
     EllipsisDecorationColor: TAlphaColor; // default = TAlphaColors.Null
     //--
-    AutoSize: Boolean; // default = True
-    AutoSizeX: Boolean; // default = False
-    AutoSizeY: Boolean; // default = False
+    AutoSize: TALAutoSizeMode; // default = TALAutoSizeMode.Both
     MaxLines: integer; // default = 65535
-    // When LineHeightMultiplier = 0 the line height will be the sum of the font ascent + font descent + font leading.
-    // When LineHeightMultiplier is non-null, the line height of the span of text will be a multiple of fontSize and be exactly fontSize * height logical pixels tall
+    /// <summary>
+    ///   When LineHeightMultiplier = 0:
+    ///     - If ALDefaultEstimateLineHeightMultiplier is nil (default),
+    ///       the line height is calculated as fontAscent + fontDescent + fontLeading.
+    ///     - If ALDefaultEstimateLineHeightMultiplier is assigned,
+    ///       the line height is determined by calling that function.
+    ///
+    ///   When LineHeightMultiplier <> 0:
+    ///     The line height is set to (fontSize * LineHeightMultiplier) logical pixels.
+    /// </summary>
     LineHeightMultiplier: single; // default = 0
     LetterSpacing: Single; // default = 0
-    Trimming: TALTextTrimming; // default = TALTextTrimming.Word
     FailIfTextBroken: boolean; // default = false
     //--
     Direction: TALTextDirection; // default = TALTextDirection.LeftToRight
@@ -89,20 +99,21 @@ type
     FillGradientColors: TArray<TAlphaColor>; // Default = [];
     FillGradientOffsets: TArray<Single>; // Default = [];
     FillResourceName: String; // default = ''
+    FillResourceStream: TStream; // default = nil
     FillMaskResourceName: String; // default = ''
-    FillMaskBitmap: TALBitmap; // default = ALNullBitmap
     FillBackgroundMargins: TRectF; // default = TRectF.Empty
     FillImageMargins: TRectF; // default = TRectF.Empty
     FillImageNoRadius: Boolean; // default = False
+    FillImageTintColor: TAlphaColor; // default = TAlphaColors.null
     FillWrapMode: TALImageWrapMode; // default = TALImageWrapMode.Fit
-    FillCropCenter: TpointF; // default = TPointF.create(-50,-50)
+    FillCropCenter: TpointF; // default = TPointF.create(0.5,0.5)
     FillBlurRadius: single; // default = 0
     //--
     StateLayerOpacity: Single; // default = 0
     StateLayerColor: TAlphaColor; // default = TAlphaColors.null
     StateLayerMargins: TRectF; // default = TRectF.Empty
-    StateLayerXRadius: Single; // default = 0
-    StateLayerYRadius: Single; // default = 0
+    StateLayerXRadius: Single; // default = NaN
+    StateLayerYRadius: Single; // default = NaN
     //--
     StrokeColor: TalphaColor; // default = TAlphaColors.null
     StrokeThickness: Single; // default = 1
@@ -122,10 +133,10 @@ type
     //   * <br>
     //   * <b>...</b>
     //   * <i>...</i>
-    //   * <font color="#FFFFFF"
+    //   * <font color="#FFFFFF or {ColorKey}"
     //           face="Roboto">...</font>
     //   * <span id="xxx"
-    //           color="#FFFFFF"
+    //           color="#FFFFFF or {ColorKey}"
     //           font-family="Roboto"
     //           font-size="14px"
     //           font-weight="bold"
@@ -134,14 +145,15 @@ type
     //           text-decoration-line="underline overline"
     //           text-decoration-style="solid"
     //           text-decoration-thickness="3"
-    //           text-decoration-color="#FFFFFF"
+    //           text-decoration-color="#FFFFFF or {ColorKey}"
     //           line-height="1.6"
     //           letter-spacing="2px"
-    //           background-color="#FFFFFF">...</span>
+    //           background-color="#FFFFFF or {ColorKey}">...</span>
     //   * <img src="{ResourceName}"
     //          width="xxx"
-    //          height="xxx">
-    //   * Other "<" and ">" must be encoded with "&lt;" and "&gt;"
+    //          height="xxx"
+    //          color="#FFFFFF or {ColorKey} or inherit">
+    //   * Other "<", ">" and "&" must be encoded with "&lt;", "&gt;" and "&amp;"
     //
     // Note: You can also use the "style" attribute for inline styling
     // Ex: <span style="font-size:14px;font-style:italic">
@@ -276,12 +288,19 @@ function ALCreateMultiLineTextDrawable(
                               // However, the calculated rectangle is offset by the shadow's dx and dy values, if a shadow is applied, to adjust for the visual shift caused by the shadow.
            const AOptions: TALMultiLineTextOptions): TALDrawable; inline; overload;
 
+type
+  TALEstimateLineHeightMultiplier = function(Const AFontSize: Single): Single;
+
+var
+  ALDefaultEstimateLineHeightMultiplier: TALEstimateLineHeightMultiplier = nil;
+
+function ALEstimateLineHeightMultiplier(Const AFontSize: Single): Single;
+function ALResolveLineHeightMultiplier(Const AFontSize: Single; const ALineHeightMultiplier: Single): Single;
 function ALGetTextElementsByID(Const ATextElements: TALTextElements; Const AId: String): TALTextElements;
 
 implementation
 
 uses
-  System.Classes,
   System.Math.Vectors,
   system.SysUtils,
   System.Character,
@@ -313,14 +332,116 @@ uses
   Macapi.CoreFoundation,
   {$ENDIF}
   {$IF defined(MSWINDOWS)}
-  Winapi.Windows,
   FMX.TextLayout,
   FMX.Helpers.Win,
   FMX.Utils,
   {$ENDIF}
+  Alcinoe.FMX.Styles,
   Alcinoe.StringList,
+  Alcinoe.Localization,
   Alcinoe.StringUtils,
+  Alcinoe.HTML,
   Alcinoe.Common;
+
+{$IFNDEF ALCompilerVersionSupported130}
+  {$MESSAGE WARN 'Check if https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-4392 was corrected, if yes delete the type below, and adjust the IFDEF'}
+{$ENDIF}
+type
+  CTParagraphStyleSetting = record
+    spec: UInt32{CTParagraphStyleSpecifier};
+    valueSize: NativeUInt;
+    value: Pointer;
+  end;
+
+const
+  ALLineHeightMultipliers: array[10..60] of Single = (
+    {10} 1.50, // 15/10
+    {11} 1.45, // 16/11 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {12} 1.33, // 16/12 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {13} 1.38, // 18/13
+    {14} 1.43, // 20/14 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {15} 1.47, // 22/15
+    {16} 1.50, // 24/16 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {17} 1.47, // 25/17
+    {18} 1.44, // 26/18
+    {19} 1.42, // 27/19
+    {20} 1.35, // 27/20
+    {21} 1.33, // 28/21
+    {22} 1.27, // 28/22 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {23} 1.30, // 30/23
+    {24} 1.33, // 32/24 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {25} 1.32, // 33/25
+    {26} 1.31, // 34/26
+    {27} 1.30, // 35/27
+    {28} 1.29, // 36/28 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {29} 1.28, // 37/29
+    {30} 1.27, // 38/30
+    {31} 1.26, // 39/31
+    {32} 1.25, // 40/32 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {33} 1.24, // 41/33
+    {34} 1.24, // 42/34
+    {35} 1.23, // 43/35
+    {36} 1.22, // 44/36 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {37} 1.22, // 45/37
+    {38} 1.21, // 46/38
+    {39} 1.21, // 47/39
+    {40} 1.20, // 48/40
+    {41} 1.20, // 49/41
+    {42} 1.19, // 50/42
+    {43} 1.19, // 51/43
+    {44} 1.18, // 52/44
+    {45} 1.16, // 52/45 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {46} 1.15, // 53/46
+    {47} 1.15, // 54/47
+    {48} 1.15, // 55/48
+    {49} 1.14, // 56/49
+    {50} 1.14, // 57/50
+    {51} 1.14, // 58/51
+    {52} 1.13, // 59/52
+    {53} 1.13, // 60/53
+    {54} 1.13, // 61/54
+    {55} 1.13, // 62/55
+    {56} 1.12, // 63/56
+    {57} 1.12, // 64/57 - https://m3.material.io/styles/typography/type-scale-tokens#a734c6ed-634c-4abb-adb2-35daf0aed06a
+    {58} 1.12, // 65/58
+    {59} 1.12, // 66/59
+    {60} 1.12); // 67/60
+
+{***********************************************************************}
+function ALEstimateLineHeightMultiplier(Const AFontSize: Single): Single;
+begin
+  // Excellent reference:
+  // https://pimpmytype.com/line-length-line-height
+  // There is no universal rule for ideal line height — it depends on many factors
+  // such as line length, typeface, font size, device, and context.
+  // This function provides an approximate estimation only.
+  var LRoundFontSize := Round(AFontSize);
+  if (LRoundFontSize >= Low(ALLineHeightMultipliers)) and (LRoundFontSize <= High(ALLineHeightMultipliers)) then
+    Result := ALLineHeightMultipliers[LRoundFontSize]
+  else
+    Result := 0;
+end;
+
+{***********************************************************************************************************}
+function ALResolveLineHeightMultiplier(Const AFontSize: Single; const ALineHeightMultiplier: Single): Single;
+begin
+  Result := ALineHeightMultiplier;
+  if sameValue(Result, 0, TEpsilon.Scale) and Assigned(ALDefaultEstimateLineHeightMultiplier) then
+    Result := ALDefaultEstimateLineHeightMultiplier(AFontSize);
+end;
+
+{*******************************************************************************************************}
+function ALGetTextElementsByID(Const ATextElements: TALTextElements; Const AId: String): TALTextElements;
+begin
+  Setlength(Result, length(ATextElements));
+  Var I := 0;
+  For var J := Low(ATextElements) to high(ATextElements) do
+    if ATextElements[J].Id = AId then begin
+      Result[I] := ATextElements[J];
+      inc(I);
+    end;
+  Setlength(Result, I);
+end;
 
 {**************************************************}
 class function TALTextElement.Empty: TALTextElement;
@@ -367,13 +488,10 @@ begin
   EllipsisDecorationThicknessMultiplier := 1;
   EllipsisDecorationColor := TAlphaColors.Null;
   //--
-  AutoSize := True;
-  AutoSizeX := False;
-  AutoSizeY := False;
+  AutoSize := TALAutoSizeMode.Both;
   MaxLines := 65535;
   LineHeightMultiplier := 0;
   LetterSpacing := 0;
-  Trimming := TALTextTrimming.Word;
   FailIfTextBroken := false;
   //--
   Direction := TALTextDirection.LeftToRight;
@@ -386,20 +504,21 @@ begin
   FillGradientColors := [];
   FillGradientOffsets := [];
   FillResourceName := '';
+  FillResourceStream := nil;
   FillMaskResourceName := '';
-  FillMaskBitmap := ALNullBitmap;
   FillBackgroundMargins := TRectF.Empty;
   FillImageMargins := TRectF.Empty;
   FillImageNoRadius := False;
+  FillImageTintColor := TAlphaColors.null;
   FillWrapMode := TALImageWrapMode.Fit;
-  FillCropCenter := TPointF.create(-50,-50);
+  FillCropCenter := TPointF.create(0.5,0.5);
   FillBlurRadius := 0;
   //--
   StateLayerOpacity := 0;
   StateLayerColor := TAlphaColors.null;
   StateLayerMargins := TRectF.Empty;
-  StateLayerXRadius := 0;
-  StateLayerYRadius := 0;
+  StateLayerXRadius := NaN;
+  StateLayerYRadius := NaN;
   //--
   StrokeColor := TalphaColors.Null;
   StrokeThickness := 1;
@@ -457,12 +576,9 @@ begin
   EllipsisDecorationColor := Source.EllipsisDecorationColor;
   //--
   AutoSize := Source.AutoSize;
-  AutoSizeX := Source.AutoSizeX;
-  AutoSizeY := Source.AutoSizeY;
   MaxLines := Source.MaxLines;
   LineHeightMultiplier := Source.LineHeightMultiplier;
   LetterSpacing := Source.LetterSpacing;
-  Trimming := Source.Trimming;
   FailIfTextBroken := Source.FailIfTextBroken;
   //--
   Direction := Source.Direction;
@@ -475,11 +591,12 @@ begin
   FillGradientColors := Source.FillGradientColors;
   FillGradientOffsets := Source.FillGradientOffsets;
   FillResourceName := Source.FillResourceName;
+  FillResourceStream := Source.FillResourceStream;
   FillMaskResourceName := Source.FillMaskResourceName;
-  FillMaskBitmap := Source.FillMaskBitmap;
   FillBackgroundMargins := Source.FillBackgroundMargins;
   FillImageMargins := Source.FillImageMargins;
   FillImageNoRadius := Source.FillImageNoRadius;
+  FillImageTintColor := Source.FillImageTintColor;
   FillWrapMode := Source.FillWrapMode;
   FillCropCenter := Source.FillCropCenter;
   FillBlurRadius := Source.FillBlurRadius;
@@ -526,8 +643,8 @@ begin
     StateLayerMargins.Right := StateLayerMargins.Right * Scale;
     StateLayerMargins.Left := StateLayerMargins.Left * Scale;
     StateLayerMargins.Bottom := StateLayerMargins.Bottom * Scale;
-    if compareValue(StateLayerXRadius, 0, TEpsilon.Vector) > 0 then StateLayerXRadius := StateLayerXRadius * Scale;
-    if compareValue(StateLayerYRadius, 0, TEpsilon.Vector) > 0 then StateLayerYRadius := StateLayerYRadius * Scale;
+    if (not isNaN(StateLayerXRadius)) and (compareValue(StateLayerXRadius, 0, TEpsilon.Vector) > 0) then StateLayerXRadius := StateLayerXRadius * Scale;
+    if (not isNaN(StateLayerYRadius)) and (compareValue(StateLayerYRadius, 0, TEpsilon.Vector) > 0) then StateLayerYRadius := StateLayerYRadius * Scale;
     StrokeThickness := StrokeThickness * Scale;
     ShadowBlur := ShadowBlur * Scale;
     ShadowOffsetX := ShadowOffsetX * Scale;
@@ -541,9 +658,9 @@ begin
     Scale := 1;
   end;
   if AlignToPixel then begin
-    FontSize := ALAlignDimensionToPixelRound(FontSize, ACanvasScale, TEpsilon.FontSize);
-    EllipsisFontSize := ALAlignDimensionToPixelRound(EllipsisFontSize, ACanvasScale, TEpsilon.FontSize);
-    LetterSpacing := ALAlignDimensionToPixelRound(LetterSpacing, ACanvasScale, TEpsilon.FontSize);
+    //FontSize := ALAlignDimensionToPixelRound(FontSize, ACanvasScale, TEpsilon.FontSize);
+    //EllipsisFontSize := ALAlignDimensionToPixelRound(EllipsisFontSize, ACanvasScale, TEpsilon.FontSize);
+    //LetterSpacing := ALAlignDimensionToPixelRound(LetterSpacing, ACanvasScale, TEpsilon.Position);
     FillBackgroundMargins := ALAlignEdgesToPixelRound(FillBackgroundMargins, ACanvasScale, TEpsilon.Position);
     FillImageMargins := ALAlignEdgesToPixelRound(FillImageMargins, ACanvasScale, TEpsilon.Position);
     StateLayerMargins := ALAlignEdgesToPixelRound(StateLayerMargins, ACanvasScale, TEpsilon.Position);
@@ -611,6 +728,7 @@ procedure ALDrawMultiLineText(
       DecorationThicknessMultiplier: Single;
       DecorationColor: TAlphaColor;
       ImgSrc: String;
+      ImgTintColor: TAlphaColor;
     end;
   {$ENDIF}
   {$ENDREGION}
@@ -636,8 +754,9 @@ procedure ALDrawMultiLineText(
   function _findLastBreakPosition(
              const AText: String;
              Const ANumberOfChars: Integer;
-             const AHardBreak: Boolean = False;
-             const ASkipEndOfTextPunctuation: Boolean = False): integer;
+             const AAllowSymbolBreaks: Boolean; // Allow breaking at symbols like \ or /
+             const AAllowCharacterBreak: Boolean; // Allow breaking on any character, not just word boundaries
+             const ASkipEndOfTextPunctuation: Boolean): integer;
   begin
     if ANumberOfChars <= 0 then exit(ANumberOfChars);
     Var Ln := AText.Length;
@@ -653,11 +772,21 @@ procedure ALDrawMultiLineText(
         dec(Result);
     end;
     // Break on \ or /
-    If (AHardBreak) and (Result <= 0) then begin
+    If (AAllowSymbolBreaks) and (Result <= 0) then begin
       Result := Min(ANumberOfChars, Ln);
       While Result > 0 do begin
         if (Result < Ln) and (CharInSet(AText.Chars[Result-1], ['\','/'])) then break
         else dec(Result);
+      end;
+    end;
+    // Break on character in last resort
+    if AAllowCharacterBreak and (Result <= 0) then begin
+      Result := Min(ANumberOfChars, Ln) - 1;
+      While Result > 0 do begin
+        // High Surrogate = First part of the pair
+        // Low Surrogate = Second part of the pair
+        if AText.Chars[Result].IsHighSurrogate then dec(Result)
+        else break;
       end;
     end;
     // Skip end of text punctuation
@@ -674,12 +803,17 @@ procedure ALDrawMultiLineText(
   Function _TryStrColorToInt(const AColorStr: String; out AColorInt: Cardinal): boolean;
   begin
     Result := False;
-    if (AColorStr <> '') and (AColorStr[low(AColorStr)] = '#') then begin
+    if AColorStr = '' then exit;
+    if AColorStr[low(AColorStr)] = '#' then begin
       var LAlphaColor: TAlphaColor;
       if ALTryRGBAHexToAlphaColor(AlcopyStr(AColorStr, 2, MaxInt), LAlphaColor) then begin
         Result := True;
         AColorInt := Cardinal(LAlphaColor);
       end;
+    end
+    else if (AColorStr[low(AColorStr)] = '{') and (AColorStr[high(AColorStr)] = '}') then begin
+      AColorInt := Cardinal(TALStyleManager.Instance.GetColor(AlcopyStr(AColorStr, 2, length(AColorStr)-2)));
+      Result := True;
     end;
   end;
   {$ENDREGION}
@@ -688,7 +822,7 @@ procedure ALDrawMultiLineText(
   Function _TryStrPxValueToFloat(const AValueStr: String; out AValueFloat: Single): boolean;
   begin
     if AlPosW('px', AValueStr) <= 0 then exit(False)
-    else result := ALTryStrToFloat(ALStringReplaceW(AValueStr, 'px', '', []), AValueFloat, ALDefaultFormatSettingsW);
+    else result := ALTryStrToFloat(ALStringReplaceW(AValueStr, 'px', '', []), AValueFloat);
   end;
   {$ENDREGION}
 
@@ -711,32 +845,34 @@ procedure ALDrawMultiLineText(
               const ALetterSpacings: TList<Single>;
               out AImgSrc: String;
               out AImgWidth: Single;
-              out AImgHeight: Single); overload;
+              out AImgHeight: Single;
+              out AImgTintColor: String); overload;
   begin
-    var LParamList := TALStringListW.Create;
+    var LParamList := TALNVStringListW.Create;
     try
-      ALExtractHeaderFieldsWithQuoteEscaped(
-        [' ', #9, #13, #10]{Separators},
-        [' ', #9, #13, #10]{WhiteSpace},
-        ['"', '''']{Quotes},
-        PChar(ATag){Content},
-        LParamList{Strings},
-        False{HttpDecode},
-        True{StripQuotes});
+      ALExtractHeaderFields(
+        [' ', #9, #13, #10], // const ASeparators: TSysCharSet;
+        [' ', #9, #13, #10], // const AWhiteSpace: TSysCharSet;
+        ['"', ''''], // const AQuoteChars: TSysCharSet;
+        PChar(ATag), // const AContent: PAnsiChar;
+        LParamList, // const AStrings: TALStringsA;
+        True); // const AStripQuotes: Boolean = False;
       //--
       var LStyle := LParamList.Values['style'];
       if LStyle <> '' then begin
-        var LStyleParamList := TALStringListW.Create;
+        var LStyleParamList := TALNVStringListW.Create;
         try
           LStyleParamList.NameValueSeparator := ':';
-          ALExtractHeaderFieldsWithQuoteEscaped(
-            [';']{Separators},
-            [' ', #9, #13, #10]{WhiteSpace},
-            ['"', '''']{Quotes},
-            PChar(LStyle){Content},
-            LStyleParamList{Strings},
-            False{HttpDecode},
-            True{StripQuotes});
+          ALExtractHeaderFields(
+            [';'], // const ASeparators: TSysCharSet;
+            [' ', #9, #13, #10], // const AWhiteSpace: TSysCharSet;
+            ['"', ''''], // const AQuoteChars: TSysCharSet;
+            PChar(LStyle), // const AContent: PAnsiChar;
+            LStyleParamList, // const AStrings: TALStringsA;
+            True, // const AStripQuotes: Boolean = False;
+            False, // const AQuoteDoublingEscape: Boolean = False;
+            #0, // const AEscapeChar: AnsiChar = #0;
+            ':'); // const ANameValueSeparator: AnsiChar = '='
           //--
           var LValue := ALLowerCase(LStyleParamList.Values['width']);
           If ALPosW('px', LValue) > 0 then LStyleParamList.Values['width'] := ALStringReplaceW(LValue, 'px', '', [])
@@ -763,6 +899,7 @@ procedure ALDrawMultiLineText(
       if AFontFamilies <> nil then begin
         var LFontFamily := LParamList.Values['face']; // <font face="Arial">
         if LFontFamily = '' then LFontFamily := LParamList.Values['font-family']; // <span font-family="Arial">
+        LFontFamily := ALResolveFontFamily(LFontFamily);
         if LFontFamily <> '' then AFontFamilies.Add(LFontFamily)
         else if AFontFamilies.Count > 0 then AFontFamilies.Add(AFontFamilies[AFontFamilies.Count - 1])
         else AFontFamilies.Add(LOptions.FontFamily);
@@ -850,7 +987,7 @@ procedure ALDrawMultiLineText(
       //--
       If ADecorationThicknessMultipliers <> nil then begin
         var LDecorationThicknessMultiplierFloat: Single;
-        if ALTryStrToFloat(LParamList.Values['text-decoration-thickness'], LDecorationThicknessMultiplierFloat, ALDefaultFormatSettingsW) then ADecorationThicknessMultipliers.Add(LDecorationThicknessMultiplierFloat) // <span text-decoration-thickness="3">
+        if ALTryStrToFloat(LParamList.Values['text-decoration-thickness'], LDecorationThicknessMultiplierFloat) then ADecorationThicknessMultipliers.Add(LDecorationThicknessMultiplierFloat) // <span text-decoration-thickness="3">
         else if ADecorationThicknessMultipliers.Count > 0 then ADecorationThicknessMultipliers.Add(ADecorationThicknessMultipliers[ADecorationThicknessMultipliers.Count - 1])
         else ADecorationThicknessMultipliers.Add(LOptions.DecorationThicknessMultiplier);
       end;
@@ -871,7 +1008,7 @@ procedure ALDrawMultiLineText(
       //--
       If ALineHeightMultipliers <> nil then begin
         var LLineHeightMultiplierFloat: Single;
-        if ALTryStrToFloat(LParamList.Values['line-height'], LLineHeightMultiplierFloat, ALDefaultFormatSettingsW) then ALineHeightMultipliers.Add(LLineHeightMultiplierFloat) // <span line-height="1.6">
+        if ALTryStrToFloat(LParamList.Values['line-height'], LLineHeightMultiplierFloat) then ALineHeightMultipliers.Add(LLineHeightMultiplierFloat) // <span line-height="1.6">
         else if ALineHeightMultipliers.Count > 0 then ALineHeightMultipliers.Add(ALineHeightMultipliers[ALineHeightMultipliers.Count - 1])
         else ALineHeightMultipliers.Add(LOptions.LineHeightMultiplier);
       end;
@@ -884,10 +1021,16 @@ procedure ALDrawMultiLineText(
       end;
       //--
       AImgSrc := LParamList.Values['src'];
-      //--
-      AImgWidth := ALStrToFloatDef(LParamList.Values['width'], 0, ALDefaultFormatSettingsW) * LScale;
-      //--
-      AImgHeight := ALStrToFloatDef(LParamList.Values['height'], 0, ALDefaultFormatSettingsW) * LScale;
+      if AImgSrc <> '' then begin
+        AImgWidth := ALStrToFloatDef(LParamList.Values['width'], 0) * LScale;
+        AImgHeight := ALStrToFloatDef(LParamList.Values['height'], 0) * LScale;
+        AImgTintColor := LParamList.Values['color'];
+      end
+      else begin
+        AImgWidth := 0;
+        AImgHeight := 0;
+        AImgTintColor := '';
+      end;
     finally
       ALFreeAndNil(LParamList);
     end;
@@ -915,6 +1058,7 @@ procedure ALDrawMultiLineText(
     Var LImgSrc: String;
     Var LImgWidth: Single;
     Var LImgHeight: Single;
+    Var LImgTintColor: String;
     _getInfosFromTag(
       ATag, // const ATag: String; // color="#ffffff" id="xxx"
       ASpanIds, // const ASpanIds: TALStringListW;
@@ -933,7 +1077,8 @@ procedure ALDrawMultiLineText(
       ALetterSpacings, // const ALetterSpacings: TList<Single>;
       LImgSrc, // out AImgSrc: String;
       LImgWidth, // out AImgWidth: Single;
-      LImgHeight); // out AImgHeight: Single)
+      LImgHeight, // out AImgHeight: Single;
+      LImgTintColor); // out AImgTintColor: String)
   end;
   {$ENDREGION}
 
@@ -948,6 +1093,7 @@ procedure ALDrawMultiLineText(
     Var LImgSrc: String;
     Var LImgWidth: Single;
     Var LImgHeight: Single;
+    Var LImgTintColor: String;
     _getInfosFromTag(
       ATag, // const ATag: String; // color="#ffffff" id="xxx"
       ASpanIds, // const ASpanIds: TALStringListW;
@@ -966,7 +1112,8 @@ procedure ALDrawMultiLineText(
       nil, // const ALetterSpacings: TList<Single>;
       LImgSrc, // out AImgSrc: String;
       LImgWidth, // out AImgWidth: Single;
-      LImgHeight); // out AImgHeight: Single)
+      LImgHeight, // out AImgHeight: Single;
+      LImgTintColor); // out AImgTintColor: String)
   end;
   {$ENDREGION}
 
@@ -978,6 +1125,7 @@ procedure ALDrawMultiLineText(
     Var LImgSrc: String;
     Var LImgWidth: Single;
     Var LImgHeight: Single;
+    Var LImgTintColor: String;
     _getInfosFromTag(
       ATag, // const ATag: String; // color="#ffffff" id="xxx"
       ASpanIds, // const ASpanIds: TALStringListW;
@@ -996,7 +1144,8 @@ procedure ALDrawMultiLineText(
       nil, // const ALetterSpacings: TList<Single>;
       LImgSrc, // out AImgSrc: String;
       LImgWidth, // out AImgWidth: Single;
-      LImgHeight); // out AImgHeight: Single)
+      LImgHeight, // out AImgHeight: Single;
+      LImgTintColor); // out AImgTintColor: String)
   end;
   {$ENDREGION}
 
@@ -1005,7 +1154,8 @@ procedure ALDrawMultiLineText(
               const ATag: String; // color="#ffffff" id="xxx"
               out AImgSrc: String;
               out AImgWidth: Single;
-              out AImgHeight: Single); overload;
+              out AImgHeight: Single;
+              out AImgTintColor: String); overload;
   begin
     _getInfosFromTag(
       ATag, // const ATag: String; // color="#ffffff" id="xxx"
@@ -1025,22 +1175,9 @@ procedure ALDrawMultiLineText(
       nil, // const ALetterSpacings: TList<Single>;
       AImgSrc, // out AImgSrc: String;
       AImgWidth, // out AImgWidth: Single;
-      AImgHeight); // out AImgHeight: Single)
+      AImgHeight, // out AImgHeight: Single;
+      AImgTintColor); // out AImgTintColor: String)
   end;
-  {$ENDREGION}
-
-  {$REGION '_getFontFamily'}
-  {$IF not defined(ALSkiaEngine)}
-  function _getFontFamily(const AFontFamilies: String): String;
-  begin
-    Result := '';
-    var LFontFamilies := AFontFamilies.Split([',', #13, #10], TStringSplitOptions.ExcludeEmpty);
-    for var I := low(LFontFamilies) to high(LFontFamilies) do begin
-      Result := ALTrim(LFontFamilies[I]);
-      if Result <> '' then break;
-    end;
-  end;
-  {$ENDIF}
   {$ENDREGION}
 
   {$REGION '_getFontStyleExt'}
@@ -1099,7 +1236,7 @@ procedure ALDrawMultiLineText(
        (ADecorationStyle = _CurrDecorationStyle) and
        (SameValue(ADecorationThicknessMultiplier, _CurrDecorationThicknessMultiplier, TEpsilon.Scale)) and
        (ADecorationColor = _CurrDecorationColor) and
-       (SameValue(ALetterSpacing, _CurrLetterSpacing, TEpsilon.FontSize)) then exit;
+       (SameValue(ALetterSpacing, _CurrLetterSpacing, TEpsilon.Position)) then exit;
 
     _CurrFontFamily := AFontFamily;
     _CurrFontSize := AFontSize;
@@ -1113,7 +1250,7 @@ procedure ALDrawMultiLineText(
     _CurrDecorationColor := ADecorationColor;
     _CurrLetterSpacing := ALetterSpacing;
 
-    var LFontFamily := _getFontFamily(AFontFamily);
+    var LFontFamily := ALExtractPrimaryFontFamily(AFontFamily);
     var LTypeface: JTypeFace := TALFontManager.GetCustomTypeFace(LFontFamily);
     if LTypeface = nil then begin
       var LFontStyles: TFontStyles := [];
@@ -1124,7 +1261,7 @@ procedure ALDrawMultiLineText(
       if AFontSlant in [TFontSlant.Italic, TFontSlant.Oblique] then LFontStyles := LFontStyles + [TFontStyle.fsItalic];
       LTypeface := TJTypeface.JavaClass.create(StringToJString(LFontFamily), ALfontStyleToAndroidStyle(LFontStyles));
     end;
-    if TOSVersion.Check(9, 0) then begin
+    if TOSVersion.Check(9, 0) {API level >= 28 (Android P)} then begin
       var LfontWeightInt: Integer;
       case AFontWeight of
         TFontWeight.Thin: LfontWeightInt := 100; //	Thin;
@@ -1247,7 +1384,7 @@ procedure ALDrawMultiLineText(
                 end;
               end;
               //--
-              if not sameValue(ALetterSpacing, 0, TEpsilon.FontSize) then begin
+              if not sameValue(ALetterSpacing, 0, TEpsilon.Position) then begin
                 var LValue: Single := ALetterSpacing;
                 var LKernAttributeValue := CFNumberCreate(nil, kCFNumberFloat32Type, @LValue);
                 if LKernAttributeValue = nil then raise Exception.Create('Failed to create CFNumber');
@@ -1316,7 +1453,8 @@ procedure ALDrawMultiLineText(
              const ALetterSpacing: Single;
              const ADirection: TALTextDirection;
              const AMaxWidth: Single;
-             const AHardBreak: Boolean;
+             const AAllowSymbolBreaks: Boolean;
+             const AAllowCharacterBreak: Boolean;
              out AMeasuredWidth: Single;
              out AMeasuredHeight: Single): integer;
   begin
@@ -1379,11 +1517,11 @@ procedure ALDrawMultiLineText(
       else begin
 
         // Calculate the correct position where the text should break
-        var LBreakPosition := _findLastBreakPosition(AText, Result, AHardBreak);
+        var LBreakPosition := _findLastBreakPosition(AText, Result, AAllowSymbolBreaks, AAllowCharacterBreak, False{ASkipEndOfTextPunctuation});
 
         // No good position found
         if LBreakPosition = 0 then begin
-          if AHardBreak then begin
+          if AAllowSymbolBreaks then begin
             AMeasuredWidth := LMeasuredWidth[0];
             AMeasuredHeight := 0;
           end
@@ -1466,8 +1604,8 @@ procedure ALDrawMultiLineText(
         {$ENDIF}
 
         // https://stackoverflow.com/questions/78144915/ctframesettercreateframe-and-kctparagraphstylespecifierfirstlineheadindent
-        if (Result < AText.Length) and (not AHardBreak) then begin
-          var LBreakPosition := _findLastBreakPosition(AText, Result, AHardBreak);
+        if (Result < AText.Length) and (not AAllowSymbolBreaks) then begin
+          var LBreakPosition := _findLastBreakPosition(AText, Result, AAllowSymbolBreaks, AAllowCharacterBreak, False{ASkipEndOfTextPunctuation});
           if LBreakPosition <= 0 then begin
             Result := 0;
             AMeasuredWidth := 0;
@@ -1513,13 +1651,13 @@ procedure ALDrawMultiLineText(
         //ALLog(
         //  'ALCreateMultiLineTextDrawable._BreakText',
         //  'Text: '+ Atext + ' | '+
-        //  'MaxWidth: '+ ALFloatToStrW(AMaxWidth, ALDefaultFormatSettingsW) + ' | '+
+        //  'MaxWidth: '+ ALFloatToStrW(AMaxWidth) + ' | '+
         //  'Result: ' + ALInttoStrW(Result) + ' | '+
-        //  'MeasuredWidth: ' + ALFloatToStrW(AMeasuredWidth, ALDefaultFormatSettingsW) + ' | '+
-        //  'MeasuredHeight: ' + ALFloatToStrW(AMeasuredHeight, ALDefaultFormatSettingsW) + ' | '+
-        //  'TrailingWhitespaceWidth: ' + ALFloatToStrW(LTrailingWhitespaceWidth, ALDefaultFormatSettingsW) + ' | '+
-        //  'Metrics.ascent: ' + ALFloatToStrW(Lmetrics.Ascent, ALDefaultFormatSettingsW) + ' | '+
-        //  'Metrics.descent: ' + ALFloatToStrW(Lmetrics.descent, ALDefaultFormatSettingsW));
+        //  'MeasuredWidth: ' + ALFloatToStrW(AMeasuredWidth) + ' | '+
+        //  'MeasuredHeight: ' + ALFloatToStrW(AMeasuredHeight) + ' | '+
+        //  'TrailingWhitespaceWidth: ' + ALFloatToStrW(LTrailingWhitespaceWidth) + ' | '+
+        //  'Metrics.ascent: ' + ALFloatToStrW(Lmetrics.Ascent) + ' | '+
+        //  'Metrics.descent: ' + ALFloatToStrW(Lmetrics.descent));
         {$ENDIF}
 
       finally
@@ -1603,7 +1741,7 @@ procedure ALDrawMultiLineText(
     // Since the Windows API only works with integers, I multiply the font size by 100
     // and later divide the result by 100 to achieve better precision.
     //
-    //var LFontFamily := _getFontFamily(AFontFamily);
+    //var LFontFamily := ALExtractPrimaryFontFamily(AFontFamily);
     //var LFont := CreateFont(
     //               -Round(AFontSize*100), // nHeight: Integer;
     //               0, // nWidth: Integer;
@@ -1632,7 +1770,7 @@ procedure ALDrawMultiLineText(
     //      AMeasuredHeight := LSize.Height/100;
     //      exit;
     //    end;
-    //    Result := _findLastBreakPosition(LText, Result-1, AHardBreak);
+    //    Result := _findLastBreakPosition(LText, Result-1, AAllowSymbolBreaks, AAllowCharacterBreak, False{ASkipEndOfTextPunctuation});
     //    If Result > 0 then
     //      LText := LText.Remove(Result);
     //  end;
@@ -1648,7 +1786,7 @@ procedure ALDrawMultiLineText(
       Result := LText.Length;
       While Result > 0 do begin
         LLayout.BeginUpdate;
-        LLayout.Font.Family := _getFontFamily(AFontFamily);
+        LLayout.Font.Family := ALExtractPrimaryFontFamily(AFontFamily);
         LLayout.Font.StyleExt := _getFontStyleExt(AFontWeight, AFontSlant, AFontStretch, ADecorationKinds);
         LLayout.Font.Size := aFontSize;
         LLayout.MaxSize := Tpointf.Create(65535, 65535);
@@ -1662,9 +1800,9 @@ procedure ALDrawMultiLineText(
         AMeasuredHeight := LLayout.TextHeight;
         If CompareValue(AMeasuredWidth, AMaxWidth, Tepsilon.Position) <= 0 then exit;
         var LPrevResult: Integer := Result;
-        Result := _findLastBreakPosition(LText, Result-1, AHardBreak);
+        Result := _findLastBreakPosition(LText, Result-1, AAllowSymbolBreaks, AAllowCharacterBreak, False{ASkipEndOfTextPunctuation});
         If Result > 0 then LText := LText.Remove(Result)
-        else if AHardBreak then begin
+        else if AAllowSymbolBreaks or AAllowCharacterBreak then begin
           Result := LPrevResult - 1;
           if LText[Result].IsHighSurrogate then dec(result);
           If Result > 0 then LText := LText.Remove(Result);
@@ -1700,6 +1838,8 @@ begin
   LOptions := TALMultiLineTextOptions.Create;
   LOptions.Assign(AOptions);
   LOptions.ScaleAndAlignProperties(LCanvasScale);
+  LOptions.FontFamily := ALResolveFontFamily(LOptions.FontFamily);
+  LOptions.EllipsisFontFamily := ALResolveFontFamily(LOptions.EllipsisFontFamily);
   ARect.Top := ARect.Top * LScale;
   ARect.right := ARect.right * LScale;
   ARect.left := ARect.left * LScale;
@@ -1759,7 +1899,6 @@ begin
           LText := ALStringReplaceW(Ltext, ' '#10, #10, [RfReplaceALL]);
         While ALPosW(#10' ', LText) > 0 do
           LText := ALStringReplaceW(Ltext, #10' ', #10, [RfReplaceALL]);
-        LText := ALStringReplaceW(Ltext, '&nbsp;', Chr($A0){0x00A0}, [RfReplaceALL, RfIgnoreCase]);
       end
       else
         LText := ALStringReplaceW(Ltext, #13#10, #10, [RfReplaceALL]);
@@ -1881,6 +2020,7 @@ begin
               var LCurrImgSrc: String;
               var LcurrImgWidth: Single;
               var LcurrImgHeight: Single;
+              var LcurrImgTintColor: TAlphaColor;
 
 
               /////////////////////////
@@ -1911,6 +2051,7 @@ begin
                 LCurrImgSrc := '';
                 LcurrImgWidth := 0;
                 LcurrImgHeight := 0;
+                LcurrImgTintColor := TAlphaColors.Null;
                 LInsertEllipsisAt := Maxint;
                 P1 := Maxint;
               end
@@ -1932,6 +2073,7 @@ begin
                   LCurrText := '';
                   LcurrImgWidth := 0;
                   LcurrImgHeight := 0;
+                  LcurrImgTintColor := TAlphaColors.Null;
                   var P2 := ALPosW('>', Ltext, P1+1); // blablabla <font color="#ffffff">blablabla</font> blablabla
                                                       //           ^P1                  ^P2
                   if P2 <= 0 then break;
@@ -1964,7 +2106,18 @@ begin
                   //-----
                   else if (ALPosW('<img ', LTag) = 1) or
                           (LTag = '<img/>') then begin // <img src="xxx">
-                    _getInfosFromTag(ALCopyStr(LTag, 6, length(LTag) - 6), LCurrImgSrc, LcurrImgWidth, LcurrImgHeight);
+                    var LcurrImgTintColorStr: String;
+                    _getInfosFromTag(ALCopyStr(LTag, 6, length(LTag) - 6), LCurrImgSrc, LcurrImgWidth, LcurrImgHeight, LcurrImgTintColorStr);
+                    if LcurrImgTintColorStr = '' then LcurrImgTintColor := TAlphaColors.Null
+                    else if ALSameTextW(LcurrImgTintColorStr, 'inherit') then begin
+                      if LFontColors.Count > 0 then LcurrImgTintColor := LFontColors[LFontColors.Count - 1]
+                      else LcurrImgTintColor := LOptions.FontColor;
+                    end
+                    else begin
+                      var LcurrImgTintColorInt: Cardinal;
+                      if _TryStrColorToInt(LcurrImgTintColorStr, LcurrImgTintColorInt) then LcurrImgTintColor := TalphaColor(LcurrImgTintColorInt)
+                      else LcurrImgTintColor := TAlphaColors.Null;
+                    end;
                   end
 
                   //-----
@@ -2007,12 +2160,12 @@ begin
                   LCurrImgSrc := '';
                   LcurrImgWidth := 0;
                   LcurrImgHeight := 0;
+                  LcurrImgTintColor := TAlphaColors.Null;
                   var P2 := ALPosW('<', Ltext, P1);  // blablabla <font color="#ffffff">blablabla</font> blablabla
                                                      //                                 ^P1      ^P2
                   if P2 <= 0 then P2 := Maxint;
                   LCurrText := ALCopyStr(Ltext, P1, P2 - P1);  // blablabla
-                  LCurrText := ALStringReplaceW(LCurrText, '&gt;', '>', [rfReplaceALL]);
-                  LCurrText := ALStringReplaceW(LCurrText, '&lt;', '<', [rfReplaceALL]);
+                  ALHtmlDecodeInPlace(LCurrText);
                   P1 := P2; // blablabla <font color="#ffffff">blablabla</font> blablabla
                             //                                          ^P1
                 end;
@@ -2028,6 +2181,7 @@ begin
                 LCurrImgSrc := '';
                 LcurrImgWidth := 0;
                 LcurrImgHeight := 0;
+                LcurrImgTintColor := TAlphaColors.Null;
                 P1 := Maxint;
               end;
 
@@ -2188,7 +2342,7 @@ begin
                   // Set decoration kinds
                   // https://api.flutter.dev/flutter/painting/TextStyle/decoration.html
                   // The decorations to paint near the text (e.g., an underline).
-                  {$IFNDEF ALCompilerVersionSupported123}
+                  {$IFNDEF ALCompilerVersionSupported130}
                     {$MESSAGE WARN 'Check if declaration of System.Skia.TSkTextDecoration didn''t changed'}
                   {$ENDIF}
                   sk4d_textstyle_set_decorations(LTextStyle, Byte(LDecorationKind));
@@ -2239,7 +2393,7 @@ begin
                   // https://api.flutter.dev/flutter/painting/TextStyle/letterSpacing.html
                   // The amount of space (in logical pixels) to add between each letter. A negative value
                   // can be used to bring the letters closer.
-                  if not SameValue(LLetterSpacing, 0, TEpsilon.FontSize) then
+                  if not SameValue(LLetterSpacing, 0, TEpsilon.Position) then
                     sk4d_textstyle_set_letter_spacing(LTextStyle, LLetterSpacing);
 
                   // set half_leading
@@ -2259,8 +2413,9 @@ begin
                   // taller or shorter than the font size. The height property allows manual adjustment of the height of the line
                   // as a multiple of fontSize. For most fonts, setting height to 1.0 is not the same as omitting or setting
                   // height to null.
-                  if not SameValue(LLineHeightMultiplier, 0, TEpsilon.Scale) then
-                    sk4d_textstyle_set_height_multiplier(LTextStyle, LLineHeightMultiplier);
+                  var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(LFontSize / LScale, LLineHeightMultiplier);
+                  if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0  then
+                    sk4d_textstyle_set_height_multiplier(LTextStyle, LTmpLineHeightMultiplier);
 
                   // Push the style
                   // https://api.flutter.dev/flutter/dart-ui/ParagraphBuilder/pushStyle.html
@@ -2269,12 +2424,20 @@ begin
 
                   // Add the text or PlaceHolder
                   if LCurrImgSrc <> '' then begin
-                    {$IFNDEF ALCompilerVersionSupported123}
+                    {$IFNDEF ALCompilerVersionSupported130}
                       {$MESSAGE WARN 'Check if declaration of System.Skia.API.sk_placeholderstyle_t didn''t changed'}
                     {$ENDIF}
                     var LPlaceholderStyle: sk_placeholderstyle_t;
-                    if CompareValue(LCurrImgWidth, 0, TEpsilon.FontSize) <= 0 then LCurrImgWidth := LOptions.FontSize;
-                    if CompareValue(LCurrImgHeight, 0, TEpsilon.FontSize) <= 0 then LCurrImgHeight := LOptions.FontSize;
+                    if (CompareValue(LCurrImgWidth, 0, TEpsilon.FontSize) <= 0) and
+                       (CompareValue(LCurrImgHeight, 0, TEpsilon.FontSize) <= 0) then LCurrImgHeight := LOptions.FontSize;
+                    if CompareValue(LCurrImgWidth, 0, TEpsilon.FontSize) <= 0 then begin
+                      var LSize := ALGetImageDimensions(LCurrImgSrc);
+                      LCurrImgWidth := (LCurrImgHeight / LSize.Height) * LSize.Width;
+                    end;
+                    if CompareValue(LCurrImgHeight, 0, TEpsilon.FontSize) <= 0 then begin
+                      var LSize := ALGetImageDimensions(LCurrImgSrc);
+                      LCurrImgHeight := (LCurrImgWidth / LSize.Width) * LSize.Height;
+                    end;
                     LPlaceholderStyle.width := LcurrImgWidth;
                     LPlaceholderStyle.height := LcurrImgHeight;
                     LPlaceholderStyle.alignment := sk_placeholderalignment_t.MIDDLE_SK_PLACEHOLDERALIGNMENT;
@@ -2282,7 +2445,7 @@ begin
                     LPlaceholderStyle.baseline_offset := 0.0;
                     sk4d_paragraphbuilder_add_placeholder(LParagraphBuilder, @LPlaceholderStyle);
                     LTextForRange := LTextForRange + '_';
-                    LPlaceHolders.Add(LCurrImgSrc);
+                    LPlaceHolders.AddObject(LCurrImgSrc, Pointer(LcurrImgTintColor));
                   end
                   else begin
                     sk4d_paragraphbuilder_add_text(LParagraphBuilder, MarshaledAString(UTF8String(LCurrText)));
@@ -2391,8 +2554,9 @@ begin
                     LInsertEllipsisAt := _findLastBreakPosition(
                                            LTextForRange, // const AText: String;
                                            LPrevInsertEllipsisAt-1, // Const ANumberOfChars: Integer;
-                                           false, // const AHardBreak: Boolean = False;
-                                           true); // const ASkipEndOfTextPunctuation: Boolean = False)
+                                           false, // const AAllowSymbolBreaks: Boolean;
+                                           I = 0, // const AAllowCharacterBreak: Boolean;
+                                           true); // const ASkipEndOfTextPunctuation: Boolean;
                   // _findLastBreakPosition return -1 when LPrevInsertEllipsisAt = 0
                   if LInsertEllipsisAt < 0 then begin
                     ARect.Width := 0;
@@ -2419,12 +2583,12 @@ begin
               //       auto floorWidth = SkScalarFloorToScalar(rawWidth);
               //
               var LOriginalRectWidth: Single := ARect.Width;
-              if LOptions.Autosize or (LOptions.AutosizeX and LOptions.AutosizeY) then begin
+              if LOptions.Autosize = TALAutoSizeMode.Both then begin
                 ARect.Width := Min(ARect.Width, Ceil(LParagraphRect.Width) + LOptions.Padding.Left + LOptions.Padding.Right);
                 ARect.Height := Min(ARect.Height, LParagraphRect.Height + LOptions.Padding.Top + LOptions.Padding.Bottom);
               end
-              else if LOptions.AutosizeX then ARect.Width := Min(ARect.Width, Ceil(LParagraphRect.Width) + LOptions.Padding.Left + LOptions.Padding.Right)
-              else if LOptions.AutosizeY then ARect.Height := Min(ARect.Height, LParagraphRect.Height + LOptions.Padding.Top + LOptions.Padding.Bottom);
+              else if LOptions.Autosize = TALAutoSizeMode.Width then ARect.Width := Min(ARect.Width, Ceil(LParagraphRect.Width) + LOptions.Padding.Left + LOptions.Padding.Right)
+              else if LOptions.Autosize = TALAutoSizeMode.Height then ARect.Height := Min(ARect.Height, LParagraphRect.Height + LOptions.Padding.Top + LOptions.Padding.Bottom);
 
               // init LParagraphRect.topleft
               case LOptions.VTextAlign of
@@ -2464,10 +2628,11 @@ begin
               // Calculate the SurfaceRect
               var LSurfaceRect := ALGetShapeSurfaceRect(
                                     ARect, // const ARect: TRectF;
+                                    LOptions.AlignToPixel, // const AAlignToPixel: Boolean;
                                     LOptions.FillColor, // const AFillColor: TAlphaColor;
                                     LOptions.FillGradientColors, // const AFillGradientColors: TArray<TAlphaColor>;
                                     LOptions.FillResourceName, // const AFillResourceName: String;
-                                    nil, // const AFillResourceStream: TStream;
+                                    LOptions.FillResourceStream, // const AFillResourceStream: TStream;
                                     LOptions.FillBackgroundMargins, // Const AFillBackgroundMarginsRect: TRectF;
                                     LOptions.FillImageMargins, // Const AFillImageMarginsRect: TRectF;
                                     LOptions.StateLayerOpacity, // const AStateLayerOpacity: Single;
@@ -2542,6 +2707,7 @@ begin
                   if (LOptions.FillColor <> TalphaColors.Null) or
                      (length(LOptions.FillGradientColors) > 0) or
                      (LOptions.FillResourceName <> '') or
+                     (LOptions.FillResourceStream <> nil) or
                      (LOptions.StateLayerColor <> TalphaColors.Null) or
                      (LOptions.StrokeColor <> TalphaColors.Null) or
                      (LOptions.ShadowColor <> TalphaColors.Null) then begin
@@ -2555,11 +2721,12 @@ begin
                       .SetFillGradientColors(LOptions.FillGradientColors)
                       .SetFillGradientOffsets(LOptions.FillGradientOffsets)
                       .SetFillResourceName(LOptions.FillResourceName)
+                      .SetFillResourceStream(LOptions.FillResourceStream)
                       .SetFillMaskResourceName(LOptions.FillMaskResourceName)
-                      .SetFillMaskBitmap(LOptions.FillMaskBitmap)
                       .SetFillBackgroundMarginsRect(LOptions.FillBackgroundMargins)
                       .SetFillImageMarginsRect(LOptions.FillImageMargins)
                       .SetFillImageNoRadius(LOptions.FillImageNoRadius)
+                      .SetFillImageTintColor(LOptions.FillImageTintColor)
                       .SetFillWrapMode(LOptions.FillWrapMode)
                       .SetFillCropCenter(LOptions.FillCropCenter)
                       .SetFillBlurRadius(LOptions.FillBlurRadius)
@@ -2610,58 +2777,81 @@ begin
                                         LTextBoxes[i].rect.Bottom);
                       LDstRect.Offset(LParagraphRect.TopLeft);
                       var LSrcRect := TRectF.Create(0,0,LDstRect.Width, LDstRect.Height);
+                      var LImage: sk_image_t;
+                      var LKey: TBytes;
+                      var LHash: Integer;
+                      var LIsCachedImage: Boolean {$IFDEF ALDPK} := False {$ENDIF};
                       {$IFDEF ALDPK}
-                      var LImg: sk_image_t;
-                      var LFileName := ALGetResourceFilename(LImgSrc);
-                      if LFileName <> '' then begin
-                        try
-                          LImg := ALCreateSkImageFromResource(
-                                    LImgSrc, // const AResourceName: String;
-                                    nil, // const AResourceStream: TStream;
-                                    '', // const AMaskResourceName: String;
-                                    0, // const AMaskImage: sk_image_t;
-                                    1, // const AScale: Single;
-                                    LDstRect.Width, LDstRect.Height, // const W, H: single;
-                                    TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
-                                    TpointF.Create(-50,-50), // const ACropCenter: TpointF;
-                                    0, // const ABlurRadius: single;
-                                    0, // const AXRadius: Single;
-                                    0); // const AYRadius: Single);
-                        except
-                          LImg := 0;
-                        end
-                      end
+                      if ALGetResourceFilename(LImgSrc) = '' then
+                        LImage := 0
                       else
-                        LImg := 0;
-                      {$ELSE}
-                      var LImg := ALCreateSkImageFromResource(
-                                    LImgSrc, // const AResourceName: String;
-                                    nil, // const AResourceStream: TStream;
-                                    '', // const AMaskResourceName: String;
-                                    0, // const AMaskImage: sk_image_t;
-                                    1, // const AScale: Single;
-                                    LDstRect.Width, LDstRect.Height, // const W, H: single;
-                                    TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
-                                    TpointF.Create(-50,-50), // const ACropCenter: TpointF;
-                                    0, // const ABlurRadius: single;
-                                    0, // const AXRadius: Single;
-                                    0); // const AYRadius: Single);
+                      try
                       {$ENDIF}
-                      If LImg <> 0 then begin
+                        if TThread.Current.ThreadID = MainThreadID then
+                          LImage := ALGetCachedBitmap(
+                                      ALCachedSkImages, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                                      LImgSrc, // const AResourceName: String;
+                                      nil, // const AResourceStream: TStream;
+                                      '', // const AMaskResourceName: String;
+                                      1, // const AScale: Single;
+                                      LDstRect.Width, LDstRect.Height, // const W, H: single;
+                                      False, // const AApplyMetadataOrientation: Boolean;
+                                      TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                                      TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                                      Cardinal(LPlaceHolders.Objects[i]), // const ATintColor: TalphaColor;
+                                      0, // const ABlurRadius: single;
+                                      0, // const AXRadius: Single;
+                                      0, // const AYRadius: Single);
+                                      LKey, // out AKey: TBytes
+                                      LHash) // out AHash: Integer)
+                        else begin
+                          LImage := ALNullBitmap;
+                          SetLength(LKey, 0);
+                        end;
+                        if ALIsBitmapNull(LImage) then begin
+                          LIsCachedImage := False;
+                          LImage := ALCreateSkImageFromResource(
+                                      LImgSrc, // const AResourceName: String;
+                                      nil, // const AResourceStream: TStream;
+                                      '', // const AMaskResourceName: String;
+                                      1, // const AScale: Single;
+                                      LDstRect.Width, LDstRect.Height, // const W, H: single;
+                                      False, // const AApplyMetadataOrientation: Boolean;
+                                      TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                                      TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                                      Cardinal(LPlaceHolders.Objects[i]), // const ATintColor: TalphaColor;
+                                      0, // const ABlurRadius: single;
+                                      0, // const AXRadius: Single;
+                                      0); // const AYRadius: Single);
+                        end
+                        else
+                          LIsCachedImage := True;
+                      {$IFDEF ALDPK}
+                      except
+                        LImage := 0;
+                        setlength(LKey, 0);
+                        LIsCachedImage := False;
+                      end;
+                      If LImage <> 0 then
+                      {$ENDIF}
                         try
                           var LSamplingoptions := ALGetNearestSkSamplingoptions;
                           sk4d_canvas_draw_image_rect(
                             ACanvas, // self: sk_canvas_t;
-                            LImg, // const image: sk_image_t;
+                            LImage, // const image: sk_image_t;
                             @LSrcRect, // const src: psk_rect_t;
                             @LDstRect,  // const dest: psk_rect_t;
                             @LSamplingoptions, // const sampling: psk_samplingoptions_t;
                             LPaint, // const paint: sk_paint_t;
                             FAST_SK_SRCRECTCONSTRAINT); // constraint: sk_srcrectconstraint_t)
                         finally
-                          sk4d_refcnt_unref(LImg);
+                          if not LIsCachedImage then begin
+                            if length(LKey) > 0 then
+                              ALCacheBitmap(ALCachedSkImages, ALMaxCachedBitmaps, LKey, LHash, LImage)
+                            else
+                              sk4d_refcnt_unref(LImage);
+                          end;
                         end;
-                      end;
                     end;
                   end;
 
@@ -2791,7 +2981,6 @@ begin
           LText := ALStringReplaceW(Ltext, ' '#10, #10, [RfReplaceALL]);
         While ALPosW(#10' ', LText) > 0 do
           LText := ALStringReplaceW(Ltext, #10' ', #10, [RfReplaceALL]);
-        LText := ALStringReplaceW(Ltext, '&nbsp;', Chr($A0){0x00A0}, [RfReplaceALL, RfIgnoreCase]);
       end
       else
         LText := ALStringReplaceW(Ltext, #13#10, #10, [RfReplaceALL]);
@@ -2809,6 +2998,7 @@ begin
         var LCurrImgSrc: String;
         var LcurrImgWidth: Single;
         var LcurrImgHeight: Single;
+        var LcurrImgTintColor: TAlphaColor := TAlphaColors.null; // Warning bug
 
 
         /////////////////////////
@@ -2879,6 +3069,7 @@ begin
                     LCurrImgSrc := '';
                     LcurrImgWidth := 0;
                     LcurrImgHeight := 0;
+                    LcurrImgTintColor := TAlphaColors.Null;
                     P1 := -1;
                     //--
                     LFontFamilies.Add(LExtendedTextElement.FontFamily);
@@ -2923,6 +3114,7 @@ begin
               LCurrImgSrc := '';
               LcurrImgWidth := 0;
               LcurrImgHeight := 0;
+              LcurrImgTintColor := TAlphaColors.Null;
               P1 := Maxint;
               //--
               if not LOptions.EllipsisInheritSettings then begin
@@ -3012,8 +3204,9 @@ begin
                   var LBreakPos := _findLastBreakPosition(
                                      LCurrText, // const AText: String;
                                      LNumberOfChars, // Const ANumberOfChars: Integer;
-                                     (LExtendedTextElements.Count > 0) and (LExtendedTextElements[LExtendedTextElements.Count-1].IsBreakLine), // const AHardBreak: Boolean = False;
-                                     true); // const ASkipEndOfTextPunctuation: Boolean = False
+                                     (LExtendedTextElements.Count > 0) and (LExtendedTextElements[LExtendedTextElements.Count-1].IsBreakLine), // const AAllowSymbolBreaks: Boolean
+                                     LExtendedTextElements.Count = 0, // const AAllowCharacterBreak: Boolean
+                                     true); // const ASkipEndOfTextPunctuation: Boolean
                   if LBreakPos <= 0 then begin
                     LAddEllipsis := 1;
                     continue; // => Go to => else if LAddEllipsis = 1 then
@@ -3034,6 +3227,7 @@ begin
               LCurrImgSrc := '';
               LcurrImgWidth := 0;
               LcurrImgHeight := 0;
+              LcurrImgTintColor := TAlphaColors.Null;
               P1 := -1;
               //--
               LFontFamilies.Add(LExtendedTextElement.FontFamily);
@@ -3096,6 +3290,7 @@ begin
           LCurrImgSrc := '';
           LcurrImgWidth := 0;
           LcurrImgHeight := 0;
+          LcurrImgTintColor := TAlphaColors.Null;
           P1 := P1 + 1;
 
         end
@@ -3117,6 +3312,7 @@ begin
             LCurrText := '';
             LcurrImgWidth := 0;
             LcurrImgHeight := 0;
+            LcurrImgTintColor := TAlphaColors.Null;
             var P2 := ALPosW('>', Ltext, P1+1); // blablabla <font color="#ffffff">blablabla</font> blablabla
                                                 //           ^P1                  ^P2
             if P2 <= 0 then break;
@@ -3149,7 +3345,18 @@ begin
             //-----
             else if (ALPosW('<img ', LTag) = 1) or
                     (LTag = '<img/>') then begin // <img src="xxx">
-              _getInfosFromTag(ALCopyStr(LTag, 6, length(LTag) - 6), LCurrImgSrc, LcurrImgWidth, LcurrImgHeight);
+              var LcurrImgTintColorStr: String;
+              _getInfosFromTag(ALCopyStr(LTag, 6, length(LTag) - 6), LCurrImgSrc, LcurrImgWidth, LcurrImgHeight, LcurrImgTintColorStr);
+              if LcurrImgTintColorStr = '' then LcurrImgTintColor := TAlphaColors.Null
+              else if ALSameTextW(LcurrImgTintColorStr, 'inherit') then begin
+                if LFontColors.Count > 0 then LcurrImgTintColor := LFontColors[LFontColors.Count - 1]
+                else LcurrImgTintColor := LOptions.FontColor;
+              end
+              else begin
+                var LcurrImgTintColorInt: Cardinal;
+                if _TryStrColorToInt(LcurrImgTintColorStr, LcurrImgTintColorInt) then LcurrImgTintColor := TalphaColor(LcurrImgTintColorInt)
+                else LcurrImgTintColor := TAlphaColors.Null;
+              end;
             end
 
             //-----
@@ -3192,6 +3399,7 @@ begin
             LCurrImgSrc := '';
             LcurrImgWidth := 0;
             LcurrImgHeight := 0;
+            LcurrImgTintColor := TAlphaColors.Null;
             var P2 := ALPosW('<', Ltext, P1);  // blablabla <font color="#ffffff">blablabla</font> blablabla
                                                //                                 ^P1      ^P2
             if P2 <= 0 then P2 := Maxint;
@@ -3199,8 +3407,7 @@ begin
             if P3 <= 0 then P3 := Maxint;
             P2 := Min(P2,P3);
             LCurrText := ALCopyStr(Ltext, P1, P2 - P1);  // blablabla
-            LCurrText := ALStringReplaceW(LCurrText, '&gt;', '>', [rfReplaceALL]);
-            LCurrText := ALStringReplaceW(LCurrText, '&lt;', '<', [rfReplaceALL]);
+            ALHtmlDecodeInPlace(LCurrText);
             P1 := P2; // blablabla <font color="#ffffff">blablabla</font> blablabla
                       //                                          ^P1
 
@@ -3217,6 +3424,7 @@ begin
           LCurrImgSrc := '';
           LcurrImgWidth := 0;
           LcurrImgHeight := 0;
+          LcurrImgTintColor := TAlphaColors.Null;
           var P2 := ALPosW(#10, Ltext, P1);  // blablabla #10blablabla#10 blablabla
                                              // ^P1       ^P2
           if P2 <= 0 then P2 := Maxint;
@@ -3317,17 +3525,17 @@ begin
             // To be in pair with skia, by default, text will layout with line height as defined by the font. Font-metrics defined line height may be
             // taller or shorter than the font size. The height property allows manual adjustment of the height of the line
             // as a multiple of fontSize. For most fonts, setting height to 1.0 is not the same as omitting or setting
-            // height to null.
+            // height to null. To summarize: when LineHeightMultiplier is set, lineHeight = fontSize * LineHeightMultiplier.
             var LDrawTextOffsetY: Single;
-            if not sameValue(LLineHeightMultiplier, 0, TEpsilon.Scale) then begin
+            var LTmpLineHeightMultiplier: Single := ALResolveLineHeightMultiplier(LFontSize / LScale, LLineHeightMultiplier);
+            if CompareValue(LTmpLineHeightMultiplier, 0, TEpsilon.Scale) > 0 then begin
               var LOldAscent := LFontMetrics.Ascent;
               var LRatio: Single := (LFontSize / (-LFontMetrics.Ascent + LFontMetrics.Descent));
-              LFontMetrics.Ascent := -1 * LRatio * -LFontMetrics.Ascent * LLineHeightMultiplier;
-              LFontMetrics.Descent := LRatio * LFontMetrics.Descent * LLineHeightMultiplier;
+              LFontMetrics.Ascent := -1 * LRatio * -LFontMetrics.Ascent * LTmpLineHeightMultiplier;
+              LFontMetrics.Descent := LRatio * LFontMetrics.Descent * LTmpLineHeightMultiplier;
               LDrawTextOffsetY :=  (-1 * LFontMetrics.Ascent) - (-1 * LOldAscent);
             end
             else LDrawTextOffsetY := 0;
-
 
             // Now break the line
             While LCurrText <> '' do begin
@@ -3359,7 +3567,8 @@ begin
                                     LLetterSpacing, // const ALetterSpacing: Single;
                                     LOptions.Direction, // const ADirection: TALTextDirection
                                     ARect.Width - LOptions.Padding.Left - LOptions.Padding.Right - LCurrLineWidth, // const AMaxWidth: Single;
-                                    samevalue(LCurrLineWidth, 0, TEpsilon.Position), // const AHardBreak: Boolean;
+                                    samevalue(LCurrLineWidth, 0, TEpsilon.Position), // const AAllowSymbolBreaks: Boolean;
+                                    LExtendedTextElements.Count = 0, // const AAllowCharacterBreak: Boolean
                                     LMeasuredWidth, // out AMeasuredWidth: Single): integer;
                                     LMeasuredHeight) // out AMeasuredHeight: Single): integer;
               else begin
@@ -3411,6 +3620,7 @@ begin
                 LExtendedTextElement.DecorationThicknessMultiplier := LDecorationThicknessMultiplier;
                 LExtendedTextElement.DecorationColor := LDecorationColor;
                 LExtendedTextElement.ImgSrc := '';
+                LExtendedTextElement.ImgTintColor := TAlphaColors.null;
                 LExtendedTextElements.add(LExtendedTextElement);
                 //--
                 if LCurrText = #10 then break // => break the loop => While LCurrText <> '' do begin => Go to the loop => while P1 <= high(Ltext) do begin
@@ -3458,6 +3668,7 @@ begin
               LExtendedTextElement.DecorationThicknessMultiplier := LDecorationThicknessMultiplier;
               LExtendedTextElement.DecorationColor := LDecorationColor;
               LExtendedTextElement.ImgSrc := '';
+              LExtendedTextElement.ImgTintColor := TAlphaColors.null;
               LExtendedTextElements.add(LExtendedTextElement);
 
               // Increase the number of lines
@@ -3497,6 +3708,7 @@ begin
                 LExtendedTextElement.DecorationThicknessMultiplier := LDecorationThicknessMultiplier;
                 LExtendedTextElement.DecorationColor := LDecorationColor;
                 LExtendedTextElement.ImgSrc := '';
+                LExtendedTextElement.ImgTintColor := TAlphaColors.null;
                 LExtendedTextElements.add(LExtendedTextElement);
               end;
 
@@ -3515,8 +3727,16 @@ begin
           else if LCurrImgSrc <> '' then begin
 
             // Update LCurrImgWidth / LCurrImgHeight
-            if CompareValue(LCurrImgWidth, 0, TEpsilon.FontSize) <= 0 then LCurrImgWidth := LOptions.FontSize;
-            if CompareValue(LCurrImgHeight, 0, TEpsilon.FontSize) <= 0 then LCurrImgHeight := LOptions.FontSize;
+            if (CompareValue(LCurrImgWidth, 0, TEpsilon.FontSize) <= 0) and
+               (CompareValue(LCurrImgHeight, 0, TEpsilon.FontSize) <= 0) then LCurrImgHeight := LOptions.FontSize;
+            if CompareValue(LCurrImgWidth, 0, TEpsilon.FontSize) <= 0 then begin
+              var LSize := ALGetImageDimensions(LCurrImgSrc);
+              LCurrImgWidth := (LCurrImgHeight / LSize.Height) * LSize.Width;
+            end;
+            if CompareValue(LCurrImgHeight, 0, TEpsilon.FontSize) <= 0 then begin
+              var LSize := ALGetImageDimensions(LCurrImgSrc);
+              LCurrImgHeight := (LCurrImgWidth / LSize.Width) * LSize.Height;
+            end;
 
             // No horizontal space left to add the Image
             If CompareValue(LCurrLineWidth + LCurrImgWidth, ARect.Width - LOptions.Padding.Left - LOptions.Padding.Right, TEpsilon.Position) > 0 then begin
@@ -3567,6 +3787,7 @@ begin
               LExtendedTextElement.DecorationThicknessMultiplier := LDecorationThicknessMultiplier;
               LExtendedTextElement.DecorationColor := LDecorationColor;
               LExtendedTextElement.ImgSrc := '';
+              LExtendedTextElement.ImgTintColor := TAlphaColors.null;
               LExtendedTextElements.add(LExtendedTextElement);
             end;
 
@@ -3611,6 +3832,7 @@ begin
             LExtendedTextElement.DecorationThicknessMultiplier := LDecorationThicknessMultiplier;
             LExtendedTextElement.DecorationColor := LDecorationColor;
             LExtendedTextElement.ImgSrc := LCurrImgSrc;
+            LExtendedTextElement.ImgTintColor := LcurrImgTintColor;
             LExtendedTextElements.add(LExtendedTextElement);
 
           end;
@@ -3684,12 +3906,12 @@ begin
       LParagraphRect.height := LParagraphRect.height;
 
       // Autosize
-      if LOptions.Autosize or (LOptions.AutosizeX and LOptions.AutosizeY) then begin
+      if LOptions.Autosize = TALAutoSizeMode.Both then begin
         ARect.Width := Min(ARect.Width, LParagraphRect.Width + LOptions.Padding.Left + LOptions.Padding.Right);
         ARect.Height := Min(ARect.Height, LParagraphRect.Height + LOptions.Padding.Top + LOptions.Padding.Bottom);
       end
-      else if LOptions.AutosizeX then ARect.Width := Min(ARect.Width, LParagraphRect.Width + LOptions.Padding.Left + LOptions.Padding.Right)
-      else if LOptions.AutosizeY then ARect.Height := Min(ARect.Height, LParagraphRect.Height + LOptions.Padding.Top + LOptions.Padding.Bottom);
+      else if LOptions.Autosize = TALAutoSizeMode.Width then ARect.Width := Min(ARect.Width, LParagraphRect.Width + LOptions.Padding.Left + LOptions.Padding.Right)
+      else if LOptions.Autosize = TALAutoSizeMode.Height then ARect.Height := Min(ARect.Height, LParagraphRect.Height + LOptions.Padding.Top + LOptions.Padding.Bottom);
 
       // HTextAlign/VTextAlign
       // TALTextHorzAlign.Justify is not yet supported
@@ -3768,10 +3990,11 @@ begin
       // Calculate the SurfaceRect
       var LSurfaceRect := ALGetShapeSurfaceRect(
                             ARect, // const ARect: TRectF;
+                            LOptions.AlignToPixel, // const AAlignToPixel: Boolean;
                             LOptions.FillColor, // const AFillColor: TAlphaColor;
                             LOptions.FillGradientColors, // const AFillGradientColors: TArray<TAlphaColor>;
                             LOptions.FillResourceName, // const AFillResourceName: String;
-                            nil, // const AFillResourceStream: TStream;
+                            LOptions.FillResourceStream, // const AFillResourceStream: TStream;
                             LOptions.FillBackgroundMargins, // Const AFillBackgroundMarginsRect: TRectF;
                             LOptions.FillImageMargins, // Const AFillImageMarginsRect: TRectF;
                             LOptions.StateLayerOpacity, // const AStateLayerOpacity: Single;
@@ -3870,6 +4093,7 @@ begin
           if (LOptions.FillColor <> TalphaColors.Null) or
              (length(LOptions.FillGradientColors) > 0) or
              (LOptions.FillResourceName <> '') or
+             (LOptions.FillResourceStream <> nil) or
              (LOptions.StateLayerColor <> TalphaColors.Null) or
              (LOptions.StrokeColor <> TalphaColors.Null) or
              (LOptions.ShadowColor <> TalphaColors.Null) then begin
@@ -3883,11 +4107,12 @@ begin
               .SetFillGradientColors(LOptions.FillGradientColors)
               .SetFillGradientOffsets(LOptions.FillGradientOffsets)
               .SetFillResourceName(LOptions.FillResourceName)
+              .SetFillResourceStream(LOptions.FillResourceStream)
               .SetFillMaskResourceName(LOptions.FillMaskResourceName)
-              .SetFillMaskBitmap(LOptions.FillMaskBitmap)
               .SetFillBackgroundMarginsRect(LOptions.FillBackgroundMargins)
               .SetFillImageMarginsRect(LOptions.FillImageMargins)
               .SetFillImageNoRadius(LOptions.FillImageNoRadius)
+              .SetFillImageTintColor(LOptions.FillImageTintColor)
               .SetFillWrapMode(LOptions.FillWrapMode)
               .SetFillCropCenter(LOptions.FillCropCenter)
               .SetFillBlurRadius(LOptions.FillBlurRadius)
@@ -3922,23 +4147,60 @@ begin
               Var LDstRect := LExtendedTextElement.Rect;
               LDstRect.Offset(LParagraphRect.TopLeft);
               var LSrcRect := TRectF.Create(0,0,LDstRect.Width, LDstRect.Height);
-              var LImg := ALCreateJbitmapFromResource(
-                            LExtendedTextElement.imgSrc, // const AResourceName: String;
-                            nil, // const AResourceStream: TStream;
-                            '', // const AMaskResourceName: String;
-                            nil, // const AMaskBitmap: JBitmap;
-                            1, // const AScale: Single;
-                            LDstRect.Width, LDstRect.Height, // const W, H: single;
-                            TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
-                            TpointF.Create(-50,-50), // const ACropCenter: TpointF;
-                            0, // const ABlurRadius: single;
-                            0, // const AXRadius: Single;
-                            0); // const AYRadius: Single);
+              var LBitmap: JBitmap;
+              var LKey: TBytes;
+              var LHash: Integer;
+              var LIsCachedBitmap: Boolean;
+              if TThread.Current.ThreadID = MainThreadID then
+                LBitmap := ALGetCachedBitmap(
+                             ALCachedJBitmaps, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                             LExtendedTextElement.imgSrc, // const AResourceName: String;
+                             nil, // const AResourceStream: TStream;
+                             '', // const AMaskResourceName: String;
+                             1, // const AScale: Single;
+                             LDstRect.Width, LDstRect.Height, // const W, H: single;
+                             False, // const AApplyMetadataOrientation: Boolean;
+                             TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                             TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                             LExtendedTextElement.ImgTintColor, // const ATintColor: TalphaColor;
+                             0, // const ABlurRadius: single;
+                             0, // const AXRadius: Single;
+                             0, // const AYRadius: Single);
+                             LKey, // out AKey: TBytes
+                             LHash) // out AHash: Integer)
+              else begin
+                LBitmap := ALNullBitmap;
+                SetLength(LKey, 0);
+              end;
+              if ALIsBitmapNull(LBitmap) then begin
+                LIsCachedBitmap := False;
+                LBitmap := ALCreateJBitmapFromResource(
+                             LExtendedTextElement.imgSrc, // const AResourceName: String;
+                             nil, // const AResourceStream: TStream;
+                             '', // const AMaskResourceName: String;
+                             1, // const AScale: Single;
+                             LDstRect.Width, LDstRect.Height, // const W, H: single;
+                             False, // const AApplyMetadataOrientation: Boolean;
+                             TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                             TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                             LExtendedTextElement.ImgTintColor, // const ATintColor: TalphaColor;
+                             0, // const ABlurRadius: single;
+                             0, // const AXRadius: Single;
+                             0); // const AYRadius: Single);
+              end
+              else
+                LIsCachedBitmap := True;
               try
-                ACanvas.drawBitmap(LImg, LDstRect.left {left}, LDstRect.top {top}, _Paint {paint});
+                ACanvas.drawBitmap(LBitmap, LDstRect.left {left}, LDstRect.top {top}, _Paint {paint});
               finally
-                LImg.recycle;
-                LImg := nil;
+                if not LIsCachedBitmap then begin
+                  if length(LKey) > 0 then
+                    ALCacheBitmap(ALCachedJBitmaps, ALMaxCachedBitmaps, LKey, LHash, LBitmap)
+                  else begin
+                    LBitmap.recycle;
+                    LBitmap := nil;
+                  end;
+                end;
               end;
             end
             else begin
@@ -3987,18 +4249,49 @@ begin
               Var LDstRect := LExtendedTextElement.Rect;
               LDstRect.Offset(LParagraphRect.TopLeft);
               var LSrcRect := TRectF.Create(0,0,LDstRect.Width, LDstRect.Height);
-              var LImg := ALCreateCGImageRefFromResource(
+              var LImage: CGImageRef;
+              var LKey: TBytes;
+              var LHash: Integer;
+              var LIsCachedImage: Boolean;
+              if TThread.Current.ThreadID = MainThreadID then
+                LImage := ALGetCachedBitmap(
+                            ALCachedCGImageRefs, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
                             LExtendedTextElement.imgSrc, // const AResourceName: String;
                             nil, // const AResourceStream: TStream;
                             '', // const AMaskResourceName: String;
-                            nil, // const AMaskImage: CGImageRef;
                             1, // const AScale: Single;
                             LDstRect.Width, LDstRect.Height, // const W, H: single;
+                            False, // const AApplyMetadataOrientation: Boolean;
                             TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
-                            TpointF.Create(-50,-50), // const ACropCenter: TpointF;
+                            TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                            LExtendedTextElement.ImgTintColor, // const ATintColor: TalphaColor;
+                            0, // const ABlurRadius: single;
+                            0, // const AXRadius: Single;
+                            0, // const AYRadius: Single);
+                            LKey, // out AKey: TBytes
+                            LHash) // out AHash: Integer)
+              else begin
+                LImage := ALNullBitmap;
+                SetLength(LKey, 0);
+              end;
+              if ALIsBitmapNull(LImage) then begin
+                LIsCachedImage := False;
+                LImage := ALCreateCGImageRefFromResource(
+                            LExtendedTextElement.imgSrc, // const AResourceName: String;
+                            nil, // const AResourceStream: TStream;
+                            '', // const AMaskResourceName: String;
+                            1, // const AScale: Single;
+                            LDstRect.Width, LDstRect.Height, // const W, H: single;
+                            False, // const AApplyMetadataOrientation: Boolean;
+                            TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                            TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                            LExtendedTextElement.ImgTintColor, // const ATintColor: TalphaColor;
                             0, // const ABlurRadius: single;
                             0, // const AXRadius: Single;
                             0); // const AYRadius: Single);
+              end
+              else
+                LIsCachedImage := True;
               try
                 CGContextDrawImage(
                   ACanvas, // c: The graphics context in which to draw the image.
@@ -4007,9 +4300,14 @@ begin
                     LDstRect.Width,
                     LDstRect.Height,
                     LGridHeight), // rect The location and dimensions in user space of the bounding box in which to draw the image.
-                  LImg); // image The image to draw.
+                  LImage); // image The image to draw.
               finally
-                CGImageRelease(LImg);
+                if not LIsCachedImage then begin
+                  if length(LKey) > 0 then
+                    ALCacheBitmap(ALCachedCGImageRefs, ALMaxCachedBitmaps, LKey, LHash, LImage)
+                  else
+                    CGImageRelease(LImage);
+                end;
               end;
             end
             else begin
@@ -4070,33 +4368,69 @@ begin
               Var LDstRect := LExtendedTextElement.Rect;
               LDstRect.Offset(LParagraphRect.TopLeft);
               var LSrcRect := TRectF.Create(0,0,LDstRect.Width, LDstRect.Height);
-              var LImg := ALCreateTBitmapFromResource(
-                            LExtendedTextElement.imgSrc, // const AResourceName: String;
-                            nil, // const AResourceStream: TStream;
-                            '', // const AMaskResourceName: String;
-                            nil, // const AMaskBitmap: TBitmap;
-                            1, // const AScale: Single;
-                            LDstRect.Width, LDstRect.Height, // const W, H: single;
-                            TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
-                            TpointF.Create(-50,-50), // const ACropCenter: TpointF;
-                            0, // const ABlurRadius: single;
-                            0, // const AXRadius: Single;
-                            0); // const AYRadius: Single);
+              var LBitmap: TBitmap;
+              var LKey: TBytes;
+              var LHash: Integer;
+              var LIsCachedBitmap: Boolean;
+              if TThread.Current.ThreadID = MainThreadID then
+                LBitmap := ALGetCachedBitmap(
+                             ALCachedTBitmaps, // const ACachedBitmaps: TList<TALTriplet<TBytes, TALBitmap, Integer>>;
+                             LExtendedTextElement.imgSrc, // const AResourceName: String;
+                             nil, // const AResourceStream: TStream;
+                             '', // const AMaskResourceName: String;
+                             1, // const AScale: Single;
+                             LDstRect.Width, LDstRect.Height, // const W, H: single;
+                             False, // const AApplyMetadataOrientation: Boolean;
+                             TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                             TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                             LExtendedTextElement.ImgTintColor, // const ATintColor: TalphaColor;
+                             0, // const ABlurRadius: single;
+                             0, // const AXRadius: Single;
+                             0, // const AYRadius: Single);
+                             LKey, // out AKey: TBytes
+                             LHash) // out AHash: Integer)
+              else begin
+                LBitmap := ALNullBitmap;
+                SetLength(LKey, 0);
+              end;
+              if ALIsBitmapNull(LBitmap) then begin
+                LIsCachedBitmap := False;
+                LBitmap := ALCreateBitmapFromResource(
+                             LExtendedTextElement.imgSrc, // const AResourceName: String;
+                             nil, // const AResourceStream: TStream;
+                             '', // const AMaskResourceName: String;
+                             1, // const AScale: Single;
+                             LDstRect.Width, LDstRect.Height, // const W, H: single;
+                             False, // const AApplyMetadataOrientation: Boolean;
+                             TALImageWrapMode.Stretch, // const AWrapMode: TALImageWrapMode;
+                             TpointF.Create(0.5,0.5), // const ACropCenter: TpointF;
+                             LExtendedTextElement.ImgTintColor, // const ATintColor: TalphaColor;
+                             0, // const ABlurRadius: single;
+                             0, // const AXRadius: Single;
+                             0); // const AYRadius: Single);
+              end
+              else
+                LIsCachedBitmap := True;
               try
                 ACanvas.drawBitmap(
-                  LImg,
+                  LBitmap,
                   LSrcRect,
                   LDstRect,
                   1{AOpacity},
                   false{HighSpeed});
               finally
-                ALFreeAndNil(LImg);
+                if not LIsCachedBitmap then begin
+                  if length(LKey) > 0 then
+                    ALCacheBitmap(ALCachedTBitmaps, ALMaxCachedBitmaps, LKey, LHash, LBitmap)
+                  else
+                    ALFreeAndNil(LBitmap);
+                end;
               end;
             end
             else begin
               Var LDstRect := LExtendedTextElement.Rect;
               LDstRect.Offset(LParagraphRect.TopLeft);
-              ACanvas.Font.Family := _getFontFamily(LExtendedTextElement.FontFamily);
+              ACanvas.Font.Family := ALExtractPrimaryFontFamily(LExtendedTextElement.FontFamily);
               ACanvas.Font.Size := LExtendedTextElement.FontSize;
               ACanvas.Font.StyleExt := _getFontStyleExt(LExtendedTextElement.FontWeight, LExtendedTextElement.FontSlant, LExtendedTextElement.FontStretch, LExtendedTextElement.DecorationKinds);
               If LExtendedTextElement.BackgroundColor <> Talphacolors.Null then begin
@@ -4448,19 +4782,6 @@ begin
               LAllTextDrawn,
               LElements,
               AOptions);
-end;
-
-{*******************************************************************************************************}
-function ALGetTextElementsByID(Const ATextElements: TALTextElements; Const AId: String): TALTextElements;
-begin
-  Setlength(Result, length(ATextElements));
-  Var I := 0;
-  For var J := Low(ATextElements) to high(ATextElements) do
-    if ATextElements[J].Id = AId then begin
-      Result[I] := ATextElements[J];
-      inc(I);
-    end;
-  Setlength(Result, I);
 end;
 
 end.

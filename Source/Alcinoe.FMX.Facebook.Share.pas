@@ -12,7 +12,7 @@ https://developers.facebook.com/docs/sharing/android/
 2) On android you just need to include the library
      * io.magicfoundation.alcinoe:alcinoe-facebook-share:1.0.0
    in the project. You can do this with the help of AndroidMerger. You can see
-   an exemple in <Alcinoe>\Demos\ALFacebookLogin\_source\android\MergeLibraries.bat
+   an exemple in <Alcinoe>\Demos\ALFmxFacebookLogin\_source\android\MergeLibraries.bat
 
 3) https://developers.facebook.com/docs/sharing/android/
    https://developers.facebook.com/docs/reference/android/current/class/FacebookContentProvider/
@@ -100,13 +100,10 @@ begin
   try
     LFBSDKShareLinkContent.setContentURL(StrToNSUrl(aLinkUrl));
     var LFBSDKShareDialog := TFBSDKShareDialog.OCClass.dialogWithViewController(nil{SharedApplication.keyWindow.rootViewController},LFBSDKShareLinkContent,nil);
-    try
-      if LFBSDKShareDialog.canshow then
-        LFBSDKShareDialog.show;
-    finally
-      //exception when we close the dialog if we release it here
-      //LFBSDKShareDialog.release;
-    end;
+    // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html
+    // No release required for LFBSDKShareDialog because it wasn’t created via a method whose name starts with “alloc”, “new”, “copy”, or “mutableCopy”.
+    if LFBSDKShareDialog.canshow then
+      LFBSDKShareDialog.show;
   finally
     LFBSDKShareLinkContent.release;
   end;

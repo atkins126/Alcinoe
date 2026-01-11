@@ -6,6 +6,8 @@ unit Alcinoe.Sqlite3.Client;
 
 interface
 
+{$I Alcinoe.inc}
+
 Uses
   System.SysUtils,
   System.Contnrs,
@@ -13,7 +15,7 @@ Uses
   Alcinoe.XMLDoc,
   Alcinoe.JSONDoc,
   Alcinoe.Sqlite3.Wrapper,
-  Alcinoe.StringUtils,
+  Alcinoe.Localization,
   Alcinoe.StringList;
 
 Type
@@ -360,7 +362,8 @@ Uses
   System.AnsiStrings,
   Alcinoe.Common,
   Alcinoe.Cipher,
-  Alcinoe.WinApi.Common;
+  Alcinoe.StringUtils,
+  Alcinoe.WinApi.Windows;
 
 {***********************************************************************************}
 constructor EALSqlite3Error.Create(const aErrorMsg: AnsiString; aErrorCode: Integer);

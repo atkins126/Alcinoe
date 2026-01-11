@@ -4,7 +4,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Editor.Items.pas was not updated and adjust the IFDEF'}
 {$ENDIF}
 
@@ -30,10 +30,27 @@ const
 
 type
 
+  {******************************************}
+  TALColorKeyProperty = class(TStringProperty)
+  public
+    function GetAttributes: TPropertyAttributes; override;
+    procedure GetValues(Proc: TGetStrProc); override;
+  end;
+
+  {***********************************}
+  TALTextEditor = class(TDefaultEditor)
+  protected
+    procedure ApplyStyleClick(Sender: TObject); virtual;
+  public
+    function GetVerb(Index: Integer): string; override;
+    function GetVerbCount: Integer; override;
+    procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
+  end;
+
   {***********************************}
   TALEditEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -43,7 +60,7 @@ type
   {***********************************}
   TALMemoEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -53,7 +70,17 @@ type
   {*************************************}
   TALButtonEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
+  public
+    function GetVerb(Index: Integer): string; override;
+    function GetVerbCount: Integer; override;
+    procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
+  end;
+
+  {*******************************************}
+  TALToggleButtonEditor = class(TDefaultEditor)
+  protected
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -63,7 +90,7 @@ type
   {***************************************}
   TALCheckBoxEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -73,7 +100,7 @@ type
   {******************************************}
   TALRadioButtonEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -83,7 +110,7 @@ type
   {*************************************}
   TALSwitchEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -93,7 +120,7 @@ type
   {***************************************}
   TALTrackBarEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
@@ -103,14 +130,34 @@ type
   {********************************************}
   TALRangeTrackBarEditor = class(TDefaultEditor)
   protected
-    procedure ApplyThemeClick(Sender: TObject); virtual;
+    procedure ApplyStyleClick(Sender: TObject); virtual;
   public
     function GetVerb(Index: Integer): string; override;
     function GetVerbCount: Integer; override;
     procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
   end;
 
-  {*****************************************}
+  {****************************************}
+  TALScrollBarEditor = class(TDefaultEditor)
+  protected
+    procedure ApplyStyleClick(Sender: TObject); virtual;
+  public
+    function GetVerb(Index: Integer): string; override;
+    function GetVerbCount: Integer; override;
+    procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
+  end;
+
+  {****************************************}
+  TALScrollBoxEditor = class(TDefaultEditor)
+  protected
+    procedure ApplyStyleClick(Sender: TObject); virtual;
+  public
+    function GetVerb(Index: Integer): string; override;
+    function GetVerbCount: Integer; override;
+    procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
+  end;
+
+  {*******************************************}
   TALPageControllerEditor = class(TItemsEditor)
   private
     FEditorNextPage: Integer;
@@ -128,7 +175,7 @@ type
     procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
   end;
 
-  {****************************************}
+  {*****************************************}
   TALPageViewEditor = class(TComponentEditor)
   private
   protected
@@ -139,7 +186,7 @@ type
     procedure PrepareItem(Index: Integer; const AItem: IMenuItem); override;
   end;
 
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if FMX.Skia.Designtime.pas was not updated and adjust the IFDEF'}
   {$ENDIF}
 
@@ -171,24 +218,106 @@ procedure Register;
 implementation
 
 uses
+  System.Generics.Collections,
   System.SysUtils,
   Vcl.Menus,
   FMX.Design.Items,
   Alcinoe.Common,
   Alcinoe.StringList,
-  Alcinoe.FMX.Themes,
+  Alcinoe.StringUtils,
+  Alcinoe.FMX.Layouts,
+  Alcinoe.FMX.Styles,
   Alcinoe.FMX.Edit,
   Alcinoe.FMX.Memo,
-  Alcinoe.fmx.common,
+  Alcinoe.FMX.common,
   Alcinoe.FMX.StdCtrls,
   Alcinoe.FMX.Objects,
+  Alcinoe.FMX.VideoPlayer,
   Alcinoe.FMX.PageController;
+
+{*****************************************************************************************************************************************}
+procedure ALBuildItemMenuHierarchy(const AParentItem: IMenuItem; const ANames: TList<TPair<String, String>>; const AOnClick: TNotifyEvent);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  function _getItem(const AParentItem: IMenuItem; const ACaption: String): IMenuItem;
+  begin
+    Result := nil;
+    for var i := 0 to AParentItem.Count - 1 do begin
+      if ALSameTextW(AParentItem.Items[i].Caption, ACaption) then begin
+        Result := AParentItem.Items[i];
+        Exit;
+      end;
+    end;
+    Result := AParentItem.AddItem(ACaption{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, nil{AOnClick}, 0{hCtx}, ''{AName});
+  end;
+
+begin
+  for var I := 0 to ANames.Count - 1 do begin
+    var LLst := TALStringListW.Create;
+    try
+      LLst.LineBreak := '.';
+      LLst.Text := ANames[i].Key; // Material3.Original.Filled
+      var LItem := AParentItem;
+      for var J := 0 to lLst.Count - 2 do
+        LItem := _getItem(LItem, lLst[J]);
+      LItem := LItem.AddItem(lLst[lLst.Count - 1]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, AOnClick{AOnClick}, 0{hCtx}, ''{AName});
+      LItem.Hint := ANames[i].Value; // // Material3.Button.Filled
+    finally
+      ALFreeAndNil(LLst);
+    end;
+  end;
+end;
+
+{**************************************************************}
+function TALColorKeyProperty.GetAttributes: TPropertyAttributes;
+begin
+  Result := [paValueList, paMultiSelect];
+end;
+
+{*********************************************************}
+procedure TALColorKeyProperty.GetValues(Proc: TGetStrProc);
+begin
+  var LNames := TALStyleManager.Instance.GetColorNames;
+  for var I := low(LNames) to high(LNames) do
+    Proc(LNames[i]);
+end;
+
+{*****************************************************}
+function TALTextEditor.GetVerb(Index: Integer): string;
+begin
+  case Index of
+    0: result := 'Style';
+    else Result := Format(SItems + ' %d', [Index]);
+  end;
+end;
+
+{*******************************************}
+function TALTextEditor.GetVerbCount: Integer;
+begin
+  result := 1;
+end;
+
+{*******************************************************}
+procedure TALTextEditor.ApplyStyleClick(Sender: TObject);
+begin
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyTextStyle(LStyleName, TALText(Component));
+end;
+
+{**************************************************************************}
+procedure TALTextEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
+begin
+  var LNames := TALStyleManager.Instance.GetTextStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
+end;
 
 {*****************************************************}
 function TALEditEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -200,33 +329,26 @@ begin
 end;
 
 {*******************************************************}
-procedure TALEditEditor.ApplyThemeClick(Sender: TObject);
+procedure TALEditEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyEditTheme(LTheme, TALEdit(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyEditStyle(LStyleName, TALEdit(Component));
 end;
 
 {**************************************************************************}
 procedure TALEditEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALEditThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
-  end;
+  var LNames := TALStyleManager.Instance.GetEditStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
 end;
 
 {*****************************************************}
 function TALMemoEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -238,33 +360,26 @@ begin
 end;
 
 {*******************************************************}
-procedure TALMemoEditor.ApplyThemeClick(Sender: TObject);
+procedure TALMemoEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyMemoTheme(LTheme, TALMemo(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyMemoStyle(LStyleName, TALMemo(Component));
 end;
 
 {**************************************************************************}
 procedure TALMemoEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALMemoThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
-  end;
+  var LNames := TALStyleManager.Instance.GetMemoStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
 end;
 
 {*******************************************************}
 function TALButtonEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -276,25 +391,74 @@ begin
 end;
 
 {*********************************************************}
-procedure TALButtonEditor.ApplyThemeClick(Sender: TObject);
+procedure TALButtonEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyButtonTheme(LTheme, TALButton(Component));
+  var LStyleName := TmenuItem(Sender).Hint;
+  if LStyleName = '' then exit;
+  TALStyleManager.Instance.ApplyButtonStyle(LStyleName, TALButton(Component));
 end;
 
 {****************************************************************************}
 procedure TALButtonEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
+  var LLstNames := TList<TPair<String, String>>.Create;
   try
-    for var LKeyValue in ALButtonThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
+    var LArrNames := TALStyleManager.Instance.GetButtonStyleNames;
+    for var I := low(LArrNames) to high(LArrNames) do begin
+      var LKey := ALStringReplaceW(LArrNames[i], 'Material3.Button.Icon',            'Material3.Original.Icon',    [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.Button.FAB',             'Material3.Original.FAB',     [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.Button',                 'Material3.Original.Button',  [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.Expressive.Button.Icon', 'Material3.Expressive.Icon',  [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.Expressive.Button.FAB',  'Material3.Expressive.FAB',   [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.',                       'Material3 ', [RFIgnoreCase]);
+      LLstNames.Add(TPair<String, String>.Create(LKey, LArrNames[i]));
+    end;
+    ALBuildItemMenuHierarchy(AItem{AParentItem}, LLstNames{ANames}, ApplyStyleClick{AOnClick});
   finally
-    ALFreeAndNil(LKeys);
+    ALFreeAndNil(LLstNames);
+  end;
+end;
+
+{*************************************************************}
+function TALToggleButtonEditor.GetVerb(Index: Integer): string;
+begin
+  case Index of
+    0: result := 'Style';
+    else Result := Format(SItems + ' %d', [Index]);
+  end;
+end;
+
+{***************************************************}
+function TALToggleButtonEditor.GetVerbCount: Integer;
+begin
+  result := 1;
+end;
+
+{***************************************************************}
+procedure TALToggleButtonEditor.ApplyStyleClick(Sender: TObject);
+begin
+  var LStyleName := TmenuItem(Sender).Hint;
+  if LStyleName = '' then exit;
+  TALStyleManager.Instance.ApplyToggleButtonStyle(LStyleName, TALToggleButton(Component));
+end;
+
+{**********************************************************************************}
+procedure TALToggleButtonEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
+begin
+  var LLstNames := TList<TPair<String, String>>.Create;
+  try
+    var LArrNames := TALStyleManager.Instance.GetToggleButtonStyleNames;
+    for var I := low(LArrNames) to high(LArrNames) do begin
+      var LKey := ALStringReplaceW(LArrNames[i], 'Material3.ToggleButton.Icon',            'Material3.Original.Icon',    [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.ToggleButton',                 'Material3.Original.ToggleButton',  [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.Expressive.ToggleButton.Icon', 'Material3.Expressive.Icon',  [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.Expressive.ToggleButton.FAB',  'Material3.Expressive.FAB',   [RFIgnoreCase]);
+      LKey := ALStringReplaceW(LKey,             'Material3.',                             'Material3 ', [RFIgnoreCase]);
+      LLstNames.Add(TPair<String, String>.Create(LKey, LArrNames[i]));
+    end;
+    ALBuildItemMenuHierarchy(AItem{AParentItem}, LLstNames{ANames}, ApplyStyleClick{AOnClick});
+  finally
+    ALFreeAndNil(LLstNames);
   end;
 end;
 
@@ -302,7 +466,7 @@ end;
 function TALCheckBoxEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -314,33 +478,26 @@ begin
 end;
 
 {***********************************************************}
-procedure TALCheckBoxEditor.ApplyThemeClick(Sender: TObject);
+procedure TALCheckBoxEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyCheckBoxTheme(LTheme, TALCheckBox(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyCheckBoxStyle(LStyleName, TALCheckBox(Component));
 end;
 
 {******************************************************************************}
 procedure TALCheckBoxEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALCheckBoxThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
-  end;
+  var LNames := TALStyleManager.Instance.GetCheckBoxStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
 end;
 
 {************************************************************}
 function TALRadioButtonEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -352,33 +509,26 @@ begin
 end;
 
 {**************************************************************}
-procedure TALRadioButtonEditor.ApplyThemeClick(Sender: TObject);
+procedure TALRadioButtonEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyRadioButtonTheme(LTheme, TALRadioButton(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyRadioButtonStyle(LStyleName, TALRadioButton(Component));
 end;
 
 {*********************************************************************************}
 procedure TALRadioButtonEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALRadioButtonThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
-  end;
+  var LNames := TALStyleManager.Instance.GetRadioButtonStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
 end;
 
 {*******************************************************}
 function TALSwitchEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -390,33 +540,26 @@ begin
 end;
 
 {*********************************************************}
-procedure TALSwitchEditor.ApplyThemeClick(Sender: TObject);
+procedure TALSwitchEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplySwitchTheme(LTheme, TALSwitch(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplySwitchStyle(LStyleName, TALSwitch(Component));
 end;
 
 {****************************************************************************}
 procedure TALSwitchEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALSwitchThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
-  end;
+  var LNames := TALStyleManager.Instance.GetSwitchStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
 end;
 
 {*********************************************************}
 function TALTrackBarEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -428,33 +571,26 @@ begin
 end;
 
 {***********************************************************}
-procedure TALTrackBarEditor.ApplyThemeClick(Sender: TObject);
+procedure TALTrackBarEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyTrackBarTheme(LTheme, TALTrackBar(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyTrackBarStyle(LStyleName, TALTrackBar(Component));
 end;
 
 {******************************************************************************}
 procedure TALTrackBarEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALTrackBarThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
-  end;
+  var LNames := TALStyleManager.Instance.GetTrackBarStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
 end;
 
 {**************************************************************}
 function TALRangeTrackBarEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
-    0: result := 'Theme';
+    0: result := 'Style';
     else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
@@ -466,29 +602,84 @@ begin
 end;
 
 {****************************************************************}
-procedure TALRangeTrackBarEditor.ApplyThemeClick(Sender: TObject);
+procedure TALRangeTrackBarEditor.ApplyStyleClick(Sender: TObject);
 begin
-  var LTheme := TmenuItem(Sender).Caption;
-  LTheme := StringReplace(LTheme, '&','',[rfReplaceALL]);
-  ALApplyRangeTrackBarTheme(LTheme, TALRangeTrackBar(Component));
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyRangeTrackBarStyle(LStyleName, TALRangeTrackBar(Component));
 end;
 
 {***********************************************************************************}
 procedure TALRangeTrackBarEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
-  var LKeys := TALStringListW.create;
-  try
-    for var LKeyValue in ALRangeTrackBarThemes do
-      LKeys.Add(LKeyValue.Key);
-    LKeys.Sort;
-    for var I := 0 to LKeys.Count - 1 do
-      AItem.AddItem(LKeys[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyThemeClick{AOnClick}, 0{hCtx}, ''{AName});
-  finally
-    ALFreeAndNil(LKeys);
+  var LNames := TALStyleManager.Instance.GetRangeTrackBarStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
+end;
+
+{**********************************************************}
+function TALScrollBarEditor.GetVerb(Index: Integer): string;
+begin
+  case Index of
+    0: result := 'Style';
+    else Result := Format(SItems + ' %d', [Index]);
   end;
 end;
 
-{***********************************************************************************}
+{************************************************}
+function TALScrollBarEditor.GetVerbCount: Integer;
+begin
+  result := 1;
+end;
+
+{************************************************************}
+procedure TALScrollBarEditor.ApplyStyleClick(Sender: TObject);
+begin
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyScrollBarStyle(LStyleName, TALScrollBar(Component));
+end;
+
+{*******************************************************************************}
+procedure TALScrollBarEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
+begin
+  var LNames := TALStyleManager.Instance.GetScrollBarStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
+end;
+
+{**********************************************************}
+function TALScrollBoxEditor.GetVerb(Index: Integer): string;
+begin
+  case Index of
+    0: result := 'Style';
+    else Result := Format(SItems + ' %d', [Index]);
+  end;
+end;
+
+{************************************************}
+function TALScrollBoxEditor.GetVerbCount: Integer;
+begin
+  result := 1;
+end;
+
+{************************************************************}
+procedure TALScrollBoxEditor.ApplyStyleClick(Sender: TObject);
+begin
+  var LStyleName := TmenuItem(Sender).Caption;
+  LStyleName := StringReplace(LStyleName, '&','',[rfReplaceALL]);
+  TALStyleManager.Instance.ApplyScrollBoxStyle(LStyleName, TALScrollBox(Component));
+end;
+
+{*******************************************************************************}
+procedure TALScrollBoxEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
+begin
+  var LNames := TALStyleManager.Instance.GetScrollBoxStyleNames;
+  for var I := low(LNames) to high(LNames) do
+    AItem.AddItem(LNames[i]{ACaption}, 0{AShortCut}, false{AChecked}, true{AEnabled}, ApplyStyleClick{AOnClick}, 0{hCtx}, ''{AName});
+end;
+
+{***************************************************************************************}
 constructor TALPageControllerEditor.Create(AComponent: TComponent; ADesigner: IDesigner);
 begin
   inherited Create(AComponent, ADesigner);
@@ -501,7 +692,7 @@ begin
   FItemsClasses[0] := TItemClassDesc.Create(TALPageView);
 end;
 
-{**********************************************************}
+{**************************************************************}
 procedure TALPageControllerEditor.DoCreateItem(Sender: TObject);
 begin
   inherited;
@@ -509,7 +700,7 @@ begin
     TALPageController(Component).ActivePageIndex := TALPageController(Component).PageCount - 1;
 end;
 
-{************************************************}
+{***********************************************************}
 function TALPageControllerEditor.GetActivePageIndex: Integer;
 begin
   if (Component is TALPageController) then
@@ -518,11 +709,12 @@ begin
     Result := -1;
 end;
 
-{********************************************************}
+{************************************************************}
 procedure TALPageControllerEditor.ExecuteVerb(Index: Integer);
 var
   LControl: TALPageController;
 
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
   procedure SelectPage(I: Integer);
   begin
     if I >= LControl.PageCount then I := LControl.PageCount - 1;
@@ -550,7 +742,7 @@ begin
   end;
 end;
 
-{***********************************************************}
+{***************************************************************}
 function TALPageControllerEditor.GetVerb(Index: Integer): string;
 var
   S: string;
@@ -577,13 +769,13 @@ begin
     end;
 end;
 
-{*************************************************}
+{*****************************************************}
 function TALPageControllerEditor.GetVerbCount: Integer;
 begin
   Result := FVerbCount;
 end;
 
-{********************************************************************************}
+{************************************************************************************}
 procedure TALPageControllerEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
   inherited;
@@ -600,7 +792,7 @@ begin
     AItem.Visible := False;
 end;
 
-{*****************************************************}
+{******************************************************}
 procedure TALPageViewEditor.ExecuteVerb(Index: Integer);
 begin
   case Index of
@@ -610,7 +802,7 @@ begin
   end;
 end;
 
-{********************************************************}
+{*********************************************************}
 function TALPageViewEditor.GetVerb(Index: Integer): string;
 begin
   case Index of
@@ -621,13 +813,13 @@ begin
   end;
 end;
 
-{**********************************************}
+{***********************************************}
 function TALPageViewEditor.GetVerbCount: Integer;
 begin
   Result := 1;
 end;
 
-{*****************************************************************************}
+{******************************************************************************}
 procedure TALPageViewEditor.PrepareItem(Index: Integer; const AItem: IMenuItem);
 begin
   inherited PrepareItem(Index, AItem);
@@ -722,18 +914,42 @@ end;
 {*****************}
 procedure Register;
 begin
+  RegisterComponentEditor(TALText, TALTextEditor);
   RegisterComponentEditor(TALEdit, TALEditEditor);
   RegisterComponentEditor(TALMemo, TALMemoEditor);
   RegisterComponentEditor(TALButton, TALButtonEditor);
+  RegisterComponentEditor(TALToggleButton, TALToggleButtonEditor);
   RegisterComponentEditor(TALCheckBox, TALCheckBoxEditor);
   RegisterComponentEditor(TALRadioButton, TALRadioButtonEditor);
   RegisterComponentEditor(TALSwitch, TALSwitchEditor);
   RegisterComponentEditor(TALTrackBar, TALTrackBarEditor);
   RegisterComponentEditor(TALRangeTrackBar, TALRangeTrackBarEditor);
+  RegisterComponentEditor(TALScrollBar, TALScrollBarEditor);
+  RegisterComponentEditor(TALScrollBox, TALScrollBoxEditor);
+  RegisterComponentEditor(TALVertScrollBox, TALScrollBoxEditor);
+  RegisterComponentEditor(TALHorzScrollBox, TALScrollBoxEditor);
   RegisterComponentEditor(TALPageController, TALPageControllerEditor);
   RegisterComponentEditor(TALPageView, TALPageViewEditor);
   RegisterPropertyEditor(TypeInfo(string), TALText, 'Text', TALTextTextPropertyEditor);
   RegisterPropertyEditor(TypeInfo(TALGradient), TALBrush, 'Gradient', TALGradientPropertyEditor);
+  RegisterPropertyEditor(TypeInfo(string), TALShadow, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALFont, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALTextDecoration, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBrush, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBrush, 'ImageTintColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALStrokeBrush, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALStateLayer, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBaseEdit.TBaseStateStyle, 'PromptTextColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBaseEdit.TBaseStateStyle, 'TintColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBaseEdit, 'PromptTextColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBaseEdit, 'TintColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALBaseCheckBox.TCheckMarkBrush, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALCustomTrack.TTrack.TStopIndicatorBrush, 'ColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALImage, 'BackgroundColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALImage, 'LoadingColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALImage, 'TintColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALVideoPlayerSurface, 'BackgroundColorKey', TALColorKeyProperty);
+  RegisterPropertyEditor(TypeInfo(string), TALVideoPlayerSurface, 'LoadingColorKey', TALColorKeyProperty);
 end;
 
 end.

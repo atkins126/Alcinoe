@@ -2,6 +2,8 @@ unit Alcinoe.AndroidApi.BillingClient;
 
 interface
 
+{$I Alcinoe.inc}
+
 uses
   Androidapi.JNI.GraphicsContentViewText,
   Androidapi.JNIBridge,
@@ -404,6 +406,9 @@ type
 
 implementation
 
+uses
+  Alcinoe.Common;
+
 {**********************}
 procedure RegisterTypes;
 begin
@@ -432,6 +437,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.AndroidApi.BillingClient','initialization');
+  {$ENDIF}
   RegisterTypes;
 
 end.

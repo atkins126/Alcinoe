@@ -7,7 +7,7 @@ interface
 
 {$I Alcinoe.inc}
 
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   //Please run <Alcinoe>\Tools\NativeBridgeFileGenerator\NativeBridgeFileGeneratorAndroid.bat
   //with the library identifiers androidx.media3:media3-exoplayer:xx.xx.xx where xx.xx.xx
   //is the last version of the Media3 exoplayer (You can find this version at
@@ -29,6 +29,7 @@ uses
 type
 
   {******************}
+  JFormat = interface;
   JPlayer = interface;
   JExoPlayer = interface;
   JExoPlayer_Builder = interface;
@@ -49,6 +50,23 @@ type
   JMediaMetadata = interface;
   JMetadata = interface;
   JMediaItem = interface;
+
+  {****************************************************************************************************************}
+  //https://github.com/androidx/media/blob/release/libraries/common/src/main/java/androidx/media3/common/Format.java
+  JFormatClass = interface(JObjectClass)
+    ['{354EDEB3-1F00-40C0-AE6E-0B9B5157CF62}']
+  end;
+  [JavaSignature('androidx/media3/common/Format')]
+  JFormat = interface(JObject)
+    ['{A590A844-F34B-485A-9C48-E600D4DC23F6}']
+    function _GetrotationDegrees: Integer; cdecl;
+    function _Getwidth: Integer; cdecl;
+    function _Getheight: Integer; cdecl;
+    property rotationDegrees: Integer read _GetrotationDegrees;
+    property width: Integer read _Getwidth;
+    property height: Integer read _Getheight;
+  end;
+  TJFormat = class(TJavaGenericImport<JFormatClass, JFormat>) end;
 
   {****************************************************************************************************************}
   //https://github.com/androidx/media/blob/release/libraries/common/src/main/java/androidx/media3/common/Player.java
@@ -104,6 +122,7 @@ type
   [JavaSignature('androidx/media3/exoplayer/ExoPlayer')]
   JExoPlayer = interface(JPlayer)
     ['{23F139A5-FEA3-450F-8FDC-039312AE95FF}']
+    function getVideoFormat: JFormat; cdecl;
   end;
   TJExoPlayer = class(TJavaGenericImport<JExoPlayerClass, JExoPlayer>) end;
 
@@ -360,9 +379,13 @@ type
 
 implementation
 
+uses
+  Alcinoe.Common;
+
 {**********************}
 procedure RegisterTypes;
 begin
+  TRegTypes.RegisterType('Alcinoe.AndroidApi.AndroidX.Media3.JFormat', TypeInfo(Alcinoe.AndroidApi.AndroidX.Media3.JFormat));
   TRegTypes.RegisterType('Alcinoe.AndroidApi.AndroidX.Media3.JPlayer', TypeInfo(Alcinoe.AndroidApi.AndroidX.Media3.JPlayer));
   TRegTypes.RegisterType('Alcinoe.AndroidApi.AndroidX.Media3.JExoPlayer', TypeInfo(Alcinoe.AndroidApi.AndroidX.Media3.JExoPlayer));
   TRegTypes.RegisterType('Alcinoe.AndroidApi.AndroidX.Media3.JExoPlayer_Builder', TypeInfo(Alcinoe.AndroidApi.AndroidX.Media3.JExoPlayer_Builder));
@@ -386,6 +409,9 @@ begin
 end;
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.AndroidApi.AndroidX.Media3','initialization');
+  {$ENDIF}
   RegisterTypes;
 
 end.

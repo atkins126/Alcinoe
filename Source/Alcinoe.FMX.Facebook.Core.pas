@@ -21,7 +21,7 @@ https://developers.facebook.com/docs/android/getting-started
     <string name="facebook_client_token">56789</string>
 
    You can merge this strings.xml with the help of AndroidMerger. You can see
-   an exemple in <Alcinoe>\Demos\ALFacebookLogin\_source\android\MergeLibraries.bat
+   an exemple in <Alcinoe>\Demos\ALFmxFacebookLogin\_source\android\MergeLibraries.bat
 
 2) https://developers.facebook.com/docs/android/getting-started
    Open the /app/manifest/AndroidManifest.xml file.
@@ -53,7 +53,7 @@ https://developers.facebook.com/docs/android/getting-started
     <application>
       ...
       <meta-data android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled"
-               android:value="false"/>
+                 android:value="false"/>
       ...
     </application>
 
@@ -241,15 +241,15 @@ begin
         'Url: ' + Lcontext.URL);
       {$ENDIF}
       if not _ALFacebookInitialised then exit;
-      {$IFNDEF ALCompilerVersionSupported123}
-        //Ios doc say iOS 13 moved opening URL functionality to the SceneDelegate. If you are
-        //using iOS 13, add the following method to your SceneDelegate so that operations like
-        //logging in or sharing function as intended (https://developers.facebook.com/docs/ios/getting-started)
-        //but actually their is no implementation in delphi for the SceneDelegate and also it's
-        //seam that the event is still called in ios 13+
-        //(https://stackoverflow.com/questions/75062913/applicationopenurloptions-vs-sceneopenurlcontexts)
-        //so for now I simply skip it and I add this warn to verify if one day
-        //SceneDelegate will be implemented in delphi
+      {$IFNDEF ALCompilerVersionSupported130}
+        // Ios doc say iOS 13 moved opening URL functionality to the SceneDelegate. If you are
+        // using iOS 13, add the following method to your SceneDelegate so that operations like
+        // logging in or sharing function as intended (https://developers.facebook.com/docs/ios/getting-started)
+        // but actually their is no implementation in delphi for the SceneDelegate and also it's
+        // seam that the event is still called in ios 13+
+        // (https://stackoverflow.com/questions/75062913/applicationopenurloptions-vs-sceneopenurlcontexts)
+        // so for now I simply skip it and I add this warn to verify if one day
+        // SceneDelegate will be implemented in delphi
         {$MESSAGE WARN 'Check if SceneDelegate is implemented in Delphi source code'}
       {$ENDIF}
       TFBSDKApplicationDelegate.OCClass.sharedInstance.applicationOpenURLOptions(
@@ -265,11 +265,8 @@ begin
         'ALFmxFacebookCoreApplicationEventHandler',
         'Event: FinishedLaunching');
       {$ENDIF}
-      {$IFNDEF ALCompilerVersionSupported123}
-        {$MESSAGE WARN 'Check if https://quality.embarcadero.com/browse/RSP-40351 is implemented like expected (With TiOSOpenApplicationContext)'}
-      {$ENDIF}
       var LdidFinishLaunchingWithOptions: NSDictionary;
-      if LValue.Context <> nil then LdidFinishLaunchingWithOptions := TNSDictionary.Wrap(TiOSOpenApplicationContext(LValue.Context).Context)
+      if LValue.Context <> nil then LdidFinishLaunchingWithOptions := TiOSApplicationLaunchingContext(LValue.Context).StartupOptions
       else LdidFinishLaunchingWithOptions := nil;
       //see note in ALInitFacebook regarding initializeSDK in ALInitFacebook
       TFBSDKApplicationDelegate.OCClass.sharedInstance.applicationDidFinishLaunchingWithOptions(
@@ -284,6 +281,9 @@ end;
 {$ENDREGION}
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Facebook.Core','initialization');
+  {$ENDIF}
 
   _ALFacebookInitialised := False;
 
@@ -294,6 +294,9 @@ initialization
   {$ENDREGION}
 
 finalization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Facebook.Core','finalization');
+  {$ENDIF}
 
   {$REGION 'IOS'}
   {$IF defined(IOS)}

@@ -37,6 +37,7 @@ uses
   Alcinoe.Execute,
   Alcinoe.Common,
   Alcinoe.XMLDoc,
+  Alcinoe.Localization,
   Alcinoe.StringList;
 
 const
@@ -569,6 +570,21 @@ begin
           LSrcChildNode.Attributes['android:name']); // const aKeyAttributeValue: AnsiString;
       end
 
+      //<property android:name="string" ... />
+      //https://developer.android.com/guide/topics/manifest/property-element
+      else if (ALSameTextA(ASrcNode.NodeName, 'activity') or
+               ALSameTextA(ASrcNode.NodeName, 'activity-alias') or
+               ALSameTextA(ASrcNode.NodeName, 'application') or
+               ALSameTextA(ASrcNode.NodeName, 'provider') or
+               ALSameTextA(ASrcNode.NodeName, 'receiver') or
+               ALSameTextA(ASrcNode.NodeName, 'service')) and
+              ALSameTextA(LSrcChildNode.NodeName, 'property') then begin
+        _SwapNodeToDest(
+          LSrcChildNode, // const ANode: TALXmlNode;
+          'android:name', // const aKeyAttributeName: AnsiString;
+          LSrcChildNode.Attributes['android:name']); // const aKeyAttributeValue: AnsiString;
+      end
+
       //<activity android:name="string" ... />
       //https://developer.android.com/guide/topics/manifest/activity-element
       else if ALSameTextA(ASrcNode.NodeName, 'application') and
@@ -1071,6 +1087,9 @@ begin
   var LHttpClient := TALWinHttpClient.Create;
   Try
 
+    // https://github.com/MagicFoundation/Alcinoe/issues/456
+    LHttpClient.RequestHeaders.UserAgent := 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0';
+
     //try to download from the ARemoteRepositoryBaseUrl
     Var LUrl := ARemoteRepositoryBaseUrl +
                 ALStringReplaceA(AGroupId,'.','/',[RfReplaceALL])+'/'+
@@ -1079,25 +1098,13 @@ begin
                 AArtifactId+'-'+AVersion; // https://dl.google.com/android/maven2/androidx/camera/camera-core/1.1.0/camera-core-1.1.0
     OverWrite(String(LUrl+'.pom'));
     var LPOMSrc: AnsiString;
-    var LResponseContent := TALStringStreamA.Create('');
-    var LResponseHeader := TALHTTPResponseHeader.Create;
+    var LHttpClientResponse := LHttpClient.Get(LUrl+'.pom');
     try
-      Try
-        LHttpClient.Get(
-          LUrl+'.pom', // const aUrl:AnsiString;
-          LResponseContent, // const aResponseContent: TStream;
-          LResponseHeader); // const aResponseHeader: TALHTTPResponseHeader;
-      except
-        on E: Exception do begin
-          if LResponseHeader.StatusCode = '404' then exit
-          else raise;
-        end;
-      End;
-      LPOMSrc := LResponseContent.DataString;
+      if LHttpClientResponse.StatusCode = 404 then exit;
+      LPOMSrc := LHttpClientResponse.BodyString;
     finally
-      ALFreeAndNil(LResponseContent);
-      ALFreeAndNil(LResponseHeader);
-    end;
+      ALFreeandNil(LHttpClientResponse);
+    End;
     ALSaveStringTofile(LPOMSrc, LLocalFilenameWithoutExt+ '.pom');
     var LPomXmlDoc := TalXmlDocument.Create('root');
     try
@@ -1114,8 +1121,14 @@ begin
       if LPackaging = 'pom' then ALocalArchivefilename := ''
       else begin
         OverWrite(String(LUrl+'.'+LPackaging));
-        var LArchiveSrc := LHttpClient.Get(LUrl+'.'+LPackaging);
-        ALSaveStringTofile(LArchiveSrc, LLocalFilenameWithoutExt+'.'+string(LPackaging));
+        LHttpClientResponse := LHttpClient.Get(LUrl+'.'+LPackaging);
+        try
+          if LHttpClientResponse.StatusCode <> 200 then
+            raise Exception.CreateFmt('GET %s.%s failed (HTTP %d)', [LUrl, LPackaging, LHttpClientResponse.StatusCode]);
+          ALSaveStringTofile(LHttpClientResponse.BodyString, LLocalFilenameWithoutExt+'.'+string(LPackaging));
+        finally
+          ALFreeAndNil(LHttpClientResponse);
+        end;
         ALocalArchivefilename := LLocalFilenameWithoutExt+'.'+string(LPackaging);
       end;
       ALocalpomfilename := LLocalFilenameWithoutExt+'.pom';
@@ -1123,6 +1136,7 @@ begin
     finally
       ALFreeAndNil(LPomXmlDoc);
     end;
+
   Finally
     ALFreeAndNil(LHttpClient);
   End;
@@ -1464,30 +1478,30 @@ begin
       var LSubKeyNames := TStringList.Create;
       Try
         LRegistry.GetKeyNames(LSubKeyNames);
-        var LCompilerVersionStr: String := '';
-        var LCompilerVersionFloat: Double := 0;
+        var LBDSVersionStr: String := '';
+        var LBDSVersionFloat: Double := 0;
         for var LName in LSubKeyNames do begin
-          var LTmpCompilerVersionFloat := ALStrToFloatDef(LName, 0, ALDefaultFormatSettingsW);
-          if LTmpCompilerVersionFloat > LCompilerVersionFloat then begin
-            LCompilerVersionStr := LName;
-            LCompilerVersionFloat := LTmpCompilerVersionFloat;
+          var LTmpCompilerVersionFloat := ALStrToFloatDef(LName, 0);
+          if LTmpCompilerVersionFloat > LBDSVersionFloat then begin
+            LBDSVersionStr := LName;
+            LBDSVersionFloat := LTmpCompilerVersionFloat;
           end;
         end;
-        if LCompilerVersionStr = '' then raise Exception.Create('Incorrect Embarcadero Delphi Registry');
+        if LBDSVersionStr = '' then raise Exception.Create('Incorrect Embarcadero Delphi Registry');
         LRegistry.CloseKey;
-        if not LRegistry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\'+LCompilerVersionStr) then
+        if not LRegistry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\'+LBDSVersionStr) then
           raise Exception.Create('Incorrect Embarcadero Delphi Registry');
         LDelphiRootDir := LRegistry.ReadString('RootDir');
         if LDelphiRootDir = '' then raise Exception.Create('Their is no RootDir Configured in Embarcadero Delphi Registry');
         if not TDirectory.Exists(LDelphiRootDir) then raise Exception.CreateFmt('Directory %s does not exist', [LDelphiRootDir]);
         LRegistry.CloseKey;
-        if not LRegistry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\'+LCompilerVersionStr+'\PlatformSDKs') then
+        if not LRegistry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\'+LBDSVersionStr+'\PlatformSDKs') then
           raise Exception.Create('Their is no platform SDK Configured');
         Var LPlatformSDKName := LRegistry.ReadString('Default_Android64');
         if LPlatformSDKName = '' then LPlatformSDKName := LRegistry.ReadString('Default_Android');
         if LPlatformSDKName = '' then raise Exception.Create('Their is no default Android platform SDK Configured');
         LRegistry.CloseKey;
-        if not LRegistry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\'+LCompilerVersionStr+'\PlatformSDKs\'+LPlatformSDKName) then
+        if not LRegistry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\'+LBDSVersionStr+'\PlatformSDKs\'+LPlatformSDKName) then
           raise Exception.Create('Incorrect Embarcadero Delphi Registry');
         LAapt2Filename := '';
         var Lfiles := TDirectory.GetFiles(TPath.combine(LDelphiRootDir, 'bin\Android\'));
@@ -1567,14 +1581,14 @@ begin
       for var I := 1 to ParamCount do
         LParamLst.Add(ParamStr(i));
       {$IF defined(DEBUG)}
-      LParamLst.Clear;
-      LParamLst.add('-LocalMavenRepositoryDir=..\..\Libraries\jar\');
-      LParamLst.add('-Libraries=.\_Build\Sample\SampleApp;io.magicfoundation.alcinoe:alcinoe-firebase-messaging:1.0.1');
-      LParamLst.add('-OutputDir=.\_Build\Sample\Merged\');
-      LParamLst.add('-DProj=_Build\Sample\Sample.dproj');
-      LParamLst.add('-AndroidManifest=_Build\Sample\AndroidManifest.template.xml');
-      LParamLst.add('-DProjNormalizer=..\DProjNormalizer\DProjNormalizer.exe');
-      LParamLst.add('-GoogleServicesJson=_Build\Sample\google-services.json');
+      //LParamLst.Clear;
+      //LParamLst.add('-LocalMavenRepositoryDir=..\..\Libraries\jar\');
+      //LParamLst.add('-Libraries=.\_Build\Sample\SampleApp;io.magicfoundation.alcinoe:alcinoe-firebase-messaging:1.0.1');
+      //LParamLst.add('-OutputDir=.\_Build\Sample\Merged\');
+      //LParamLst.add('-DProj=_Build\Sample\Sample.dproj');
+      //LParamLst.add('-AndroidManifest=_Build\Sample\AndroidManifest.template.xml');
+      //LParamLst.add('-DProjNormalizer=..\DProjNormalizer\DProjNormalizer.exe');
+      //LParamLst.add('-GoogleServicesJson=_Build\Sample\google-services.json');
       {$ENDIF}
       {$ENDREGION}
 
@@ -1875,6 +1889,10 @@ begin
           Try
             LLst.LineBreak := ':';
             LLst.Text := LLine;
+            if LLst.Count = 2 then begin // androidx.annotation:annotation -> 1.3.0
+              LLine := ALStringReplaceA(LLine,' -> ', ':0.0.0 -> ', []); // androidx.annotation:annotation:0.0.0 -> 1.3.0
+              LLst.Text := LLine;
+            end;
             if LLst.Count <> 3 then raise Exception.Create('Error 43963A52-56D3-4B57-AA34-816194BCADCE ('+String(LLine)+')');
             var LDependencyGroupID := LLst[0]; // androidx.annotation
             var LDependencyArtifactID := LLst[1]; // annotation
@@ -2177,11 +2195,14 @@ begin
           if LClientNode.ChildNodes.Count <> 1 then raise Exception.Create('client node must have only 1 child in google-services.json');
           LClientNode := LClientNode.ChildNodes[0];
           //---
-          var LOauthClientNode := LClientNode.ChildNodes.FindNode('oauth_client');
-          if LOauthClientNode = nil then raise Exception.Create('Could not find client.oauth_client node in google-services.json');
-          if LOauthClientNode.ChildNodes.Count <> 1 then raise Exception.Create('client.oauth_client node must have only 1 child in google-services.json');
-          LOauthClientNode := LOauthClientNode.ChildNodes[0];
-          if LOauthClientNode.GetChildNodeValueFloat('client_type',0) <> 3 then raise Exception.Create('client.oauth_client node must have client_type=3 child node in google-services.json');
+          var LOauthClientNodes := LClientNode.ChildNodes.FindNode('oauth_client');
+          if LOauthClientNodes = nil then raise Exception.Create('Could not find client.oauth_client node in google-services.json');
+          var LOauthClientType3Node: TALJsonNodeA := nil;
+          for var I := 0 to LOauthClientNodes.ChildNodes.Count - 1 do
+            if SameValue(LOauthClientNodes.ChildNodes[i].GetChildNodeValueFloat('client_type', 0), 3) then begin
+              LOauthClientType3Node := LOauthClientNodes.ChildNodes[i];
+              break;
+            end;
           //---
           var LApikeyNode := LClientNode.ChildNodes.FindNode('api_key');
           if LApikeyNode = nil then raise Exception.Create('Could not find client.api_key node in google-services.json');
@@ -2199,10 +2220,12 @@ begin
           //  <string name="project_id" translatable="false">alfirebasemessagingapp</string> <!-- project_info/project_id -->
           //</resources>
           //---
-          with LStringsXmlDoc.DocumentElement.AddChild('string') do begin
-            Attributes['name'] := 'default_web_client_id';
-            Attributes['translatable'] := 'false';
-            text := LOauthClientNode.GetChildNodeValueText('client_id','');
+          if LOauthClientType3Node <> nil then begin
+            with LStringsXmlDoc.DocumentElement.AddChild('string') do begin
+              Attributes['name'] := 'default_web_client_id';
+              Attributes['translatable'] := 'false';
+              text := LOauthClientType3Node.GetChildNodeValueText('client_id','');
+            end;
           end;
           with LStringsXmlDoc.DocumentElement.AddChild('string') do begin
             Attributes['name'] := 'gcm_defaultSenderId';
@@ -2464,7 +2487,7 @@ begin
           if LDeploymentNode = nil then raise Exception.Create('ProjectExtensions.BorlandProject.Deployment node not found!');
 
           //init LDeployFilesToDeactivate
-          {$IFNDEF ALCompilerVersionSupported123}
+          {$IFNDEF ALCompilerVersionSupported130}
             {$MESSAGE WARN 'Check if no new Android resource files were added in DeployProjNormalizer'}
           {$ENDIF}
           LDeployFilesToDeactivate.Add('Android_Strings=<PlatForm>\<Config>\strings.xml');
@@ -2695,7 +2718,7 @@ begin
 
           //normalize the LdprojXmlDoc
           if LDProjNormalizer <> '' then
-            ExecuteCmdLine('"'+LDProjNormalizer+'" "' +LDProjFilename + '" false');
+            ExecuteCmdLine('"'+LDProjNormalizer+'" -DProj="'+LDProjFilename+'" -CreateBackup="false"');
 
         finally
           ALFreeAndNil(LdprojXmlDoc);
@@ -2762,6 +2785,11 @@ begin
     on E: Exception do begin
       Writeln(E.ClassName+': '+E.Message, TALConsoleColor.ccRed);
       Writeln('');
+      Writeln('Command line used:', TALConsoleColor.ccRed);
+      {$WARN SYMBOL_PLATFORM OFF}
+      Writeln(CmdLine, TALConsoleColor.ccRed);
+      {$WARN SYMBOL_PLATFORM ON}
+      Writeln('');
       Writeln('Usage:');
       Writeln('  AndroidMerger.exe');
       Writeln('    -Libraries=Paths to libraries (aar, jar, directory, maven name). Separate paths with '';''.');
@@ -2784,7 +2812,7 @@ begin
       Writeln('    -OutputDir=c:\MyProject\Android\Merged^');
       Writeln('    -DProj=c:\MyProject\MyProject.dproj^');
       Writeln('    -AndroidManifest=c:\MyProject\AndroidManifest.template.xml^');
-      Writeln('    -DProjNormalizer=c:\Alcinoe\Tools\DeployProjNormalizer\DeployProjNormalizer.exe');
+      Writeln('    -DProjNormalizer=c:\Alcinoe\Tools\DProjNormalizer\DProjNormalizer.exe');
       Writeln('');
       Writeln('');
       Writeln('Merge failed!');

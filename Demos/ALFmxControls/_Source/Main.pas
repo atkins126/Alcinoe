@@ -28,12 +28,16 @@ uses
   FMX.Edit,
   FMX.Effects,
   FMX.Filter.Effects,
-  Alcinoe.FMX.Themes,
+  FMX.Platform,
+  Alcinoe.Common,
+  Alcinoe.FMX.Materials.Canvas,
+  Alcinoe.FMX.Snackbar,
+  Alcinoe.FMX.Styles,
   Alcinoe.FMX.Objects,
   Alcinoe.FMX.Layouts,
   Alcinoe.FMX.Common,
   Alcinoe.FMX.StdCtrls,
-  Alcinoe.FMX.TabControl,
+  Alcinoe.FMX.PageController,
   Alcinoe.FMX.Edit,
   Alcinoe.FMX.VideoPlayer,
   Alcinoe.FMX.DatePickerDialog,
@@ -42,7 +46,9 @@ uses
   Alcinoe.FMX.Graphics,
   Alcinoe.FMX.Ani,
   Alcinoe.FMX.Memo,
-  Alcinoe.FMX.Controls;
+  Alcinoe.FMX.Controls,
+  Alcinoe.FMX.FilterEffects,
+  Alcinoe.FMX.NativeControl;
 
 type
 
@@ -132,28 +138,9 @@ type
     Text9: TALText;
     ButtonBenchTCircle: TALButton;
     ButtonBenchTALCircle: TALButton;
-    ALRectangle9: TALRectangle;
-    ALTabControl1: TALTabControl;
-    ALTabItem1: TALTabItem;
-    ALText3: TALText;
-    ALText4: TALText;
-    alImage1: TALImage;
-    ALTabItem2: TALTabItem;
-    ALText1: TALText;
-    ALText2: TALText;
-    Image2: TALImage;
-    ALTabItem3: TALTabItem;
-    ALText5: TALText;
-    ALText6: TALText;
-    Image3: TALImage;
-    ALTabItem4: TALTabItem;
-    ALText7: TALText;
-    ALText8: TALText;
-    Image4: TALImage;
     ALRangeTrackBar1: TALRangeTrackBar;
     ALTrackBar1: TALTrackBar;
     Text11: TALText;
-    TextUpdateBat: TALText;
     ALVideoPlayerSurface1: TALVideoPlayerSurface;
     MonochromeEffect1: TMonochromeEffect;
     BandedSwirlEffect1: TBandedSwirlEffect;
@@ -188,26 +175,6 @@ type
     ALLayout26: TALLayout;
     ALButton17: TALButton;
     ALButton18: TALButton;
-    ALRectangle2: TALRectangle;
-    ALLayout2: TALLayout;
-    ALButton1: TALButton;
-    ALButton2: TALButton;
-    ALLayout5: TALLayout;
-    ALButton3: TALButton;
-    ALButton4: TALButton;
-    ALLayout11: TALLayout;
-    ALButton5: TALButton;
-    ALButton8: TALButton;
-    ALLayout23: TALLayout;
-    ALButton15: TALButton;
-    ALButton16: TALButton;
-    ALLayout29: TALLayout;
-    ALButton19: TALButton;
-    ALButton20: TALButton;
-    ALText29: TALText;
-    ALLayout41: TALLayout;
-    ALButton23: TALButton;
-    ALButton24: TALButton;
     ALText17: TALText;
     MainTitle: TALText;
     SubTitle: TALText;
@@ -263,32 +230,10 @@ type
     ALLayout50: TALLayout;
     ALEdit4: TALEdit;
     ALMemo2: TALMemo;
-    DarkThemeEditBackground: TALRectangle;
-    ALText20: TALText;
-    ALEdit5: TALEdit;
-    ALImage6: TALImage;
-    ALLayout51: TALLayout;
-    ALLayout52: TALLayout;
-    ALEdit8: TALEdit;
-    ALImage7: TALImage;
-    ALLayout53: TALLayout;
-    ALEdit9: TALEdit;
-    ALMemo3: TALMemo;
-    ALEdit10: TALEdit;
-    ALImage8: TALImage;
-    ALLayout54: TALLayout;
-    ALLayout55: TALLayout;
-    ALEdit11: TALEdit;
-    ALImage9: TALImage;
-    ALLayout56: TALLayout;
-    ALEdit12: TALEdit;
-    ALMemo4: TALMemo;
     ALText38: TALText;
     ALText39: TALText;
     ALEdit14: TALEdit;
     ALImage10: TALImage;
-    ALEdit15: TALEdit;
-    ALImage11: TALImage;
     ALText42: TALText;
     ALText43: TALText;
     ALAutoSizeLayout1: TALLayout;
@@ -331,11 +276,6 @@ type
     ALButton26: TALButton;
     ALButton27: TALButton;
     ALButton28: TALButton;
-    ALLayout81: TALLayout;
-    ALButton29: TALButton;
-    ALButton30: TALButton;
-    ALButton31: TALButton;
-    ALButton32: TALButton;
     ALText67: TALText;
     ALButton33: TALButton;
     ALLayout84: TALLayout;
@@ -344,88 +284,152 @@ type
     ALLayout86: TALLayout;
     ALCheckBox4: TALCheckBox;
     ALText50: TALText;
-    ALRectangle7: TALRectangle;
-    ALText68: TALText;
-    ALLayout94: TALLayout;
-    ALCheckBox5: TALCheckBox;
-    ALText69: TALText;
-    ALLayout96: TALLayout;
-    ALCheckBox6: TALCheckBox;
-    ALText70: TALText;
     ALLayout88: TALLayout;
     ALText71: TALText;
     ALLayout44: TALLayout;
     ALText47: TALText;
     ALRadioButton1: TALRadioButton;
     ALRadioButton2: TALRadioButton;
-    ALRectangle8: TALRectangle;
-    ALText72: TALText;
-    ALLayout92: TALLayout;
-    ALText73: TALText;
-    ALLayout98: TALLayout;
-    ALText74: TALText;
-    ALRadioButton3: TALRadioButton;
-    ALRadioButton4: TALRadioButton;
-    ALRectangle10: TALRectangle;
-    ALText75: TALText;
-    ALLayout100: TALLayout;
-    ALText76: TALText;
-    ALSwitch2: TALSwitch;
     ALLayout104: TALLayout;
     ALSwitch1: TALSwitch;
     ALText78: TALText;
     ALLayout102: TALLayout;
     ALSwitch3: TALSwitch;
     ALText77: TALText;
-    ALLayout106: TALLayout;
-    ALSwitch4: TALSwitch;
-    ALText79: TALText;
     ALLayout108: TALLayout;
-    ALSwitch5: TALSwitch;
     ALText80: TALText;
     ALTrackBar2: TALTrackBar;
-    ALTrackBar3: TALTrackBar;
+    ALTrackBarCustomStyle: TALTrackBar;
     ALText82: TALText;
     ALText83: TALText;
     ALText84: TALText;
     ALTrackBar4: TALTrackBar;
     ALText86: TALText;
-    ALRectangle11: TALRectangle;
-    ALText87: TALText;
-    ALTrackBar5: TALTrackBar;
-    ALText88: TALText;
-    ALTrackBar6: TALTrackBar;
-    ALText89: TALText;
     ALText90: TALText;
     ALRangeTrackBar2: TALRangeTrackBar;
     ALText91: TALText;
-    ALRangeTrackBar3: TALRangeTrackBar;
     ALText92: TALText;
-    ALEdit13: TALEdit;
-    ALImage16: TALImage;
     ALText45: TALText;
     ALImage12: TALImage;
     ALText48: TALText;
     ALImage17: TALImage;
+    ALText55: TALText;
+    ALPageController3: TALPageController;
+    ALPageView3_1: TALPageView;
+    ALPageView3_2: TALPageView;
+    ALPageView3_6: TALPageView;
+    ALImageGallery3_1: TALImage;
+    ALImageGallery3_2: TALImage;
+    ALImageGallery3_6: TALImage;
+    ALPageView3_5: TALPageView;
+    ALPageView3_4: TALPageView;
+    ALPageView3_3: TALPageView;
+    ALImageGallery3_5: TALImage;
+    ALImageGallery3_3: TALImage;
+    ALImageGallery3_4: TALImage;
+    ALPageController2: TALPageController;
+    ALPageView2_2: TALPageView;
+    ALImageGallery2_2: TALImage;
+    ALPageView2_3: TALPageView;
+    ALImageGallery2_3: TALImage;
+    ALPageView2_4: TALPageView;
+    ALImageGallery2_4: TALImage;
+    ALPageView2_5: TALPageView;
+    ALImageGallery2_5: TALImage;
+    ALPageView2_6: TALPageView;
+    ALImageGallery2_6: TALImage;
+    ALPageView2_1: TALPageView;
+    ALImageGallery2_1: TALImage;
+    ALPageIndicator2: TALPageIndicator;
+    ALPageIndicator3: TALPageIndicator;
+    ALText1: TALText;
+    ALText2: TALText;
+    ButtonShowSimpleDialog: TALButton;
+    ButtonShowMultipleChoiceDialog: TALButton;
+    ButtonShowSingleChoiceDialog: TALButton;
+    ButtonShowEditDialog: TALButton;
+    ALText3: TALText;
+    ALText4: TALText;
+    ALLayout3: TALLayout;
+    ALText5: TALText;
+    ALRadioButtonLightTheme: TALRadioButton;
+    ALLayout4: TALLayout;
+    ALText6: TALText;
+    ALRadioButtonDarkTheme: TALRadioButton;
+    ALLayout6: TALLayout;
+    ALText7: TALText;
+    ALRadioButtonAutoTheme: TALRadioButton;
+    ALLayout2: TALLayout;
+    ALSwitch5: TALSwitch;
+    ALRangeTrackBarCustomStyle: TALRangeTrackBar;
+    ALEdit5: TALEdit;
+    ALImage1: TALImage;
+    ButtonShowMemoDialog: TALButton;
+    ButtonShowActionDialog: TALButton;
+    ALText8: TALText;
+    ALLayout9: TALLayout;
+    ALButton3: TALButton;
+    ALButton4: TALButton;
+    ALButton5: TALButton;
+    ALButton8: TALButton;
+    ALLayout10: TALLayout;
+    ALButton15: TALButton;
+    ALButton16: TALButton;
+    ALButton19: TALButton;
+    ALLayout11: TALLayout;
+    ALButton20: TALButton;
+    ALLayout12: TALLayout;
+    ALButton24: TALButton;
+    ALLayout13: TALLayout;
+    ALButton30: TALButton;
+    ALLayout15: TALLayout;
+    ALButton34: TALButton;
+    ALText20: TALText;
+    ALLayout5: TALLayout;
+    ALButton2: TALButton;
+    ALText29: TALText;
+    ALText68: TALText;
+    ALLayout8: TALLayout;
+    ALButton1: TALToggleButton;
+    ALLayout16: TALLayout;
+    ALButton23: TALToggleButton;
+    ALLayout19: TALLayout;
+    ALButton31: TALToggleButton;
+    ALLayout21: TALLayout;
+    ALButton32: TALToggleButton;
+    ALLayout22: TALLayout;
+    ALButton35: TALToggleButton;
+    ALButton36: TALToggleButton;
+    ALButton37: TALToggleButton;
+    ALButton38: TALToggleButton;
+    ALText69: TALText;
+    ALToggleButton1: TALToggleButton;
+    ALText70: TALText;
+    ALText72: TALText;
+    ButtonShowBottomSheet: TALButton;
+    ButtonShowLeftSheet: TALButton;
+    ButtonShowTopSheet: TALButton;
+    ButtonShowRightSheet: TALButton;
+    ALText73: TALText;
+    ALText74: TALText;
+    ButtonShowLoadingOverlay: TALButton;
+    ALText75: TALText;
+    ALText76: TALText;
+    ButtonShowSnackbar: TALButton;
+    ALText79: TALText;
+    ButtonStartLoading: TALButton;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
     procedure ButtonLaunchScrollBoxDemoAlcinoeClick(Sender: TObject);
     procedure ButtonBenchTALRectangleClick(Sender: TObject);
     procedure ButtonBenchTRectangleClick(Sender: TObject);
     procedure ButtonBenchTALTextClick(Sender: TObject);
-    procedure FormCreate(Sender: TObject);
-    procedure FormDestroy(Sender: TObject);
     procedure ButtonBenchTTextClick(Sender: TObject);
     procedure ButtonLaunchScrollBoxDemoDelphiClick(Sender: TObject);
     procedure ButtonBenchTLineClick(Sender: TObject);
     procedure ButtonBenchTALLineClick(Sender: TObject);
     procedure ButtonBenchTALCircleClick(Sender: TObject);
     procedure ButtonBenchTCircleClick(Sender: TObject);
-    procedure ALTabControl1ViewportPositionChange(Sender: TObject; const OldViewportPosition, NewViewportPosition: TPointF);
-    procedure ALTabControl1AniTransitionInit(
-                const sender: TObject;
-                const ATransition: TALTabTransition;
-                const aVelocity: Single;
-                const aAnimation: TALFloatPropertyAnimation);
-    procedure ALTabControl1Resized(Sender: TObject);
     procedure FormVirtualKeyboardHidden(Sender: TObject; KeyboardVisible: Boolean; const Bounds: TRect);
     procedure FormVirtualKeyboardShown(Sender: TObject; KeyboardVisible: Boolean; const Bounds: TRect);
     procedure ALVertScrollBox1Click(Sender: TObject);
@@ -442,6 +446,25 @@ type
     procedure ALTextEllipsisElementMouseLeave(Sender: TObject; const Element: TALTextElement);
     procedure ALSwitchAnimatedImageClick(Sender: TObject);
     procedure ALVertScrollBox1Resized(Sender: TObject);
+    procedure ALPageController2Resized(Sender: TObject);
+    procedure ALPageController2MouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+    procedure ALPageController2MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+    procedure ALPageController3Resized(Sender: TObject);
+    procedure ALPageController3ViewportPositionChange(Sender: TObject; const OldViewportPosition, NewViewportPosition: TALPointD);
+    procedure ButtonShowSimpleDialogClick(Sender: TObject);
+    procedure ALRadioButtonThemeClick(Sender: TObject);
+    procedure ButtonShowSingleChoiceDialogClick(Sender: TObject);
+    procedure ButtonShowMultipleChoiceDialogClick(Sender: TObject);
+    procedure ButtonShowEditDialogClick(Sender: TObject);
+    procedure ButtonShowMemoDialogClick(Sender: TObject);
+    procedure ButtonShowActionDialogClick(Sender: TObject);
+    procedure ButtonShowBottomSheetClick(Sender: TObject);
+    procedure ButtonShowLeftSheetClick(Sender: TObject);
+    procedure ButtonShowTopSheetClick(Sender: TObject);
+    procedure ButtonShowRightSheetClick(Sender: TObject);
+    procedure ButtonShowLoadingOverlayClick(Sender: TObject);
+    procedure ButtonShowSnackbarClick(Sender: TObject);
+    procedure ButtonStartLoadingClick(Sender: TObject);
   private
     FDatePickerDialog: TALDatePickerDialog;
     fLine: TLineStopWatch;
@@ -452,10 +475,10 @@ type
     fRectangle: TRectangleStopWatch;
     fALCircle: TALCircleStopWatch;
     fCircle: TCircleStopWatch;
-    FVirtualKeyboardOpen: boolean;
     FCurrentTextElements: TDictionary<TObject, TALTextElement>;
-  protected
-    procedure PaintBackground; override;
+    FPageViewAnimation: TALFloatAnimation;
+    FCanvasColorAdjustTextureMaterialGallery2: TALCanvasColorAdjustTextureMaterial;
+    procedure PageViewAnimationProcess(Sender: TObject);
   public
     procedure InitializeNewForm; override;
   end;
@@ -471,22 +494,48 @@ uses
   system.Math,
   system.DateUtils,
   system.Math.Vectors,
+  {$IF defined(ANDROID)}
+  Androidapi.Helpers,
+  Androidapi.JNI.GraphicsContentViewText,
+  Androidapi.JNI.App,
+  {$ENDIF}
   fmx.DialogService,
+  Alcinoe.FMX.Dialogs,
+  Alcinoe.Fmx.Sheets,
   Alcinoe.FMX.ScrollEngine,
-  Alcinoe.Common,
+  Alcinoe.Stringutils,
+  Alcinoe.FMX.LoadingOverlay,
   ScrollBoxDemo;
 
 {$R *.fmx}
+
+type
+  TALImageProtectedAccess = class(TALImage);
 
 {************************************}
 procedure TMainForm.InitializeNewForm;
 begin
   ALLog('TMainForm.InitializeNewForm', 'begin');
+  ALGlobalClickSoundEnabled := True;
+  {$IF defined(DEBUG)}
+  ALInitHasTouchScreen;
+  ALHasTouchScreen := true;
+  {$ENDIF}
+  ALDefaultEstimateLineHeightMultiplier := ALEstimateLineHeightMultiplier;
+  TALStyleManager.Instance.ApplyDialogManagerStyle('Material3.DialogManager', TALDialogManager.Instance, 18{AFontSize});
+  TALStyleManager.Instance.ApplySnackbarManagerStyle('Material3.SnackbarManager', TALSnackbarManager.Instance, 18{AFontSize});
+  TALStyleManager.Instance.ApplySheetManagerStyle('Material3.SheetManager', TALSheetManager.Instance, 22{AFontSize});
+  TALStyleManager.Instance.ApplyLoadingOverlayManagerStyle('Material3.LoadingOverlayManager', TALLoadingOverlayManager.Instance);
   // We can not call RegisterTypefaceFromResource in FormCreate because FormCreate is
   // called in TCommonCustomForm.AfterConstruction once all child components are
   // already fully loaded.
   TALFontManager.RegisterTypefaceFromResource('GoodDogPlain', 'GoodDog Plain');
   TALFontManager.RegisterTypefaceFromResource('MaShanZhengRegular', 'Ma Shan Zheng');
+  ALSetSystemBarsColor(
+    TALStyleManager.Instance.GetColor('Material3.Color.Surface'), // const AStatusBarColor: TAlphaColor
+    TALStyleManager.Instance.GetColor('Material3.Color.Surface'), // const ANavigationBarColor: TAlphaColor
+    TALStyleManager.Instance.IsDarkMode, // const AStatusBarUseLightIcons: TAlphaColor
+    TALStyleManager.Instance.IsDarkMode); // const ANavigationBarUseLightIcons: TAlphaColor
   inherited;
   BeginUpdate;
   ALLog('TMainForm.InitializeNewForm', 'end | Form.size: ' + FloatToStr(width) + 'x' + FloatToStr(height));
@@ -498,22 +547,20 @@ end;
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   ALLog('TMainForm.FormCreate', 'begin');
+
   TALErrorReporting.Instance;
-  {$IF defined(MSWindows)}
-  ALVertScrollBox1.ScrollEngine.TouchTracking := [ttVertical];
-  {$ENDIF}
-  //special case for windows
-  if not ALVertScrollBox1.HasTouchScreen then begin
+
+  FCanvasColorAdjustTextureMaterialGallery2 := TALCanvasColorAdjustTextureMaterial.Create;
+
+  if not ALGetHasTouchScreen then begin
     ALVertScrollBox1.VScrollBar.Width := 8;
     ALVertScrollBox1.VScrollBar.Margins.Right := 3;
     ALVertScrollBox1.VScrollBar.Thumb.XRadius := -50;
     ALVertScrollBox1.VScrollBar.Thumb.yRadius := -50;
   end;
+
   FCurrentTextElements := TDictionary<TObject, TALTextElement>.Create;
   fDatePickerDialog := nil;
-  FVirtualKeyboardOpen := False;
-
-  TextUpdateBat.Visible := False;
 
   var LTitle: String := MainForm.Canvas.ClassName;
   {$IF defined(Android) and defined(SKIA)}
@@ -539,13 +586,13 @@ begin
   SubTitle.Text := 'Tbitmap (Delphi Engine)';
   {$ENDIF}
   //-----
-  ALVideoPlayerSurface1.Height := (width / 1920) * 1080;
+  ALVideoPlayerSurface1.Height := (ALVertScrollBox1.Content.width / 1920) * 1080;
   //-----
   fALRectangle := TALRectangleStopWatch.Create(self);
   fALRectangle.Parent := ALVertScrollBox1;
   //fALRectangle.DoubleBuffered := False;
-  fALRectangle.Fill.Color := $FFf1ecff;
-  fALRectangle.Stroke.Color := $FFbea7fb;
+  fALRectangle.Fill.ColorKey := 'Material3.Color.SurfaceContainerHighest';
+  fALRectangle.Stroke.ColorKey := 'Material3.Color.OutlineVariant';
   fALRectangle.Align := TALalignLayout.Top;
   fALRectangle.Margins.Left := 16;
   fALRectangle.Margins.Top := 8;
@@ -557,17 +604,18 @@ begin
   fALRectangle.HitTest := False;
   var LText := TalText.Create(fALRectangle);
   LText.Parent := fALRectangle;
-  LText.AutoSize := true;
+  LText.AutoSize := TALAutoSizeMode.Both;
   LText.Align := TALAlignLayout.Center;
   LText.TextSettings.Font.Size := 16;
+  LText.TextSettings.Font.ColorKey := 'Material3.Color.OnSurface';
   LText.Text := 'TALRectangle';
   LText.HitTest := false;
   //-----
   fRectangle := TRectangleStopWatch.Create(self);
   fRectangle.Parent := ALVertScrollBox1;
   fRectangle.Align := TalignLayout.Top;
-  fRectangle.Fill.Color := $FFf1ecff;
-  fRectangle.Stroke.Color := $FFbea7fb;
+  fRectangle.Fill.Color := TALStyleManager.Instance.GetColor('Material3.Color.SurfaceContainerHighest');
+  fRectangle.Stroke.Color := TALStyleManager.Instance.GetColor('Material3.Color.OutlineVariant');
   fRectangle.Margins.Left := 16;
   fRectangle.Margins.Top := 12;
   fRectangle.Margins.Right := 16;
@@ -579,17 +627,18 @@ begin
   fRectangle.HitTest := false;
   LText := TalText.Create(fRectangle);
   LText.Parent := fRectangle;
-  LText.AutoSize := true;
+  LText.AutoSize := TALAutoSizeMode.Both;
   LText.Align := TALAlignLayout.Center;
   LText.TextSettings.Font.Size := 16;
+  LText.TextSettings.Font.ColorKey := 'Material3.Color.OnSurface';
   LText.Text := 'TRectangle';
   LText.HitTest := false;
   //-----
   fALCircle := TALCircleStopWatch.Create(ALLayout33);
   fALCircle.Parent := ALLayout33;
   //fALCircle.DoubleBuffered := False;
-  fALCircle.Fill.Color := $FFf1ecff;
-  fALCircle.Stroke.Color := $FFbea7fb;
+  fALCircle.Fill.ColorKey := 'Material3.Color.SurfaceContainerHighest';
+  fALCircle.Stroke.ColorKey := 'Material3.Color.OutlineVariant';
   fALCircle.Margins.Left := 15;
   fALCircle.Margins.Right := 15;
   fALCircle.Size.Height := 100;
@@ -597,16 +646,17 @@ begin
   fALCircle.HitTest := False;
   LText := TalText.Create(fALCircle);
   LText.Parent := fALCircle;
-  LText.AutoSize := true;
+  LText.AutoSize := TALAutoSizeMode.Both;
   LText.Align := TALAlignLayout.Center;
   LText.TextSettings.Font.Size := 16;
+  LText.TextSettings.Font.ColorKey := 'Material3.Color.OnSurface';
   LText.Text := 'TALCircle';
   LText.HitTest := False;
   //-----
   fCircle := TCircleStopWatch.Create(ALLayout34);
   fCircle.Parent := ALLayout34;
-  fCircle.Fill.Color := $FFf1ecff;
-  fCircle.Stroke.Color := $FFbea7fb;
+  fCircle.Fill.Color := TALStyleManager.Instance.GetColor('Material3.Color.SurfaceContainerHighest');
+  fCircle.Stroke.Color := TALStyleManager.Instance.GetColor('Material3.Color.OutlineVariant');
   fCircle.Margins.Left := 15;
   fCircle.Margins.Right := 15;
   fCircle.Size.Height := 100;
@@ -614,9 +664,10 @@ begin
   fCircle.HitTest := False;
   LText := TalText.Create(fCircle);
   LText.Parent := fCircle;
-  LText.AutoSize := true;
+  LText.AutoSize := TALAutoSizeMode.Both;
   LText.Align := TALAlignLayout.Center;
   LText.TextSettings.Font.Size := 16;
+  LText.TextSettings.Font.ColorKey := 'Material3.Color.OnSurface';
   LText.Text := 'TCircle';
   LText.HitTest := False;
   //-----
@@ -625,7 +676,8 @@ begin
   //fALText.DoubleBuffered := False;
   fALText.TextSettings.HorzAlign := TALTextHorzAlign.Center;
   fALText.TextSettings.Font.Size := 18;
-  fALText.TextSettings.Font.Family := ALConvertFontFamily('sans-serif');
+  fALText.TextSettings.Font.Family := 'sans-serif';
+  fALText.TextSettings.Font.ColorKey := 'Material3.Color.OnSurface';
   fALText.Align := TALalignLayout.Top;
   fALText.Margins.Top := 12;
   fALText.Margins.left := 16;
@@ -640,7 +692,8 @@ begin
   fText.TextSettings.WordWrap := True;
   fText.TextSettings.HorzAlign := TTextAlign.Center;
   fText.TextSettings.Font.Size := 18;
-  fText.TextSettings.Font.Family := ALConvertFontFamily('sans-serif');
+  fText.TextSettings.Font.Family := TALStyleManager.Instance.GetFontFamily('sans-serif');
+  fText.TextSettings.FontColor := TALStyleManager.Instance.GetColor('Material3.Color.OnSurface');
   fText.Align := TalignLayout.Top;
   fText.Margins.Top := 8;
   fText.Margins.left := 16;
@@ -658,6 +711,7 @@ begin
   fALline.Size.Height := 100;
   fALline.Size.Width := 100;
   fALline.Stroke.Thickness := 3;
+  fALline.Stroke.ColorKey := 'Material3.Color.Outline';
   fALline.LineType := TALLineType.TopLeftToBottomRight;
   fALline.HitTest := False;
   //-----
@@ -668,12 +722,32 @@ begin
   fline.Size.Height := 100;
   fline.Size.Width := 100;
   fline.Stroke.Thickness := 3;
+  fline.Stroke.Color := TALStyleManager.Instance.GetColor('Material3.Color.Outline');
   fline.LineType := TLineType.Diagonal;
   fline.HitTest := False;
 
+  FPageViewAnimation := TALFloatAnimation.Create;
+  FPageViewAnimation.OnProcess := PageViewAnimationProcess;
+
+  case TALStyleManager.Instance.DarkModeBehavior of
+    TALStyleManager.TDarkModeBehavior.AlwaysLight: ALRadioButtonLightTheme.Checked := True;
+    TALStyleManager.TDarkModeBehavior.AlwaysDark: ALRadioButtonDarkTheme.Checked := True;
+    TALStyleManager.TDarkModeBehavior.FollowSystem: ALRadioButtonAutoTheme.Checked := True;
+  end;
+  Fill.Color := TALStyleManager.Instance.GetColor('Material3.Color.Surface');
+  SystemStatusBar.BackgroundColor := TALStyleManager.Instance.GetColor('Material3.Color.Surface');
+
+  if TALStyleManager.Instance.IsDarkMode then begin
+    ALTrackBarCustomStyle.Thumb.Fill.Color := $FFe5e0e8;
+    ALTrackBarCustomStyle.Thumb.Stroke.Color := TalphaColors.Null;
+    ALRangeTrackBarCustomStyle.Thumb.Fill.Color := $FFe5e0e8;
+    ALRangeTrackBarCustomStyle.Thumb.Stroke.Color := TalphaColors.Null;
+  end;
+
   EndUpdate;
 
-  ALTabControl1Resized(nil);
+  ALPageController2Resized(nil);
+  ALPageController3Resized(nil);
   ALVertScrollBox1Resized(nil);
   ALLog('TMainForm.FormCreate', 'end | Form.size: ' + FloatToStr(width) + 'x' + FloatToStr(height));
 end;
@@ -681,14 +755,62 @@ end;
 {***********************************************}
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
+  ALFreeAndNil(FCanvasColorAdjustTextureMaterialGallery2);
+  ALFreeAndNil(FPageViewAnimation);
   ALFreeAndNil(FCurrentTextElements);
+end;
+
+{***********************************************************}
+procedure TMainForm.ALRadioButtonThemeClick(Sender: TObject);
+begin
+  if ALRadioButtonDarkTheme.Checked then
+    TALStyleManager.Instance.DarkModeBehavior := TALStyleManager.TDarkModeBehavior.AlwaysDark
+  else if ALRadioButtonLightTheme.Checked then
+    TALStyleManager.Instance.DarkModeBehavior := TALStyleManager.TDarkModeBehavior.AlwaysLight
+  else
+    TALStyleManager.Instance.DarkModeBehavior := TALStyleManager.TDarkModeBehavior.FollowSystem;
+
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      Sleep(250);
+      TThread.Synchronize(nil,
+        procedure
+        begin
+          TALStyleManager.Instance.ApplyColorScheme(Self, 'Material3.Color.Surface'{AFormFillColorKey}, 'Material3.Color.Surface'{ASystemStatusBarBackgroundColorKey});
+          ALSetSystemBarsColor(
+            TALStyleManager.Instance.GetColor('Material3.Color.Surface'), // const AStatusBarColor: TAlphaColor
+            TALStyleManager.Instance.GetColor('Material3.Color.Surface'), // const ANavigationBarColor: TAlphaColor
+            TALStyleManager.Instance.IsDarkMode, // const AStatusBarUseLightIcons: TAlphaColor
+            TALStyleManager.Instance.IsDarkMode); // const ANavigationBarUseLightIcons: TAlphaColor
+          fRectangle.Fill.Color := TALStyleManager.Instance.GetColor('Material3.Color.SurfaceContainerHighest');
+          fRectangle.Stroke.Color := TALStyleManager.Instance.GetColor('Material3.Color.OutlineVariant');
+          fCircle.Fill.Color := TALStyleManager.Instance.GetColor('Material3.Color.SurfaceContainerHighest');
+          fCircle.Stroke.Color := TALStyleManager.Instance.GetColor('Material3.Color.OutlineVariant');
+          fText.TextSettings.FontColor := TALStyleManager.Instance.GetColor('Material3.Color.OnSurface');
+          fline.Stroke.Color := TALStyleManager.Instance.GetColor('Material3.Color.Outline');
+          if TALStyleManager.Instance.IsDarkMode then begin
+            ALTrackBarCustomStyle.Thumb.Fill.Color := $FFe5e0e8;
+            ALTrackBarCustomStyle.Thumb.Stroke.Color := TalphaColors.Null;
+            ALRangeTrackBarCustomStyle.Thumb.Fill.Color := $FFe5e0e8;
+            ALRangeTrackBarCustomStyle.Thumb.Stroke.Color := TalphaColors.Null;
+          end
+          else begin
+            ALTrackBarCustomStyle.Thumb.Fill.Color := $FFFFFFFF;
+            ALTrackBarCustomStyle.Thumb.Stroke.ColorKey := 'Material3.Color.OutlineVariant';
+            ALRangeTrackBarCustomStyle.Thumb.Fill.Color := $FFFFFFFF;
+            ALRangeTrackBarCustomStyle.Thumb.Stroke.ColorKey := 'Material3.Color.OutlineVariant';
+          end;
+          ALMakeBufDrawables(ALVertScrollBox1, False{AEnsureDoubleBuffered});
+        end)
+    end).Start;
 end;
 
 {**********************************************}
 procedure TMainForm.FormResize(Sender: TObject);
 begin
   ALLog('TMainForm.FormResize', 'Form.size: ' + FloatToStr(width) + 'x' + FloatToStr(height));
-  ALVideoPlayerSurface1.Height := (width / 1920) * 1080;
+  ALVideoPlayerSurface1.Height := (ALVertScrollBox1.Content.width / 1920) * 1080;
 end;
 
 {***********************************************************}
@@ -697,37 +819,6 @@ begin
   ALLog('TMainForm.ALVertScrollBox1Resized', 'ALVertScrollBox1.size: ' + FloatToStr(ALVertScrollBox1.width) + 'x' + FloatToStr(ALVertScrollBox1.height));
   if FUpdating <= 0 then
     ALMakeBufDrawables(ALVertScrollBox1, False{AEnsureDoubleBuffered});
-end;
-
-{**********************************}
-procedure TMainForm.PaintBackground;
-
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  function _IsParentDarkThemeEditBackground(const aParent: TFmxObject): Boolean;
-  begin
-    if aParent = nil then exit(false);
-    result := aParent = DarkThemeEditBackground;
-    if not result then result := _IsParentDarkThemeEditBackground(aParent.parent);
-  end;
-
-begin
-  inherited;
-  if (CompareValue(AlVertScrollBox1.margins.Bottom, 0, TEpsilon.position) > 0) and
-     (Focused <> nil) and
-     ((_IsParentDarkThemeEditBackground(Focused.parent)) or
-      (DarkThemeEditBackground.Position.y < ALVertScrollBox1.ScrollEngine.ViewportPosition.Y + ALVertScrollBox1.height)) then begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.fill.Color := DarkThemeEditBackground.Fill.Color;
-    // Width+1 because of https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1723
-    Canvas.FillRect(TRectF.Create(TpointF.create(0,height-AlVertScrollBox1.margins.Bottom), Width+1, AlVertScrollBox1.margins.Bottom+1), 1{AOpacity})
-  end
-  else if ALVertScrollBox1.ScrollEngine.ViewportPosition.Y > ALVertScrollBox1.ScrollEngine.MaxScrollLimit.y then begin
-    var LOverScrollDistance := ALVertScrollBox1.ScrollEngine.ViewportPosition.Y - ALVertScrollBox1.ScrollEngine.MaxScrollLimit.y;
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.fill.Color := DarkThemeEditBackground.Fill.Color;
-    // Width+1 because of https://embt.atlassian.net/servicedesk/customer/portal/1/RSS-1723
-    Canvas.FillRect(TRectF.Create(TpointF.create(0,height-LOverScrollDistance), Width+1, LOverScrollDistance+1), 1{AOpacity})
-  end;
 end;
 
 {**************************************************************}
@@ -754,54 +845,6 @@ end;
 procedure TMainForm.ALVertScrollBox1Click(Sender: TObject);
 begin
   SetFocused(nil);
-end;
-
-{*************************************************}
-procedure TMainForm.ALTabControl1AniTransitionInit(
-            const sender: TObject;
-            const ATransition: TALTabTransition;
-            const aVelocity: Single;
-            const aAnimation: TALFloatPropertyAnimation);
-begin
-  // aVelocity = pixels per seconds given by the anicalculations
-  // ALTabControl1.Width - abs(ALTabControl1.activeTab.Position.X) = the number of pixel we need to scroll
-  // 6 = factor i choose to compensate the deceleration made by the quartic Interpolation
-  if comparevalue(aVelocity, 0) <> 0 then aAnimation.Duration := abs((ALTabControl1.Width - abs(ALTabControl1.activeTab.Position.X)) / aVelocity) * 6
-  else aAnimation.Duration := 0.8;
-  if aAnimation.Duration > 0.8 then aAnimation.Duration := 0.8
-  else if aAnimation.Duration < 0.1 then aAnimation.Duration := 0.1;
-  aAnimation.AnimationType := TAnimationType.out;
-  aAnimation.Interpolation := TALInterpolationType.circular;
-end;
-
-{********************************************************}
-procedure TMainForm.ALTabControl1Resized(Sender: TObject);
-
-  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-  procedure _updateLabels(const aTab: TalTabItem);
-  begin
-    var LText1: TalText := nil;
-    var LText2: TalText := nil;
-    for var LControl1 in aTab.Controls do begin
-      if (LControl1 is TalText) and (LControl1.Tag = 1) then LText1 := TalText(LControl1)
-      else if (LControl1 is TalText) and (LControl1.Tag = 2) then LText2 := TalText(LControl1);
-    end;
-    if LText1 <> nil then
-      LText1.Position.X := ((aTab.Width - LText1.Width) / 2) + (aTab.Position.X / 5);
-    if LText2 <> nil then
-      LText2.Position.X := ((aTab.Width - LText2.Width) / 2) + (aTab.Position.X);
-  end;
-
-begin
-  if ALTabControl1.TabIndex > 0 then _updateLabels(ALTabControl1.tabs[ALTabControl1.TabIndex - 1]);
-  _updateLabels(ALTabControl1.tabs[ALTabControl1.TabIndex]);
-  if ALTabControl1.TabIndex < ALTabControl1.Tabcount - 1 then _updateLabels(ALTabControl1.tabs[ALTabControl1.TabIndex + 1]);
-end;
-
-{********************************************************************************************************************************}
-procedure TMainForm.ALTabControl1ViewportPositionChange(Sender: TObject; const OldViewportPosition, NewViewportPosition: TPointF);
-begin
-  ALTabControl1Resized(nil);
 end;
 
 {*********************************************************************************************}
@@ -831,7 +874,10 @@ end;
 {*****************************************************************************************}
 procedure TMainForm.ALTextDemoElementClick(Sender: TObject; const Element: TALTextElement);
 begin
-  TDialogService.ShowMessage('You clicked on the span with ID: ' + Element.Id);
+  TALDialog.Builder
+    .SetMessageText('You clicked on the span with ID: <b>' + Element.Id + '</b>')
+    .addButton('OK', 1)
+    .Show;
 end;
 
 {**********************************************************************************************}
@@ -865,8 +911,8 @@ begin
   If FCurrentTextElements.TryGetValue(Sender, LTextElement) then begin
     var LtextElements := ALGetTextElementsByID(TALText(Sender).elements, LTextElement.id);
     For var I := low(LtextElements) to high (LtextElements) do begin
-      Canvas.Fill.Color := TalphaColors.Red;
-      Canvas.FillRect(LtextElements[i].Rect, 0.3);
+      Canvas.Fill.Color := TALStyleManager.Instance.GetColor('Material3.Color.OnTertiaryContainer');
+      Canvas.FillRect(LtextElements[i].Rect, 0.2);
     end;
   end;
 end;
@@ -916,9 +962,6 @@ begin
   var LScrollBoxDemoForm := TScrollBoxDemoForm.Create(nil);
   var LVertScrollBox := TalVertScrollBox.Create(LScrollBoxDemoForm);
   LVertScrollBox.Parent := LScrollBoxDemoForm;
-  {$IF defined(MSWindows)}
-  LVertScrollBox.ScrollEngine.TouchTracking := [ttVertical];
-  {$ENDIF}
   LVertScrollBox.BeginUpdate;
   LVertScrollBox.Align := TALalignLayout.Client;
   LVertScrollBox.ScrollEngine.MinEdgeSpringbackEnabled := False;
@@ -946,7 +989,7 @@ begin
     LText.Text := 'Alcinoe';
     LText.Margins.Left := 15;
     LText.TextSettings.MaxLines := 1;
-    LText.autosize := True;
+    LText.AutoSize := TALAutoSizeMode.Both;
     //-----
     var LChildRectangle := TALRectangle.Create(LRectangle);
     LChildRectangle.Parent := LRectangle;
@@ -1076,7 +1119,7 @@ begin
     LText.Text := 'Alcinoe';
     LText.Margins.Left := 15;
     LText.WordWrap := False;
-    LText.autosize := True;
+    LText.AutoSize := True;
     //-----
     var LChildRectangle := TRectangle.Create(LRectangle);
     LChildRectangle.Parent := LRectangle;
@@ -1181,12 +1224,166 @@ begin
                          'OK', // const aBtnOKCaption: string;
                          'Cancel', // const aBtnCancelCaption: string;
                          '', // const aBtnClearCaption: string
-                         'Title');// const aTitle: String = ''
+                         'TALDatePickerDialog (Spinner)');// const aTitle: String = ''
   fDatePickerDialog.show(
     YearOf(now), // const aYear: integer;
     MonthOf(now), // const aMonth: integer;
     DayOfTheMonth(now)); // const aDayOfMonth: integer);
 
+end;
+
+{***************************************************************}
+procedure TMainForm.ButtonShowSimpleDialogClick(Sender: TObject);
+begin
+  TALDialog.Builder
+    .SetIconResourceName('checkbox_checked')
+    .SetHeadlineText('Dialog')
+    .SetMessageText('A dialog is a type of modal window that appears in front of app content to provide critical information, or ask for a decision.')
+    .addButton('Accept', 1)
+    .addButton('Cancel', 2)
+    .SetOnActionCallback(
+       procedure(Const ADialog: TALDialog; const AAction: Integer; var ACanClose: Boolean)
+       begin
+         // Handle the action here
+       end)
+    .Show;
+end;
+
+{*********************************************************************}
+procedure TMainForm.ButtonShowSingleChoiceDialogClick(Sender: TObject);
+begin
+  TALDialog.Builder
+    .SetHeadlineText('Select one country')
+    .addRadioButton('Argentina', 1{ATag}, False{AChecked})
+    .addRadioButton('Australia', 2{ATag}, False{AChecked})
+    .addRadioButton('Brazil', 3{ATag}, False{AChecked})
+    .addRadioButton('Canada', 4{ATag}, False{AChecked})
+    .addRadioButton('China', 5{ATag}, False{AChecked})
+    .addRadioButton('Egypt', 6{ATag}, False{AChecked})
+    .addRadioButton('France', 7{ATag}, False{AChecked})
+    .addRadioButton('Germany', 8{ATag}, False{AChecked})
+    .addRadioButton('India', 9{ATag}, False{AChecked})
+    .addRadioButton('Indonesia', 10{ATag}, False{AChecked})
+    .addRadioButton('Italy', 10{ATag}, False{AChecked})
+    .addRadioButton('Japan', 12{ATag}, False{AChecked})
+    .addRadioButton('Mexico', 13{ATag}, False{AChecked})
+    .addRadioButton('Morocco', 14{ATag}, False{AChecked})
+    .addRadioButton('Nigeria', 15{ATag}, False{AChecked})
+    .addRadioButton('Russia', 16{ATag}, False{AChecked})
+    .addRadioButton('South Africa', 17{ATag}, False{AChecked})
+    .addRadioButton('South Korea', 18{ATag}, False{AChecked})
+    .addRadioButton('Spain', 19{ATag}, False{AChecked})
+    .addRadioButton('United States', 20{ATag}, False{AChecked})
+    .addButton('Done', 1)
+    .addButton('Cancel', 2)
+    .SetOnActionCallback(
+       procedure(Const ADialog: TALDialog; const AAction: Integer; var ACanClose: Boolean)
+       begin
+         ACanClose := True;
+         if AAction = 1 then begin
+           var LCheckedRadioButton := ADialog.GetCheckedRadioButton;
+           if LCheckedRadioButton = nil then begin
+             ACanClose := False;
+             var LRadioButtons := ADialog.GetRadioButtons;
+             For var I := low(LRadioButtons) to high(LRadioButtons) do
+               TALStyleManager.Instance.ApplyRadioButtonStyle('Material3.RadioButton.Error', LRadioButtons[i]);
+           end;
+         end;
+       end)
+    .Show;
+end;
+
+{***********************************************************************}
+procedure TMainForm.ButtonShowMultipleChoiceDialogClick(Sender: TObject);
+begin
+  TALDialog.Builder
+    .SetHeadlineText('Select countries')
+    .SetMessageText('Because the fate of your coffee depends on it.')
+    .addCheckBox('Argentina', 1{ATag}, False{AChecked})
+    .addCheckBox('Australia', 2{ATag}, False{AChecked})
+    .addCheckBox('Brazil', 3{ATag}, False{AChecked})
+    .addCheckBox('Canada', 4{ATag}, False{AChecked})
+    .addButton('Done', 1)
+    .addButton('Cancel', 2)
+    .SetOnActionCallback(
+       procedure(Const ADialog: TALDialog; const AAction: Integer; var ACanClose: Boolean)
+       begin
+         // Handle the action here
+       end)
+    .Show;
+end;
+
+{***************************************************************}
+procedure TMainForm.ButtonShowActionDialogClick(Sender: TObject);
+begin
+  TALDialog.Builder
+    .SetHeadlineText('You are missing rewards!')
+    .SetMessageText('Every time you search is an opportunity to earn points.')
+    .addButton('<img src="login" width="25" height="25" color="inherit">&nbsp; Log In', 1{ATag}, False{AIsFooterButton})
+    .addButton('<img src="signin" width="24" height="25" color="inherit">&nbsp; Create an Account', 2{ATag}, False{AIsFooterButton})
+    .addButton('Skip', 3{ATag})
+    .SetOnActionCallback(
+       procedure(Const ADialog: TALDialog; const AAction: Integer; var ACanClose: Boolean)
+       begin
+         // Handle the action here
+       end)
+    .Show;
+end;
+
+{*************************************************************}
+procedure TMainForm.ButtonShowEditDialogClick(Sender: TObject);
+begin
+  TALDialog.Builder
+    .SetHeadlineText('Login')
+    .SetHeadlineAlign(TALAlignLayout.TopCenter)
+    .AddEdit('User name'{APromptText}, 'User name'{ALabelText}, ''{ASupportingText}, 1{ATag})
+    .AddEdit('Password'{APromptText}, 'Password'{ALabelText}, ''{ASupportingText}, 2{ATag})
+    .addButton('Login', 1)
+    .addButton('Cancel', 2)
+    .SetOnActionCallback(
+       procedure(Const ADialog: TALDialog; const AAction: Integer; var ACanClose: Boolean)
+       begin
+         ACanClose := True;
+         SetFocused(nil);
+         if AAction = 1{Login} then begin
+           Var LLoginEdit := ADialog.GetEdit(1{ATag});
+           if LLoginEdit.Text = '' then begin
+             ACanClose := False;
+             TALStyleManager.Instance.ApplyEditStyle('Material3.Edit.Hybrid.Error', LLoginEdit);
+           end;
+           Var LPasswordEdit := ADialog.GetEdit(2{ATag});
+           if LPasswordEdit.Text = '' then begin
+             ACanClose := False;
+             TALStyleManager.Instance.ApplyEditStyle('Material3.Edit.Hybrid.Error', LPasswordEdit);
+           end;
+         end;
+       end)
+    .Show;
+end;
+
+{*************************************************************}
+procedure TMainForm.ButtonShowMemoDialogClick(Sender: TObject);
+begin
+  TALDialog.Builder
+    .SetHeadlineText('Add your note')
+    .AddMemo('Enter your note'{APromptText}, ''{ALabelText}, ''{ASupportingText}, 1{ATag})
+    .addButton('OK', 1)
+    .addButton('Cancel', 2)
+    .SetOnActionCallback(
+       procedure(Const ADialog: TALDialog; const AAction: Integer; var ACanClose: Boolean)
+       begin
+         // Handle the action here
+       end)
+    .Show;
+end;
+
+{***********************************************************}
+procedure TMainForm.ButtonShowSnackbarClick(Sender: TObject);
+begin
+  TALSnackBar.Builder
+    .SetMessageText('No internet connection')
+    .AddActionButton('Dismiss', 1)
+    .Show;
 end;
 
 {********************************************}
@@ -1195,7 +1392,6 @@ procedure TMainForm.FormVirtualKeyboardHidden(
             KeyboardVisible: Boolean; const Bounds: TRect);
 begin
   ALLog('FormVirtualKeyboardHidden');
-  FVirtualKeyboardOpen := False;
   AlVertScrollBox1.margins.Bottom := 0;
 end;
 
@@ -1205,7 +1401,8 @@ procedure TMainForm.FormVirtualKeyboardShown(
             KeyboardVisible: Boolean; const Bounds: TRect);
 begin
   ALLog('FormVirtualKeyboardShown');
-  FVirtualKeyboardOpen := True;
+  if TALDialogManager.Instance.IsShowingDialog then exit;
+  if TALSheetManager.Instance.IsShowingSheet then exit;
   AlVertScrollBox1.margins.Bottom := Bounds.height;
   if (Focused <> nil) and
      (AlVertScrollBox1.ScreenToLocal(Focused.LocalToScreen(TPointF.Create(0,0))).y > AlVertScrollBox1.Height - Tcontrol(Focused.GetObject).Height - 16) then
@@ -1313,6 +1510,312 @@ begin
                         'Paint: ' + FormatFloat('0.#####',fALRectangle.PaintMs) + ' ms';
         end);
     end).Start;
+end;
+
+{***********************************************************}
+procedure TMainForm.ButtonStartLoadingClick(Sender: TObject);
+begin
+  ButtonStartLoading.ShowLoadingIndicator('alcinoe_loading_indicator', TALStyleManager.Instance.GetColor('Material3.Color.Primary'));
+  TThread.CreateAnonymousThread(
+    Procedure
+    begin
+      Sleep(3000);
+      TThread.Synchronize(nil,
+        procedure
+        begin
+          ButtonStartLoading.HideLoadingIndicator;
+        end);
+    end).Start;
+end;
+
+{***********************************************************}
+procedure TMainForm.ButtonShowTopSheetClick(Sender: TObject);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  procedure _addIcon(const AParent: TALLayout; const AResName: String);
+  begin
+    var LIcon := TALRectangle.Create(AParent);
+    LIcon.Parent := AParent;
+    LIcon.Align := TALAlignLayout.LeftCenter;
+    LIcon.Width := 50;
+    LIcon.Height := 50;
+    LIcon.Fill.ResourceName := AResName;
+    LIcon.Fill.Color := TalphaColors.Null;
+    LIcon.Stroke.Color := TAlphaColors.Null;
+    LIcon.Margins.Left := (width - 150 - 25 - 25) / 6;
+    LIcon.Margins.right := LIcon.Margins.Left;
+  end;
+
+
+begin
+
+  // Build a sample content layout for demonstration purposes.
+  // In a real application, it is recommended to use a dedicated TFrame
+  // for better structure and reusability.
+  Var LContent := TALRectangle.Create(nil);
+  LContent.AutoSize := TALAutoSizeMode.Height;
+  LContent.Stroke.Color := TAlphaColors.Null;
+  LContent.Fill.Color := TAlphaColors.Null;
+
+  var LBar1 := TALLayout.Create(LContent);
+  LBar1.Parent := LContent;
+  LBar1.AutoSize := TALAutoSizeMode.Both;
+  LBar1.Align := TALAlignLayout.MosttopCenter;
+  LBar1.Margins.top := 32;
+  LBar1.Margins.Bottom := 48;
+  _addIcon(LBar1, 'tool1');
+  _addIcon(LBar1, 'tool2');
+  _addIcon(LBar1, 'tool3');
+
+  var LBar2 := TALLayout.Create(LContent);
+  LBar2.Parent := LContent;
+  LBar2.AutoSize := TALAutoSizeMode.Both;
+  LBar2.Align := TALAlignLayout.topCenter;
+  LBar2.Margins.Bottom := 8;
+  _addIcon(LBar2, 'tool4');
+  _addIcon(LBar2, 'tool5');
+  _addIcon(LBar2, 'tool6');
+
+  TALTopSheet.Builder
+    .Setcontent(LContent)
+    .SetContainerCorners(AllCorners)
+    .SetContainerMargins(TRectF.Create(25,25,25,25))
+    .Show;
+
+end;
+
+{**************************************************************}
+procedure TMainForm.ButtonShowBottomSheetClick(Sender: TObject);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  procedure _addIcon(const AParent: TALLayout; const AResName: String);
+  begin
+    var LIcon := TALRectangle.Create(AParent);
+    LIcon.Parent := AParent;
+    LIcon.Align := TALAlignLayout.LeftCenter;
+    LIcon.Width := 50;
+    LIcon.Height := 50;
+    LIcon.Fill.ResourceName := AResName;
+    LIcon.Fill.Color := TalphaColors.Null;
+    LIcon.Stroke.Color := TAlphaColors.Null;
+    LIcon.Margins.Left := (width - 150) / 6;
+    LIcon.Margins.right := LIcon.Margins.Left;
+  end;
+
+
+begin
+
+  // Build a sample content layout for demonstration purposes.
+  // In a real application, it is recommended to use a dedicated TFrame
+  // for better structure and reusability.
+  Var LContent := TALRectangle.Create(nil);
+  LContent.AutoSize := TALAutoSizeMode.Height;
+  LContent.Stroke.Color := TAlphaColors.Null;
+  LContent.Fill.Color := TAlphaColors.Null;
+
+  var LBar1 := TALLayout.Create(LContent);
+  LBar1.Parent := LContent;
+  LBar1.AutoSize := TALAutoSizeMode.Both;
+  LBar1.Align := TALAlignLayout.MosttopCenter;
+  LBar1.Margins.top := 8;
+  LBar1.Margins.Bottom := 48;
+  _addIcon(LBar1, 'tool1');
+  _addIcon(LBar1, 'tool2');
+  _addIcon(LBar1, 'tool3');
+
+  var LBar2 := TALLayout.Create(LContent);
+  LBar2.Parent := LContent;
+  LBar2.AutoSize := TALAutoSizeMode.Both;
+  LBar2.Align := TALAlignLayout.topCenter;
+  LBar2.Margins.Bottom := 32;
+  _addIcon(LBar2, 'tool4');
+  _addIcon(LBar2, 'tool5');
+  _addIcon(LBar2, 'tool6');
+
+  TALBottomSheet.Builder
+    .Setcontent(LContent)
+    .Show;
+
+end;
+
+{************************************************************}
+procedure TMainForm.ButtonShowLeftSheetClick(Sender: TObject);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  procedure _addIcon(const AParent: TALRectangle; const AResName: String);
+  begin
+    var LIcon := TALRectangle.Create(AParent);
+    LIcon.Parent := AParent;
+    LIcon.Align := TALAlignLayout.TopCenter;
+    LIcon.Width := 50;
+    LIcon.Height := 50;
+    LIcon.Fill.ResourceName := AResName;
+    LIcon.Fill.Color := TalphaColors.Null;
+    LIcon.Stroke.Color := TAlphaColors.Null;
+    LIcon.Margins.Top := (Height - (6*50) - 200) / 7;
+  end;
+
+begin
+
+  // Build a sample content layout for demonstration purposes.
+  // In a real application, it is recommended to use a dedicated TFrame
+  // for better structure and reusability.
+  Var LContent := TALRectangle.Create(nil);
+  LContent.Width := 250;
+  LContent.Stroke.Color := TAlphaColors.Null;
+  LContent.Fill.Color := TAlphaColors.Null;
+
+  _addIcon(LContent, 'tool1');
+  _addIcon(LContent, 'tool2');
+  _addIcon(LContent, 'tool3');
+  _addIcon(LContent, 'tool4');
+  _addIcon(LContent, 'tool5');
+  _addIcon(LContent, 'tool6');
+
+  TALLeftSheet.Builder
+    .AddBackButton(0{ATag})
+    //.AddCloseButton(0{ATag})
+    .SetHeadlineText('Title')
+    .Setcontent(LContent)
+    .SetContainerCorners(AllCorners)
+    .SetContainerMargins(TRectF.Create(15,15,15,15))
+    .Show;
+
+end;
+
+{*************************************************************}
+procedure TMainForm.ButtonShowRightSheetClick(Sender: TObject);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  procedure _addIcon(const AParent: TALRectangle; const AResName: String);
+  begin
+    var LIcon := TALRectangle.Create(AParent);
+    LIcon.Parent := AParent;
+    LIcon.Align := TALAlignLayout.TopCenter;
+    LIcon.Width := 50;
+    LIcon.Height := 50;
+    LIcon.Fill.ResourceName := AResName;
+    LIcon.Fill.Color := TalphaColors.Null;
+    LIcon.Stroke.Color := TAlphaColors.Null;
+    LIcon.Margins.Top := (Height - (6*50) - 200) / 7;
+  end;
+
+begin
+
+  // Build a sample content layout for demonstration purposes.
+  // In a real application, it is recommended to use a dedicated TFrame
+  // for better structure and reusability.
+  Var LContent := TALRectangle.Create(nil);
+  LContent.Width := 250;
+  LContent.Stroke.Color := TAlphaColors.Null;
+  LContent.Fill.Color := TAlphaColors.Null;
+
+  _addIcon(LContent, 'tool1');
+  _addIcon(LContent, 'tool2');
+  _addIcon(LContent, 'tool3');
+  _addIcon(LContent, 'tool4');
+  _addIcon(LContent, 'tool5');
+  _addIcon(LContent, 'tool6');
+
+  TALRightSheet.Builder
+    .AddBackButton(0{ATag})
+    //.AddCloseButton(0{ATag})
+    .SetHeadlineText('Title')
+    .Setcontent(LContent)
+    .SetContainerCorners(AllCorners)
+    .SetContainerMargins(TRectF.Create(15,15,15,15))
+    .Show;
+
+end;
+
+{*****************************************************************}
+procedure TMainForm.ButtonShowLoadingOverlayClick(Sender: TObject);
+begin
+  TALLoadingOverlay.Builder.Show;
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      sleep(5000);
+      TThread.Synchronize(nil,
+        Procedure
+        Begin
+          TALLoadingOverlayManager.Instance.CloseCurrentLoadingOverlay;
+        End);
+    end).Start;
+end;
+
+{************************************************************}
+procedure TMainForm.PageViewAnimationProcess(Sender: TObject);
+begin
+  ALImageGallery2_1.Scale.Point := TPointF.Create(FPageViewAnimation.CurrentValue, FPageViewAnimation.CurrentValue);
+  ALImageGallery2_2.Scale.Point := TPointF.Create(FPageViewAnimation.CurrentValue, FPageViewAnimation.CurrentValue);
+  ALImageGallery2_3.Scale.Point := TPointF.Create(FPageViewAnimation.CurrentValue, FPageViewAnimation.CurrentValue);
+  ALImageGallery2_4.Scale.Point := TPointF.Create(FPageViewAnimation.CurrentValue, FPageViewAnimation.CurrentValue);
+  ALImageGallery2_5.Scale.Point := TPointF.Create(FPageViewAnimation.CurrentValue, FPageViewAnimation.CurrentValue);
+  ALImageGallery2_6.Scale.Point := TPointF.Create(FPageViewAnimation.CurrentValue, FPageViewAnimation.CurrentValue);
+  FCanvasColorAdjustTextureMaterialGallery2.ShaderVariables.saturation := 4 * (FPageViewAnimation.CurrentValue - 1);
+end;
+
+{*********************************************************************************************************************}
+procedure TMainForm.ALPageController2MouseDown(Sender: TObject;Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  FPageViewAnimation.StopAtCurrent;
+  FPageViewAnimation.StartValue := ALImageGallery2_1.Scale.X;
+  FPageViewAnimation.StopValue := 0.75;
+  FPageViewAnimation.Duration := 0.2;
+  FPageViewAnimation.Start;
+  {$IF defined(ALGpuCanvas)}
+  if TALImageProtectedAccess(ALImageGallery2_1).fBufDrawable <> nil then TALImageProtectedAccess(ALImageGallery2_1).fBufDrawable.Material := FCanvasColorAdjustTextureMaterialGallery2;
+  if TALImageProtectedAccess(ALImageGallery2_2).fBufDrawable <> nil then TALImageProtectedAccess(ALImageGallery2_2).fBufDrawable.Material := FCanvasColorAdjustTextureMaterialGallery2;
+  if TALImageProtectedAccess(ALImageGallery2_3).fBufDrawable <> nil then TALImageProtectedAccess(ALImageGallery2_3).fBufDrawable.Material := FCanvasColorAdjustTextureMaterialGallery2;
+  if TALImageProtectedAccess(ALImageGallery2_4).fBufDrawable <> nil then TALImageProtectedAccess(ALImageGallery2_4).fBufDrawable.Material := FCanvasColorAdjustTextureMaterialGallery2;
+  if TALImageProtectedAccess(ALImageGallery2_5).fBufDrawable <> nil then TALImageProtectedAccess(ALImageGallery2_5).fBufDrawable.Material := FCanvasColorAdjustTextureMaterialGallery2;
+  if TALImageProtectedAccess(ALImageGallery2_6).fBufDrawable <> nil then TALImageProtectedAccess(ALImageGallery2_6).fBufDrawable.Material := FCanvasColorAdjustTextureMaterialGallery2;
+  {$ENDIF}
+end;
+
+{********************************************************************************************************************}
+procedure TMainForm.ALPageController2MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  FPageViewAnimation.StopAtCurrent;
+  FPageViewAnimation.StartValue := ALImageGallery2_1.Scale.X;
+  FPageViewAnimation.StopValue := 1;
+  FPageViewAnimation.Duration := 0.4;
+  FPageViewAnimation.Start;
+end;
+
+{************************************************************}
+procedure TMainForm.ALPageController2Resized(Sender: TObject);
+begin
+  ALPageController2.Height := (ALPageController2.Width - 50) * (1350 / 1080);
+end;
+
+{************************************************************}
+procedure TMainForm.ALPageController3Resized(Sender: TObject);
+begin
+  ALPageController3.Height := (ALPageController3.Width * 0.6) * (1349 / 1080);
+  ALPageController3ViewportPositionChange(sender, ALPageController3.ScrollEngine.ViewportPosition, ALPageController3.ScrollEngine.ViewportPosition);
+end;
+
+{**************************************************************************************************************************************}
+procedure TMainForm.ALPageController3ViewportPositionChange(Sender: TObject; const OldViewportPosition, NewViewportPosition: TALPointD);
+
+  {~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+  procedure UpdateImageScale(const AImage: TALImage);
+  begin
+    var LRootCenterLine := ALPageController3.Width / 2;
+    var LImageCenterLine := AImage.LocalToAbsolute(AImage.LocalRect).Left + (AImage.Width / 2);
+    var LScale := 1 + (abs(LImageCenterLine - LRootCenterLine) - 1) * ((0.8 - 1) / ((AImage.Width) - 1));
+    AImage.Scale.Point := TPointF.Create(LScale,LScale);
+  end;
+
+begin
+  UpdateImageScale(ALImageGallery3_1);
+  UpdateImageScale(ALImageGallery3_2);
+  UpdateImageScale(ALImageGallery3_3);
+  UpdateImageScale(ALImageGallery3_4);
+  UpdateImageScale(ALImageGallery3_5);
+  UpdateImageScale(ALImageGallery3_6);
 end;
 
 {*****************************************}

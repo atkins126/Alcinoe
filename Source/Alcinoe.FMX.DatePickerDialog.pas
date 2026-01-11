@@ -2,10 +2,12 @@ unit Alcinoe.FMX.DatePickerDialog;
 
 interface
 
+{$I Alcinoe.inc}
+
 uses
   {$IF defined(android)}
   Androidapi.JNIBridge,
-  Alcinoe.AndroidApi.Common,
+  Alcinoe.AndroidApi.Widget,
   {$ENDIF}
   {$IF defined(ios)}
   System.TypInfo,
@@ -157,6 +159,7 @@ uses
   FMX.Helpers.iOS,
   FMX.Forms,
   {$ENDIF}
+  Alcinoe.Localization,
   Alcinoe.StringUtils,
   Alcinoe.Common;
 
@@ -253,7 +256,7 @@ begin
   FUIDatePicker.setDatePickerMode(UIDatePickerModeDate);
 
   { Subscribing to change orientation events }
-  DefaultNotificationCenter.addObserver(GetObjectID, sel_getUid('DeviceOrientationChanged'), StringToID(FMXViewControllerFrameChanged), nil);
+  DefaultNotificationCenter.addObserver(GetObjectID, sel_getUid('DeviceOrientationChanged'), StrToNSStr(FMXViewControllerFrameChanged), nil);
 
   { Creating Root view container for picker }
   FUIOverlayView := TUIView.Create;
@@ -278,7 +281,7 @@ begin
 
   { Creating Root view container for picker }
   FUIContainerView := TUIView.Create;
-  FUIContainerView.setBackgroundColor(TUIColor.Wrap(TUIColor.OCClass.whiteColor));
+  FUIContainerView.setBackgroundColor(TUIColor.OCClass.systemBackgroundColor);
   FUIContainerView.setAutoresizingMask(
     UIViewAutoresizingFlexibleWidth or
     UIViewAutoresizingFlexibleLeftMargin or
@@ -377,8 +380,8 @@ begin
   if aTitle <> '' then begin
 
     FUITitle := TUILabel.Wrap(TUILabel.Alloc.initWithFrame(RectToNSRect(TRect.Create(0, 0, floor(getWidth) - _TitlePaddingleft - _TitlePaddingRight, 10000))));
-    FUITitle.setTextAlignment(UITextAlignmentCenter);
-    FUITitle.setLineBreakMode(UILineBreakModeWordWrap);
+    FUITitle.setTextAlignment(NSTextAlignmentCenter);
+    FUITitle.setLineBreakMode(NSLineBreakByWordWrapping);
     FUITitle.setFont(FUITitle.font.fontWithSize(TUIFont.OCClass.labelFontSize + 5));
     FUITitle.setNumberOfLines(0);
     FUITitle.setText(StrToNsStr(aTitle));
@@ -564,7 +567,7 @@ function TALDatePickerDialog.GetToolBarHeight: Single;
 begin
   result := FUIToolBar.frame.size.height;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetToolBarHeight','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetToolBarHeight','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 
@@ -573,7 +576,7 @@ function TALDatePickerDialog.GetContentHeight: Single;
 begin
   Result := FUIDatePicker.frame.size.height;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetContentHeight','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetContentHeight','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 
@@ -583,7 +586,7 @@ begin
   if assigned(FUITitle) then result := FUITitle.frame.size.height
   else Result := 0;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetTitleHeight','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetTitleHeight','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 
@@ -593,7 +596,7 @@ begin
   if assigned(FUITitle) then result := _TitlePaddingTop
   else Result := 0;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetTitlePaddingTop','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetTitlePaddingTop','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 
@@ -603,7 +606,7 @@ begin
   if assigned(FUITitle) then result := _TitlePaddingBottom
   else Result := 0;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetTitlePaddingBottom','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetTitlePaddingBottom','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 
@@ -612,7 +615,7 @@ function TALDatePickerDialog.GetWidth: Single;
 begin
   result := FUIDatePicker.frame.size.width;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetWidth','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetWidth','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 
@@ -625,7 +628,7 @@ begin
                   GetToolBarHeight +
                     GetContentHeight;
   {$IFDEF DEBUG}
-  allog('TALDatePickerDialog.GetHeight','result: ' + ALFloatToStrW(result, ALDefaultFormatSettingsW));
+  allog('TALDatePickerDialog.GetHeight','result: ' + ALFloatToStrW(result));
   {$ENDIF}
 end;
 

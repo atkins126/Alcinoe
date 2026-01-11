@@ -1,12 +1,20 @@
 program ALFmxDynamicListBoxDemo;
 
 {$R 'Resources.res' 'Resources\Resources.rc'}
+{$R 'AlcinoeResources.res' '..\..\..\Source\Resources\AlcinoeResources.rc'}
+
+{$I Alcinoe.inc}
 
 uses
   System.StartUpCopy,
+  {$IF defined(SKIA)}
+  FMX.Skia,
+  {$ENDIF }
+  {$IF defined(ALAppleOS) and defined(ALUseMetal)}
+  FMX.Context.Metal,
+  {$ENDIF }
   FMX.Forms,
   FMX.Types,
-  FMX.Skia,
   Main in 'Main.pas' {MainForm};
 
 {$R *.res}
@@ -14,14 +22,22 @@ uses
 begin
   {$IF defined(SKIA)}
   GlobalUseSkia := True;
-  GlobalUseVulkan := False;
+  {$IF defined(ALUseVulkan)}
+  GlobalUseVulkan := True;
   {$ELSE}
-  GlobalUseSkia := FALSE;
   GlobalUseVulkan := False;
   {$ENDIF}
-  //GlobalUseGPUCanvas := True;
-  //GlobalUseMetal := True;
+  {$ENDIF}
+  {$IF defined(ALAppleOS) and defined(ALUseMetal)}
+  if TCustomContextMetal.IsMetalSupported then
+    GlobalUseMetal := True
+  else
+    GlobalUseMetal := False;
+  {$ELSE}
+  GlobalUseMetal := False;
+  {$ENDIF}
   Application.Initialize;
+  Application.FormFactor.Orientations := [TFormOrientation.Portrait, TFormOrientation.InvertedPortrait];
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
 end.

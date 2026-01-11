@@ -16,7 +16,7 @@ uses
 type
 
   {*************************************}
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if FMX.Types3D.TTexture still has the exact same fields and adjust the IFDEF'}
   {$ENDIF}
   TALTextureAccessPrivate = class(TInterfacedPersistent)
@@ -94,6 +94,7 @@ uses
   fmx.surfaces,
   FMX.Consts,
   Alcinoe.FMX.Materials.Canvas,
+  Alcinoe.Localization,
   Alcinoe.StringUtils,
   Alcinoe.Common;
 
@@ -129,7 +130,7 @@ begin
 end;
 
 {*************************************}
-{$IFNDEF ALCompilerVersionSupported123}
+{$IFNDEF ALCompilerVersionSupported130}
   {$MESSAGE WARN 'Check if FMX.Types3D.TTexture.assign is still having the same implementation as in previous version and adjust the IFDEF'}
 {$ENDIF}
 //
@@ -189,10 +190,10 @@ begin
   if (Handle <> 0) and (PixelFormat <> TPixelFormat.None) then AtomicIncrement(TotalMemoryUsedByTextures, Width * Height * BytesPerPixel);
   if TThread.GetTickCount - AtomicCmpExchange(LastTotalMemoryUsedByTexturesLog, 0, 0) > 1000 then begin // every 1 sec
     AtomicExchange(LastTotalMemoryUsedByTexturesLog, TThread.GetTickCount); // oki maybe 2 or 3 log can be show simultaneously. i will not died for this !
-    ALLog('TALTexture', 'TotalMemoryUsedByTextures: ' + ALFormatFloatW('0.##', AtomicCmpExchange(TotalMemoryUsedByTextures, 0, 0) / 1000000, ALDefaultFormatSettingsW) +' MB');
+    ALLog('TALTexture', 'TotalMemoryUsedByTextures: ' + ALFormatFloatW('0.##', AtomicCmpExchange(TotalMemoryUsedByTextures, 0, 0) / 1000000) +' MB');
   end;
   if TALTextureAccessPrivate(self).FBits <> nil then
-    ALLog('TALTexture.Assign', 'Bits: ' + ALFormatFloatW('0.##',(Width * Height * BytesPerPixel) / 1000, ALDefaultFormatSettingsW) +' kB', TalLogType.Warn);
+    ALLog('TALTexture.Assign', 'Bits: ' + ALFormatFloatW('0.##',(Width * Height * BytesPerPixel) / 1000) +' kB', TalLogType.Warn);
   {$WARNINGS ON}
   {$ENDIF}
 
@@ -207,7 +208,7 @@ begin
   if (Handle <> 0) and (PixelFormat <> TPixelFormat.None) then AtomicDecrement(TotalMemoryUsedByTextures, Width * Height * BytesPerPixel);
   {$ENDIF}
 
-  {$IFNDEF ALCompilerVersionSupported123}
+  {$IFNDEF ALCompilerVersionSupported130}
     {$MESSAGE WARN 'Check if the full flow of FMX.Types3D.TTexture.Assign and FMX.Context.GLES.TCustomContextOpenGL.DoInitializeTexture are still the same as below and adjust the IFDEF'}
   {$ENDIF}
   if (Handle <> 0) and
@@ -253,19 +254,15 @@ begin
           TTextureFilter.Linear: glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         end;
         if TTextureStyle.MipMaps in Style then
-        begin
           case MinFilter of
             TTextureFilter.Nearest: glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
             TTextureFilter.Linear: glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-          end;
-        end
+          end
         else
-        begin
           case MinFilter of
             TTextureFilter.Nearest: glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             TTextureFilter.Linear: glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
           end;
-        end;
         TJGLUtils.JavaClass.texImage2D(
           GL_TEXTURE_2D, // target: Integer;
           0, // level: Integer;
@@ -282,7 +279,7 @@ begin
   if (Handle <> 0) and (PixelFormat <> TPixelFormat.None) then AtomicIncrement(TotalMemoryUsedByTextures, Width * Height * BytesPerPixel);
   if TThread.GetTickCount - AtomicCmpExchange(LastTotalMemoryUsedByTexturesLog, 0, 0) > 1000 then begin // every 1 sec
     AtomicExchange(LastTotalMemoryUsedByTexturesLog, TThread.GetTickCount); // oki maybe 2 or 3 log can be show simultaneously. i will not died for this !
-    ALLog('TALTexture', 'TotalMemoryUsedByTextures: ' + ALFormatFloatW('0.##', AtomicCmpExchange(TotalMemoryUsedByTextures, 0, 0) / 1000000, ALDefaultFormatSettingsW) +' MB');
+    ALLog('TALTexture', 'TotalMemoryUsedByTextures: ' + ALFormatFloatW('0.##', AtomicCmpExchange(TotalMemoryUsedByTextures, 0, 0) / 1000000) +' MB');
   end;
   {$ENDIF}
 
@@ -337,6 +334,9 @@ end;
 {$ENDIF}
 
 initialization
+  {$IF defined(DEBUG)}
+  ALLog('Alcinoe.FMX.Types3D','initialization');
+  {$ENDIF}
   {$IFDEF DEBUG}
   TotalMemoryUsedByTextures := 0;
   LastTotalMemoryUsedByTexturesLog := 0;
